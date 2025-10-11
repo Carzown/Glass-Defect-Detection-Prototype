@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Glass Defect Detector</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      @import url("https://fonts.googleapis.com/css?family=Lexend+Deca:400,500,600,700");
+    </style>
+    <link href="Dashboard1.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="machine-container">
+      <aside class="machine-sidebar">
+        <div class="machine-sidebar-logo">
+          <img
+            src="/Alumpreneur Logo.png"
+            alt="Logo"
+            class="machine-logo-image"
+          >
+        </div>
+
+        <nav class="machine-nav-menu"></nav>
+
+        <div class="machine-bottom-menu">
+          <button onclick="handleSettings()" class="machine-bottom-button">
+            <svg class="icon" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M12 1v6m0 6v6m8.66-15.66l-4.24 4.24m-4.24 4.24L7.34 22.66M23 12h-6m-6 0H1m15.66 8.66l-4.24-4.24m-4.24-4.24L1.34 1.34"></path>
+            </svg>
+            <span class="machine-bottom-label">Settings</span>
+          </button>
+          <button onclick="handleLogout()" class="machine-bottom-button">
+            <svg class="icon" viewBox="0 0 24 24">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            <span class="machine-bottom-label">Log Out</span>
+          </button>
+        </div>
+      </aside>
+
+      <main class="machine-main-content">
+        <header class="machine-header">
+          <div class="machine-header-left">
+            <h1 class="machine-header-title">Glass Defect Detector</h1>
+            <p class="machine-header-subtitle">CAM-001</p>
+          </div>
+          <button onclick="toggleDetection()" class="machine-detection-button" id="detectionButton">
+            Start Detection
+          </button>
+        </header>
+
+        <div class="machine-content-area">
+          <div class="machine-content-wrapper">
+            <div class="machine-video-section">
+              <h2 class="machine-section-title" id="videoSectionTitle">Rendering</h2>
+              <div class="machine-video-container">
+                <div id="videoPlaceholder" class="machine-video-placeholder">
+                  <p class="machine-placeholder-title">Camera Ready</p>
+                  <p class="machine-placeholder-subtitle">
+                    Click "Start Detection" to begin live view
+                  </p>
+                </div>
+                <div id="liveFeed" class="machine-live-feed hidden">
+                  <div style="width: 100%; height: 100%; background-color: #333; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px;">
+                    Live Camera Feed
+                  </div>
+                  <div class="machine-live-indicator">
+                    <span class="machine-live-dot"></span>
+                    LIVE
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="machine-defects-panel">
+              <div class="defects-panel-header">
+                <h2 class="machine-section-title">Detected Defects</h2>
+                <div class="defects-panel-actions">
+                  <button onclick="clearDefects()" class="action-button clear-button" id="clearButton" disabled>
+                    Clear
+                  </button>
+                  <button onclick="uploadToDatabase()" class="action-button upload-button" id="uploadButton" disabled>
+                    Upload to Database
+                  </button>
+                  <button onclick="downloadCSV()" class="action-button download-button" id="downloadButton" disabled>
+                    Download CSV
+                  </button>
+                </div>
+              </div>
+              <div class="machine-defects-list">
+                <div id="defectsList">
+                  <div class="machine-empty-state">
+                    <p class="machine-empty-state-text">No detections yet</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <div id="imageModal" class="modal hidden">
+      <div class="modal-content">
+        <button onclick="closeModal()" class="modal-close">
+          <svg class="icon" viewBox="0 0 24 24">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+        <div class="modal-image-container">
+          <img id="modalImage" src="" alt="Defect Image" class="modal-image">
+          <div class="modal-defect-info">
+            <p id="modalDefectInfo"></p>
+          </div>
+        </div>
+        <button onclick="nextImage()" class="modal-next">
+          Next
+          <svg class="icon" viewBox="0 0 24 24" style="width: 16px; height: 16px;">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <script src="Dashboard1.js"></script>
+  </body>
+</html>
