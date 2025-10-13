@@ -1,18 +1,40 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/AlumpreneurLogo.png';
 import './Dashboard.css';
 
 const defectTypes = ['Bubble', 'Crack', 'Scratch'];
 
+// Adjust these values to match your actual layout
+const DEFECT_ITEM_HEIGHT = 56; // px, estimate or measure your defect item height
+
 function Dashboard() {
   const [isDetecting, setIsDetecting] = useState(false);
   const [currentDefects, setCurrentDefects] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [defectsPanelHeight, setDefectsPanelHeight] = useState(0);
   const detectionInterval = useRef(null);
   const csvInputRef = useRef(null);
+  const defectsPanelRef = useRef(null);
   const navigate = useNavigate();
+
+  // Dynamically measure the defects panel height
+  useEffect(() => {
+    function updatePanelHeight() {
+      if (defectsPanelRef.current) {
+        setDefectsPanelHeight(defectsPanelRef.current.offsetHeight);
+      }
+    }
+    updatePanelHeight();
+    window.addEventListener('resize', updatePanelHeight);
+    return () => window.removeEventListener('resize', updatePanelHeight);
+  }, []);
+
+  // Calculate how many defects can fit (for optional limiting)
+  const maxVisibleDefects = defectsPanelHeight
+    ? Math.floor(defectsPanelHeight / DEFECT_ITEM_HEIGHT)
+    : 6; // fallback default
 
   const startDetection = () => {
     setIsDetecting(true);
@@ -45,7 +67,7 @@ function Dashboard() {
 
     setCurrentDefects(prev => {
       const updated = [...prev, { time: timeStr, type, imageUrl }];
-      return updated.length > 20 ? updated.slice(-20) : updated;
+      return updated;
     });
   }
 
@@ -73,7 +95,7 @@ function Dashboard() {
 
   function handleLogout() {
     sessionStorage.removeItem('loggedIn');
-    navigate('/'); // ✅ Go back to Login
+    navigate('/');
   }
 
   function openModal(index) {
@@ -116,7 +138,6 @@ function Dashboard() {
     <div className="machine-container">
       <aside className="machine-sidebar">
         <div className="machine-sidebar-logo">
-          {/* ✅ Use imported logo here */}
           <img
             src={logo}
             alt="Alumpreneur Logo"
@@ -185,7 +206,7 @@ function Dashboard() {
             </div>
 
             {/* Defect List Section */}
-            <div className="machine-defects-panel">
+            <div className="machine-defects-panel" ref={defectsPanelRef} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <div className="defects-panel-header">
                 <h2 className="machine-section-title">Detected Defects</h2>
                 <div className="defects-panel-actions">
@@ -222,7 +243,17 @@ function Dashboard() {
                   </button>
                 </div>
               </div>
-              <div className="machine-defects-list" style={{ maxHeight: 400, overflowY: 'auto' }}>
+              <div
+                className="machine-defects-list"
+                style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'flex-start',
+                  height: '100%',
+                }}
+              >
                 <div id="defectsList">
                   {currentDefects.length === 0 ? (
                     <div className="machine-empty-state">
@@ -230,7 +261,7 @@ function Dashboard() {
                     </div>
                   ) : (
                     currentDefects.map((defect, index) => (
-                      <div className="machine-defect-item" key={index}>
+                      <div className="machine-defect-item" key={index} style={{ height: DEFECT_ITEM_HEIGHT }}>
                         <div className="machine-defect-content">
                           <span className="machine-defect-time">{defect.time}</span>
                           <span className="machine-defect-label">Glass Defect:</span>
