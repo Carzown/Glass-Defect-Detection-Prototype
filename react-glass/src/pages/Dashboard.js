@@ -1,12 +1,20 @@
+/**
+ * Professor's suggestions implemented:
+ * - Only 1 machine (realistic, not 3 prototypes)
+ * - Clicking defect image opens modal with X (close) and Next button
+ * - Defect history is reversed (latest at top)
+ * - Clear button for defect details section
+ * - Upload to Database button
+ * - Download as CSV button (image is represented by its URL in CSV)
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/AlumpreneurLogo.png';
 import './Dashboard.css';
 
 const defectTypes = ['Bubble', 'Crack', 'Scratch'];
-
-// Adjust these values to match your actual layout
-const DEFECT_ITEM_HEIGHT = 56; // px, estimate or measure your defect item height
+const DEFECT_ITEM_HEIGHT = 56;
 
 function Dashboard() {
   const [isDetecting, setIsDetecting] = useState(false);
@@ -19,7 +27,6 @@ function Dashboard() {
   const defectsPanelRef = useRef(null);
   const navigate = useNavigate();
 
-  // Dynamically measure the defects panel height
   useEffect(() => {
     function updatePanelHeight() {
       if (defectsPanelRef.current) {
@@ -31,16 +38,12 @@ function Dashboard() {
     return () => window.removeEventListener('resize', updatePanelHeight);
   }, []);
 
-  // Calculate how many defects can fit (for optional limiting)
-  const maxVisibleDefects = defectsPanelHeight
-    ? Math.floor(defectsPanelHeight / DEFECT_ITEM_HEIGHT)
-    : 6; // fallback default
-
+  // Show a new defect every 3 seconds
   const startDetection = () => {
     setIsDetecting(true);
     setCurrentDefects([]);
     addDefectByTime();
-    detectionInterval.current = setInterval(addDefectByTime, 15000);
+    detectionInterval.current = setInterval(addDefectByTime, 3000);
   };
 
   const stopDetection = () => {
@@ -52,11 +55,7 @@ function Dashboard() {
   };
 
   const toggleDetection = () => {
-    if (isDetecting) {
-      stopDetection();
-    } else {
-      startDetection();
-    }
+    isDetecting ? stopDetection() : startDetection();
   };
 
   function addDefectByTime() {
@@ -65,10 +64,7 @@ function Dashboard() {
     const type = defectTypes[Math.floor(Math.random() * defectTypes.length)];
     const imageUrl = `https://via.placeholder.com/600x400/dc2626/ffffff?text=${type}+Defect`;
 
-    setCurrentDefects(prev => {
-      const updated = [...prev, { time: timeStr, type, imageUrl }];
-      return updated;
-    });
+    setCurrentDefects(prev => [{ time: timeStr, type, imageUrl }, ...prev]);
   }
 
   function clearDefects() {
@@ -147,7 +143,11 @@ function Dashboard() {
         <div className="machine-sidebar-divider"></div>
         <nav className="machine-nav-menu"></nav>
         <div className="machine-bottom-menu">
-          <button onClick={handleLogout} className="machine-bottom-button">
+          <button
+            onClick={handleLogout}
+            className="machine-bottom-button sidebar-logout-button"
+            style={{ width: '100%' }}
+          >
             <svg className="icon" viewBox="0 0 24 24">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
               <polyline points="16 17 21 12 16 7"></polyline>
@@ -171,18 +171,11 @@ function Dashboard() {
 
         <div className="machine-content-area">
           <div className="machine-content-wrapper">
-            {/* Camera section */}
+            {/* Only 1 machine, realistic preview */}
             <div className="machine-video-section">
-              <h2 className="machine-section-title" id="videoSectionTitle">{isDetecting ? 'Monitoring' : 'Monitor'}</h2>
+              <h2 className="machine-section-title" id="videoSectionTitle">Detection Preview</h2>
               <div className="machine-video-container">
-                {!isDetecting ? (
-                  <div id="videoPlaceholder" className="machine-video-placeholder">
-                    <p className="machine-placeholder-title">Camera Ready</p>
-                    <p className="machine-placeholder-subtitle">
-                      Click "Start Detection" to begin live view
-                    </p>
-                  </div>
-                ) : (
+                {isDetecting ? (
                   <div id="liveFeed" className="machine-live-feed">
                     <div style={{
                       width: '100%',
@@ -194,11 +187,25 @@ function Dashboard() {
                       color: 'white',
                       fontSize: 18
                     }}>
-                      Live Camera Feed
+                      Detection View
                     </div>
                     <div className="machine-live-indicator">
                       <span className="machine-live-dot"></span>
                       LIVE
+                    </div>
+                  </div>
+                ) : (
+                  <div id="videoPlaceholder" className="machine-video-placeholder">
+                    <div style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <p className="machine-placeholder-title" style={{ color: '#1a3a52', fontWeight: 700, fontSize: 18 }}>Camera Ready</p>
+                      <p className="machine-placeholder-subtitle" style={{ color: '#6b7280', fontSize: 14 }}>Click "Start Detection" to begin live view</p>
                     </div>
                   </div>
                 )}
@@ -284,7 +291,7 @@ function Dashboard() {
         </div>
       </main>
 
-      {/* Modal */}
+      {/* Modal for defect image with X and Next button */}
       {modalOpen && (
         <div id="imageModal" className="modal">
           <div className="modal-content">

@@ -1,3 +1,8 @@
+/**
+ * Professor's suggestions implemented:
+ * - Sign In button included
+ */
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/AlumpreneurLogo.png';
@@ -11,7 +16,6 @@ function Login() {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-
     if (username && password) {
       if (remember) {
         localStorage.setItem('rememberMe', 'true');
@@ -20,7 +24,6 @@ function Login() {
         localStorage.removeItem('rememberMe');
         localStorage.removeItem('username');
       }
-
       sessionStorage.setItem('loggedIn', 'true');
       navigate('/dashboard');
     }
@@ -30,7 +33,6 @@ function Login() {
     <div className="login-container">
       <div className="login-card">
         <div className="login-logo">
-          {/* ✅ Use imported logo */}
           <img src={logo} alt="Alumpreneur Logo" />
         </div>
         <h1 className="login-title">Glass Defect Detector</h1>
