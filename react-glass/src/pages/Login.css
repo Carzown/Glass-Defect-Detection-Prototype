@@ -11,15 +11,18 @@ body {
 
 .login-container {
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  min-height: 100svh; /* prefer small viewport height when supported */
+  height: 100dvh; /* handle mobile UI and zoom better */
+  display: grid; /* robust centering at any zoom */
+  place-items: center;
   background-color: #1a3a52;
+  overflow-y: auto; /* allow scrolling when zoom causes overflow */
+  padding: 24px; /* keep card from touching edges at high zoom */
 }
 
 .login-card {
   background: white;
-  padding: 48px 40px;
+  padding: 40px 40px;
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   width: 100%;
@@ -29,13 +32,36 @@ body {
 .login-logo {
   display: flex;
   justify-content: center;
-  margin-bottom: 32px;
+  margin-bottom: 0px;
 }
 
 .login-logo img {
-  width: 200px;
-  height: 200px;
+  width: 300px;
+  height: 300px;
   object-fit: contain;
+  transition: transform 0.25s ease;
+}
+
+.login-logo:hover img {
+  transform: scale(1.12);
+}
+
+@media (max-width: 480px) {
+  .login-logo img {
+    width: 350px;
+    height: 350px;
+  }
+}
+
+/* Scale down vertically on short viewports (e.g., high zoom) */
+@media (max-height: 750px) {
+  .login-logo img {
+    width: 220px;
+    height: 220px;
+  }
+  .login-title {
+    margin-bottom: 28px;
+  }
 }
 
 .login-title {
@@ -44,6 +70,32 @@ body {
   font-size: 28px;
   font-weight: 700;
   margin-bottom: 48px;
+}
+
+.login-role-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  background: #d0d8e9;
+  padding: 6px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.role-tab {
+  border: none;
+  background: transparent;
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #1a3a52;
+  font-weight: 600;
+}
+
+.role-tab.active {
+  background: white;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  color: #0f2942;
 }
 
 .login-form {
@@ -93,6 +145,15 @@ body {
 .form-checkbox-label {
   color: #6b7280;
   font-size: 14px;
+  cursor: pointer;
+}
+
+.forgot-link {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #1a3a52;
+  font-weight: 600;
   cursor: pointer;
 }
 

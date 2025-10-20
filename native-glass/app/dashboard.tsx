@@ -33,6 +33,7 @@ export default function DashboardScreen() {
     setIsLive(!isLive);
   };
 
+  // Optional fake defect generation every 5s when detecting
   useEffect(() => {
   let interval: ReturnType<typeof setInterval>;
   if (isDetecting) {

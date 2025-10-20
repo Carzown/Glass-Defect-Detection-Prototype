@@ -1,16 +1,6 @@
-/**
- * Professor's suggestions implemented:
- * - Only 1 machine (realistic, not 3 prototypes)
- * - Clicking defect image opens modal with X (close) and Next button
- * - Defect history is reversed (latest at top)
- * - Clear button for defect details section
- * - Upload to Database button
- * - Download as CSV button (image is represented by its URL in CSV)
- */
-
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import logo from '../assets/AlumpreneurLogo.png';
+import Sidebar from '../components/Sidebar';
 import './Dashboard.css';
 
 const defectTypes = ['Bubble', 'Crack', 'Scratch'];
@@ -21,22 +11,9 @@ function Dashboard() {
   const [currentDefects, setCurrentDefects] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [defectsPanelHeight, setDefectsPanelHeight] = useState(0);
   const detectionInterval = useRef(null);
   const csvInputRef = useRef(null);
-  const defectsPanelRef = useRef(null);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    function updatePanelHeight() {
-      if (defectsPanelRef.current) {
-        setDefectsPanelHeight(defectsPanelRef.current.offsetHeight);
-      }
-    }
-    updatePanelHeight();
-    window.addEventListener('resize', updatePanelHeight);
-    return () => window.removeEventListener('resize', updatePanelHeight);
-  }, []);
 
   // Show a new defect every 3 seconds
   const startDetection = () => {
@@ -64,7 +41,7 @@ function Dashboard() {
     const type = defectTypes[Math.floor(Math.random() * defectTypes.length)];
     const imageUrl = `https://via.placeholder.com/600x400/dc2626/ffffff?text=${type}+Defect`;
 
-    setCurrentDefects(prev => [{ time: timeStr, type, imageUrl }, ...prev]);
+  setCurrentDefects(prev => [...prev, { time: timeStr, type, imageUrl }]);
   }
 
   function clearDefects() {
@@ -132,31 +109,16 @@ function Dashboard() {
 
   return (
     <div className="machine-container">
-      <aside className="machine-sidebar">
-        <div className="machine-sidebar-logo">
-          <img
-            src={logo}
-            alt="Alumpreneur Logo"
-            className="machine-logo-image"
-          />
-        </div>
-        <div className="machine-sidebar-divider"></div>
-        <nav className="machine-nav-menu"></nav>
-        <div className="machine-bottom-menu">
-          <button
-            onClick={handleLogout}
-            className="machine-bottom-button sidebar-logout-button"
-            style={{ width: '100%' }}
-          >
-            <svg className="icon" viewBox="0 0 24 24">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-              <polyline points="16 17 21 12 16 7"></polyline>
-              <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
-            <span className="machine-bottom-label">Log Out</span>
-          </button>
-        </div>
-      </aside>
+      <Sidebar
+        onLogout={handleLogout}
+        mainItems={[
+          { key: 'dashboard', label: 'Dashboard', onClick: () => navigate('/dashboard') },
+        ]}
+        bottomItems={[
+          { key: 'help', label: ' Help', onClick: () => navigate('/help') },
+        ]}
+        activeKey="dashboard"
+      />
 
       <main className="machine-main-content">
         <header className="machine-header">
@@ -164,19 +126,18 @@ function Dashboard() {
             <h1 className="machine-header-title">Glass Defect Detector</h1>
             <p className="machine-header-subtitle">CAM-001</p>
           </div>
-          <button onClick={toggleDetection} className="machine-detection-button" id="detectionButton">
+          <button onClick={toggleDetection} className="machine-detection-button">
             {isDetecting ? 'Stop Detection' : 'Start Detection'}
           </button>
         </header>
 
         <div className="machine-content-area">
           <div className="machine-content-wrapper">
-            {/* Only 1 machine, realistic preview */}
             <div className="machine-video-section">
-              <h2 className="machine-section-title" id="videoSectionTitle">Detection Preview</h2>
+              <h2 className="machine-section-title">Detection Preview</h2>
               <div className="machine-video-container">
                 {isDetecting ? (
-                  <div id="liveFeed" className="machine-live-feed">
+                  <div className="machine-live-feed">
                     <div style={{
                       width: '100%',
                       height: '100%',
@@ -195,7 +156,7 @@ function Dashboard() {
                     </div>
                   </div>
                 ) : (
-                  <div id="videoPlaceholder" className="machine-video-placeholder">
+                  <div className="machine-video-placeholder">
                     <div style={{
                       width: '100%',
                       height: '100%',
@@ -213,21 +174,19 @@ function Dashboard() {
             </div>
 
             {/* Defect List Section */}
-            <div className="machine-defects-panel" ref={defectsPanelRef} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div className="machine-defects-panel">
               <div className="defects-panel-header">
                 <h2 className="machine-section-title">Detected Defects</h2>
                 <div className="defects-panel-actions">
                   <button
                     onClick={clearDefects}
                     className="action-button clear-button"
-                    id="clearButton"
                     disabled={currentDefects.length === 0}
                   >
                     Clear
                   </button>
                   <input
                     type="file"
-                    id="csvInput"
                     accept=".csv"
                     style={{ display: 'none' }}
                     ref={csvInputRef}
@@ -236,32 +195,20 @@ function Dashboard() {
                   <button
                     onClick={() => csvInputRef.current.click()}
                     className="action-button upload-button"
-                    id="uploadButton"
                   >
                     Upload to Database
                   </button>
                   <button
                     onClick={downloadCSV}
                     className="action-button download-button"
-                    id="downloadButton"
                     disabled={currentDefects.length === 0}
                   >
                     Download CSV
                   </button>
                 </div>
               </div>
-              <div
-                className="machine-defects-list"
-                style={{
-                  flex: 1,
-                  overflowY: 'auto',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'flex-start',
-                  height: '100%',
-                }}
-              >
-                <div id="defectsList">
+              <div className="machine-defects-list">
+                <div>
                   {currentDefects.length === 0 ? (
                     <div className="machine-empty-state">
                       <p className="machine-empty-state-text">No detections yet</p>
@@ -293,7 +240,7 @@ function Dashboard() {
 
       {/* Modal for defect image with X and Next button */}
       {modalOpen && (
-        <div id="imageModal" className="modal">
+        <div className="modal">
           <div className="modal-content">
             <button onClick={closeModal} className="modal-close">
               <svg className="icon" viewBox="0 0 24 24">
@@ -303,13 +250,12 @@ function Dashboard() {
             </button>
             <div className="modal-image-container">
               <img
-                id="modalImage"
                 src={currentDefects[currentImageIndex]?.imageUrl}
                 alt="Defect"
                 className="modal-image"
               />
               <div className="modal-defect-info">
-                <p id="modalDefectInfo">
+                <p>
                   {currentDefects[currentImageIndex]?.time} Glass Defect: {currentDefects[currentImageIndex]?.type}
                 </p>
               </div>
