@@ -1,0 +1,10 @@
+application/model.pt filter=lfs diff=lfs merge=lfs -text
+
+if (Test-Path .\App\.gitattributes) {
+  Get-Content .\App\.gitattributes | Add-Content .\.gitattributes
+  Remove-Item .\App\.gitattributes
+}
+if (Test-Path .\application\.gitattributes) {
+  Get-Content .\application\.gitattributes | Add-Content .\.gitattributes
+  Remove-Item .\application\.gitattributes
+}

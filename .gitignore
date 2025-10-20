@@ -1,0 +1,60 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.Python
+
+# Virtual environments
+venv/
+.venv/
+App/venv/
+application/venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+logs/
+*.log
+
+# Test & coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg
+*.egg-info/
+
+# ---- JavaScript / Node ----
+react-glass/node_modules/
+native-glass/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# React build output
+react-glass/build/
+
+# Expo / React Native
+native-glass/.expo/
+native-glass/.expo-shared/
+
+# ---- Editor / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Note: Do NOT ignore model files; they are tracked via Git LFS
+# (We intentionally do not add a '*.pt' ignore rule here.)
+# If needed, you can explicitly unignore:
+# !application/model.pt
+# !App/model.pt
