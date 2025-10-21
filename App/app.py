@@ -14,7 +14,7 @@ def _find_model_path() -> str:
         os.path.join(here, "model.pt"),
         os.path.join(os.getcwd(), "model.pt"),
         # Fallback to sibling App folder where model.pt likely resides
-        os.path.join(os.path.dirname(here), "App", "model.pt"),
+        os.path.join(os.path.dirname(here), "app", "model.pt"),
     ]
     for p in candidates:
         if os.path.exists(p):

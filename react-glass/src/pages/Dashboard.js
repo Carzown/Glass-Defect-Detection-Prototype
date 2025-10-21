@@ -68,6 +68,7 @@ function Dashboard() {
 
   function handleLogout() {
     sessionStorage.removeItem('loggedIn');
+    sessionStorage.removeItem('role');
     navigate('/');
   }
 

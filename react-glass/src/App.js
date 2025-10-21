@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import DashboardV2 from './pages/DashboardV2';
+import Admin from './pages/Admin';
 import Help from './pages/Help';
 
 function App() {
@@ -11,7 +11,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/dashboard-v2" element={<DashboardV2 />} />
+          <Route path="/admin" element={<Admin />} />
           <Route path="/help" element={<Help />} />
         </Routes>
       </Router>

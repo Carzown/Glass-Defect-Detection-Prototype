@@ -21,7 +21,7 @@ function Help() {
     if (!email || !message) return;
     setSending(true);
     try {
-      // Placeholder for real API call
+      // Simulate API call
       await new Promise((res) => setTimeout(res, 700));
       alert('Your message has been sent to the admin.');
       setSubject('');

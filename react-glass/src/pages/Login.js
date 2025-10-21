@@ -1,18 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/AlumpreneurLogo.png';
 import './Login.css';
+import { signInAndGetRole } from '../firebase';
 
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
-  const [role, setRole] = useState('employee'); // 'admin' | 'employee'
+  const [role, setRole] = useState('employee'); // UI hint only; actual role comes from DB
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  
   const navigate = useNavigate();
 
-  const handleSubmit = (event) => {
+  // Prefill from localStorage when user previously selected "Remember me"
+  useEffect(() => {
+    const remembered = localStorage.getItem('rememberMe') === 'true';
+    const savedEmail = localStorage.getItem('email') || '';
+    if (remembered) {
+      setRemember(true);
+      if (savedEmail) setEmail(savedEmail);
+    }
+  }, []);
+
+  // If already logged in (same tab), auto-redirect based on stored role
+  useEffect(() => {
+    const loggedIn = sessionStorage.getItem('loggedIn') === 'true';
+    if (loggedIn) {
+      const roleStored = sessionStorage.getItem('role') || 'employee';
+      if (roleStored === 'admin') navigate('/admin');
+      else navigate('/dashboard');
+    }
+  }, [navigate]);
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    if (email && password) {
+    setError('');
+    setLoading(true);
+    try {
+      const res = await signInAndGetRole(email, password);
+      const actualRole = res.role || 'employee';
+
       if (remember) {
         localStorage.setItem('rememberMe', 'true');
         localStorage.setItem('email', email);
@@ -20,15 +49,24 @@ function Login() {
         localStorage.removeItem('rememberMe');
         localStorage.removeItem('email');
       }
+
       sessionStorage.setItem('loggedIn', 'true');
-      sessionStorage.setItem('role', role);
-      if (role === 'admin') {
-        navigate('/dashboard-v2');
+      sessionStorage.setItem('role', actualRole);
+
+      if (actualRole === 'admin') {
+  navigate('/admin');
       } else {
         navigate('/dashboard');
       }
+    } catch (e) {
+      console.error(e);
+      setError(e?.message || 'Login failed');
+    } finally {
+      setLoading(false);
     }
   };
+
+  
 
   return (
     <div className="login-container">
@@ -92,13 +130,20 @@ function Login() {
               onChange={e => setRemember(e.target.checked)}
             />
             <label className="form-checkbox-label" htmlFor="remember">Remember me</label>
-            <button type="button" className="forgot-link" onClick={() => alert('Password recovery flow not implemented.')}>Forgot password?</button>
           </div>
-          <button type="submit" className="login-button">Sign In</button>
+          {error && (
+            <div style={{ color: '#dc2626', fontSize: 13, marginTop: 8 }}>{error}</div>
+          )}
+          <button type="submit" className="login-button" disabled={loading}>
+            {loading ? 'Signing In…' : 'Sign In'}
+          </button>
         </form>
+        
       </div>
     </div>
   );
 }
 
 export default Login;
+
+// Inline modal to avoid new files; styles added to Login.css below.

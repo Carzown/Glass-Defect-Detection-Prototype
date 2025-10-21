@@ -2,9 +2,8 @@ import React from 'react';
 import '../pages/Dashboard.css';
 import logoDefault from '../assets/AlumpreneurLogo.png';
 
-
-function Sidebar({ logoSrc = logoDefault, onLogout, mainItems, bottomItems = [], activeKey, navItems }) {
-  const items = Array.isArray(mainItems) ? mainItems : (Array.isArray(navItems) ? navItems : []);
+function Sidebar({ logoSrc = logoDefault, onLogout, mainItems = [], bottomItems = [], activeKey }) {
+  const items = Array.isArray(mainItems) ? mainItems : [];
   return (
     <aside className="machine-sidebar">
       <div className="machine-sidebar-logo">
