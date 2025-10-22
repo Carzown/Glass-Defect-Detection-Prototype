@@ -1,10 +1,18 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import './Dashboard.css';
 
 function Admin() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const role = sessionStorage.getItem('role');
+    if (role !== 'admin') {
+      alert('Only Admin can access this page. Redirecting to Employee Dashboard.');
+      navigate('/dashboard');
+    }
+  }, [navigate]);
 
   function handleLogout() {
     sessionStorage.removeItem('loggedIn');

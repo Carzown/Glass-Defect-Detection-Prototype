@@ -15,6 +15,7 @@
     "build": "react-scripts build",
     "eject": "react-scripts eject"
   },
+  "devDependencies": {},
   "eslintConfig": {
     "extends": ["react-app"]
   },

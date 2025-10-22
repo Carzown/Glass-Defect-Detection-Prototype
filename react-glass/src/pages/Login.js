@@ -40,7 +40,11 @@ function Login() {
     setLoading(true);
     try {
       const res = await signInAndGetRole(email, password);
-      const actualRole = res.role || 'employee';
+      let actualRole = res.role || 'employee';
+      // Hard-code admin email mapping
+      if (res.email && res.email.toLowerCase() === 'qvcdclarito@tip.edu.ph') {
+        actualRole = 'admin';
+      }
 
       if (remember) {
         localStorage.setItem('rememberMe', 'true');
@@ -53,8 +57,16 @@ function Login() {
       sessionStorage.setItem('loggedIn', 'true');
       sessionStorage.setItem('role', actualRole);
 
+      // Warn if selected role tab mismatches actual role
+      if (role === 'admin' && actualRole !== 'admin') {
+        alert('You are not authorized as Admin. Redirecting to Employee Dashboard.');
+      }
+      if (role === 'employee' && actualRole === 'admin') {
+        alert('Admins cannot use the Employee Dashboard. Redirecting to Admin.');
+      }
+
       if (actualRole === 'admin') {
-  navigate('/admin');
+        navigate('/admin');
       } else {
         navigate('/dashboard');
       }

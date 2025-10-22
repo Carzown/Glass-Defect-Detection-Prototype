@@ -5,6 +5,14 @@ let detectionIntervalId = null;
 
 const defectTypes = ['Bubble', 'Crack', 'Scratch'];
 
+// Helpers
+function formatTime(date) {
+  const h = date.getHours().toString().padStart(2, '0');
+  const m = date.getMinutes().toString().padStart(2, '0');
+  const s = date.getSeconds().toString().padStart(2, '0');
+  return `[${h}:${m}:${s}]`;
+}
+
 function checkAuth() {
   if (sessionStorage.getItem('loggedIn') !== 'true') {
     window.location.href = 'Login.html';
@@ -29,14 +37,17 @@ function updateButtonStates() {
   const uploadButton = document.getElementById('uploadButton');
   const downloadButton = document.getElementById('downloadButton');
 
+  if (!clearButton || !uploadButton || !downloadButton) return;
+
   const hasDefects = currentDefects.length > 0;
   clearButton.disabled = !hasDefects;
-  uploadButton.disabled = false; 
+  uploadButton.disabled = false;
   downloadButton.disabled = !hasDefects;
 }
 
 function renderDefects() {
   const defectsList = document.getElementById('defectsList');
+  if (!defectsList) return;
 
   if (currentDefects.length === 0) {
     defectsList.innerHTML = `
@@ -45,7 +56,8 @@ function renderDefects() {
       </div>
     `;
   } else {
-    defectsList.innerHTML = currentDefects.map((defect, index) => `
+    defectsList.innerHTML = currentDefects
+      .map((defect, index) => `
       <div class="machine-defect-item">
         <div class="machine-defect-content">
           <span class="machine-defect-time">${defect.time}</span>
@@ -54,7 +66,8 @@ function renderDefects() {
           <span class="machine-defect-image-link" onclick="openModal(${index})">Image</span>
         </div>
       </div>
-    `).join('');
+    `)
+      .join('');
   }
 
   updateButtonStates();
@@ -62,7 +75,7 @@ function renderDefects() {
 
 function addDefectByTime() {
   const now = new Date();
-  const timeStr = `[${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}]`;
+  const timeStr = formatTime(now);
   const type = defectTypes[Math.floor(Math.random() * defectTypes.length)];
   const imageUrl = `https://via.placeholder.com/600x400/dc2626/ffffff?text=${type}+Defect`;
 
@@ -113,7 +126,9 @@ function openModal(index) {
   const modalImage = document.getElementById('modalImage');
   const modalDefectInfo = document.getElementById('modalDefectInfo');
 
+  if (!modal || !modalImage || !modalDefectInfo) return;
   const defect = currentDefects[currentImageIndex];
+  if (!defect) return;
   modalImage.src = defect.imageUrl;
   modalDefectInfo.textContent = `${defect.time} Glass Defect: ${defect.type}`;
 
@@ -122,15 +137,18 @@ function openModal(index) {
 
 function closeModal() {
   const modal = document.getElementById('imageModal');
+  if (!modal) return;
   modal.classList.add('hidden');
 }
 
 function nextImage() {
+  if (currentDefects.length === 0) return;
   currentImageIndex = (currentImageIndex + 1) % currentDefects.length;
   const modalImage = document.getElementById('modalImage');
   const modalDefectInfo = document.getElementById('modalDefectInfo');
-
+  if (!modalImage || !modalDefectInfo) return;
   const defect = currentDefects[currentImageIndex];
+  if (!defect) return;
   modalImage.src = defect.imageUrl;
   modalDefectInfo.textContent = `${defect.time} Glass Defect: ${defect.type}`;
 }
