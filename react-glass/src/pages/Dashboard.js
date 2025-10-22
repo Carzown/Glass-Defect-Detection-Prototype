@@ -5,7 +5,14 @@ import './Dashboard.css';
 
 const DEFECT_ITEM_HEIGHT = 56;
 
-// (Removed fake defect generator helpers)
+// Fake defect list generator helpers (HTML version parity)
+const defectTypes = ['Bubble', 'Crack', 'Scratch'];
+function formatTime(date) {
+  const h = date.getHours().toString().padStart(2, '0');
+  const m = date.getMinutes().toString().padStart(2, '0');
+  const s = date.getSeconds().toString().padStart(2, '0');
+  return `[${h}:${m}:${s}]`;
+}
 
 function Dashboard() {
   const [isDetecting, setIsDetecting] = useState(false);
@@ -21,7 +28,11 @@ function Dashboard() {
   const navigate = useNavigate();
   const defectsListRef = useRef(null);
 
-  // (Removed fake defect generator state/refs)
+  // Generator interval ref
+  const detectionIntervalRef = useRef(null);
+  // Track paused state in a ref so the interval callback sees latest value
+  const pausedRef = useRef(false);
+  useEffect(() => { pausedRef.current = isPaused; }, [isPaused]);
 
   useEffect(() => {
     const role = sessionStorage.getItem('role');
@@ -35,10 +46,27 @@ function Dashboard() {
   const startDetection = async () => {
     setIsDetecting(true);
     setIsPaused(false);
-    // Generator removed: defects will only come from uploads or future integrations
+    // Reset defects and start fake generator (immediate + every 15s)
+    setCurrentDefects([]);
+    const addDefectByTime = () => {
+      if (pausedRef.current) return; // respect Pause
+      const now = new Date();
+      const timeStr = formatTime(now);
+      const type = defectTypes[Math.floor(Math.random() * defectTypes.length)];
+      const imageUrl = `https://via.placeholder.com/600x400/dc2626/ffffff?text=${type}+Defect`;
+      setCurrentDefects((prev) => {
+        const next = [...prev, { time: timeStr, type, imageUrl }];
+        return next.length > 20 ? next.slice(-20) : next;
+      });
+    };
+    // seed immediately
+    addDefectByTime();
+    // then every 15s
+    if (detectionIntervalRef.current) {
+      clearInterval(detectionIntervalRef.current);
+    }
+    detectionIntervalRef.current = setInterval(addDefectByTime, 15000);
     setCameraError('');
-
-  // (Generator removed)
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -95,6 +123,10 @@ function Dashboard() {
   const stopDetection = () => {
     setIsDetecting(false);
     setIsPaused(false);
+    if (detectionIntervalRef.current) {
+      clearInterval(detectionIntervalRef.current);
+      detectionIntervalRef.current = null;
+    }
     releaseStream();
   // Generator is managed by the isDetecting effect below
   };
@@ -190,6 +222,10 @@ function Dashboard() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current);
+        detectionIntervalRef.current = null;
+      }
       releaseStream();
     };
   }, []);
