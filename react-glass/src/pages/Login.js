@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/AlumpreneurLogo.png';
 import './Login.css';
-import { signInAndGetRole } from '../firebase';
+import { signInAndGetRole, getCurrentUser } from '../supabase';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -24,28 +24,46 @@ function Login() {
     }
   }, []);
 
-  // If already logged in (same tab), auto-redirect based on stored role
+  // If already logged in (check Supabase session), auto-redirect based on stored role
+  // But only if the user hasn't intentionally logged out
   useEffect(() => {
-    const loggedIn = sessionStorage.getItem('loggedIn') === 'true';
-    if (loggedIn) {
-      const roleStored = sessionStorage.getItem('role') || 'employee';
-      if (roleStored === 'admin') navigate('/admin');
-      else navigate('/dashboard');
-    }
+    const checkAuthState = async () => {
+      try {
+        const user = await getCurrentUser();
+        const hasLoggedIn = sessionStorage.getItem('loggedIn') === 'true';
+        
+        // Only auto-redirect if user is authenticated AND we have a valid session marker
+        // This prevents auto-login after intentional logout
+        if (user && hasLoggedIn) {
+          const roleStored = sessionStorage.getItem('role') || 'employee';
+          if (roleStored === 'admin') navigate('/admin');
+          else navigate('/dashboard');
+        }
+      } catch (error) {
+        // User not authenticated, stay on login page
+        console.log('User not authenticated');
+      }
+    };
+    
+    checkAuthState();
   }, [navigate]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
     setLoading(true);
+    
     try {
+      // Authenticate with Supabase
       const res = await signInAndGetRole(email, password);
       let actualRole = res.role || 'employee';
-      // Hard-code admin email mapping
+      
+      // Hard-code admin email mapping (override database role if needed)
       if (res.email && res.email.toLowerCase() === 'qvcdclarito@tip.edu.ph') {
         actualRole = 'admin';
       }
 
+      // Handle "Remember me" functionality
       if (remember) {
         localStorage.setItem('rememberMe', 'true');
         localStorage.setItem('email', email);
@@ -54,10 +72,12 @@ function Login() {
         localStorage.removeItem('email');
       }
 
+      // Set session storage for app state
       sessionStorage.setItem('loggedIn', 'true');
       sessionStorage.setItem('role', actualRole);
+      sessionStorage.setItem('userId', res.uid);
 
-      // Warn if selected role tab mismatches actual role
+      // Show role mismatch warnings if user selected wrong tab
       if (role === 'admin' && actualRole !== 'admin') {
         alert('You are not authorized as Admin. Redirecting to Employee Dashboard.');
       }
@@ -65,14 +85,32 @@ function Login() {
         alert('Admins cannot use the Employee Dashboard. Redirecting to Admin.');
       }
 
+      // Navigate based on actual role
       if (actualRole === 'admin') {
         navigate('/admin');
       } else {
         navigate('/dashboard');
       }
-    } catch (e) {
-      console.error(e);
-      setError(e?.message || 'Login failed');
+    } catch (error) {
+      console.error('Login error:', error);
+      
+      // Handle specific Supabase auth errors
+      let errorMessage = 'Login failed';
+      if (error.message) {
+        if (error.message.includes('Invalid login credentials') || error.message.includes('Invalid email or password')) {
+          errorMessage = 'Invalid email or password';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Please check your email and confirm your account';
+        } else if (error.message.includes('Too many requests')) {
+          errorMessage = 'Too many login attempts. Please try again later';
+        } else if (error.message.includes('signup is disabled')) {
+          errorMessage = 'Account signup is currently disabled';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -151,6 +189,9 @@ function Login() {
           </button>
         </form>
         
+        <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
+          <p>Powered by Supabase Authentication</p>
+        </div>
       </div>
     </div>
   );

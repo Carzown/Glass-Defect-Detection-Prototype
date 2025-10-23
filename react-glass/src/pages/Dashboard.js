@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
+import { signOutUser } from '../supabase';
 import './Dashboard.css';
 
 const DEFECT_ITEM_HEIGHT = 56;
@@ -111,7 +112,6 @@ function Dashboard() {
         videoRef.current.srcObject = stream;
         try { await videoRef.current.play(); } catch (e) { /* ignore autoplay errors */ }
       }
-      // generator already started above
     } catch (err) {
       console.error(err);
       setCameraError(err?.message || 'Unable to access camera');
@@ -128,7 +128,6 @@ function Dashboard() {
       detectionIntervalRef.current = null;
     }
     releaseStream();
-  // Generator is managed by the isDetecting effect below
   };
 
   const toggleDetection = () => {
@@ -171,8 +170,6 @@ function Dashboard() {
     }
   }
 
-  // (Removed fake defects generator)
-
   function openClearConfirm() { setConfirmClearOpen(true); }
   function closeClearConfirm() { setConfirmClearOpen(false); }
   function clearDefects() { setCurrentDefects([]); setConfirmClearOpen(false); }
@@ -193,9 +190,25 @@ function Dashboard() {
     window.URL.revokeObjectURL(url);
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    try {
+      // Sign out from Supabase
+      await signOutUser();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    
+    // Clear session storage
     sessionStorage.removeItem('loggedIn');
     sessionStorage.removeItem('role');
+    sessionStorage.removeItem('userId');
+    
+    // If "Remember me" is not enabled, clear the email too
+    const remembered = localStorage.getItem('rememberMe') === 'true';
+    if (!remembered) {
+      localStorage.removeItem('email');
+    }
+    
     navigate('/');
   }
 
@@ -230,15 +243,12 @@ function Dashboard() {
     };
   }, []);
 
-  // (Removed generator start/stop effect)
-
   // Auto-scroll defects list so newest entries are visible
   useEffect(() => {
     if (defectsListRef.current) {
       defectsListRef.current.scrollTop = defectsListRef.current.scrollHeight;
     }
   }, [currentDefects]);
-
 
   function handleCsvUpload(event) {
     const file = event.target.files[0];
@@ -262,6 +272,7 @@ function Dashboard() {
     };
     reader.readAsText(file);
   }
+
   return (
     <div className="machine-container">
       <Sidebar
@@ -415,25 +426,22 @@ function Dashboard() {
       {modalOpen && (
         <div className="modal">
           <div className="modal-content">
-            <button onClick={closeModal} className="modal-close">
-              <svg className="icon" viewBox="0 0 24 24">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
+            <div className="modal-header">
+              <button onClick={closeModal} className="modal-close">
+                <svg className="icon" viewBox="0 0 24 24">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
             <div className="modal-image-container">
               <img
                 src={currentDefects[currentImageIndex]?.imageUrl}
                 alt="Defect"
                 className="modal-image"
               />
-              <div className="modal-defect-info">
-                <p>
-                  {currentDefects[currentImageIndex]?.time} Glass Defect: {currentDefects[currentImageIndex]?.type}
-                </p>
-              </div>
             </div>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', padding: '16px 32px 24px' }}>
               {currentImageIndex > 0 && (
                 <button onClick={prevImage} className="modal-next">
                   <svg className="icon" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}>
