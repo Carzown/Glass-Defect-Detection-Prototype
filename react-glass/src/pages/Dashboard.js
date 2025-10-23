@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { signOutUser } from '../supabase';
 import './Dashboard.css';
+import { io } from 'socket.io-client';
 
 const DEFECT_ITEM_HEIGHT = 56;
 
@@ -23,9 +24,9 @@ function Dashboard() {
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const csvInputRef = useRef(null);
-  const videoRef = useRef(null);
-  const mediaStreamRef = useRef(null);
   const [cameraError, setCameraError] = useState('');
+  const [frameSrc, setFrameSrc] = useState(null);
+  const socketRef = useRef(null);
   const navigate = useNavigate();
   const defectsListRef = useRef(null);
 
@@ -43,80 +44,52 @@ function Dashboard() {
     }
   }, [navigate]);
 
-  // Start camera stream and begin inference loop
+  // Start socket connection and begin receiving frames
   const startDetection = async () => {
     setIsDetecting(true);
     setIsPaused(false);
     // Reset defects and start fake generator (immediate + every 15s)
     setCurrentDefects([]);
-    const addDefectByTime = () => {
-      if (pausedRef.current) return; // respect Pause
-      const now = new Date();
-      const timeStr = formatTime(now);
-      const type = defectTypes[Math.floor(Math.random() * defectTypes.length)];
-      const imageUrl = `https://via.placeholder.com/600x400/dc2626/ffffff?text=${type}+Defect`;
-      setCurrentDefects((prev) => {
-        const next = [...prev, { time: timeStr, type, imageUrl }];
-        return next.length > 20 ? next.slice(-20) : next;
-      });
-    };
-    // seed immediately
-    addDefectByTime();
-    // then every 15s
-    if (detectionIntervalRef.current) {
-      clearInterval(detectionIntervalRef.current);
-    }
-    detectionIntervalRef.current = setInterval(addDefectByTime, 15000);
     setCameraError('');
 
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera not supported in this browser');
-      }
-      // Ensure any previous stream is fully released before opening a new one
-      releaseStream();
-      let constraints;
-      // Try to prefer an external/USB camera automatically (no UI)
-      if (navigator.mediaDevices.enumerateDevices) {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const vids = devices.filter(d => d.kind === 'videoinput');
-        const preferred = vids.find(d => /usb|external|front/i.test(d.label))
-          || vids.find(d => !/integrated|internal/i.test(d.label))
-          || vids[0];
-        if (preferred && preferred.deviceId) {
-          constraints = { video: { deviceId: { exact: preferred.deviceId } }, audio: false };
+      // Connect to backend Socket.IO
+      const url = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+      const socket = io(url, { transports: ['websocket'] });
+      socketRef.current = socket;
+
+      // Identify as dashboard client
+      socket.emit('client:hello', { role: 'dashboard' });
+
+      socket.on('connect', () => {
+        console.log('Connected to backend for live stream');
+      });
+
+      socket.on('stream:frame', (payload) => {
+        if (pausedRef.current) return;
+        if (payload?.dataUrl) setFrameSrc(payload.dataUrl);
+        // Append any defects into the list (cap to last 20)
+        if (Array.isArray(payload?.defects) && payload.defects.length) {
+          const timeStr = formatTime(new Date(payload.time || Date.now()));
+          const toAdd = payload.defects.map((d) => ({
+            time: timeStr,
+            type: d?.type || 'Defect',
+            imageUrl: payload.dataUrl,
+          }));
+          setCurrentDefects((prev) => {
+            const next = [...prev, ...toAdd];
+            return next.length > 20 ? next.slice(-20) : next;
+          });
         }
-      }
-      if (!constraints) {
-        constraints = { video: true, audio: false };
-      }
-      let stream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
-      } catch (err1) {
-        console.warn('Primary getUserMedia failed, trying fallbacks...', err1);
-        // Try environment-facing camera
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-        } catch (err2) {
-          // Final fallback: any available camera
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-          } catch (err3) {
-            throw err1 || err2 || err3;
-          }
-        }
-      }
-      mediaStreamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        try { await videoRef.current.play(); } catch (e) { /* ignore autoplay errors */ }
-      }
+      });
+
+      socket.on('disconnect', () => {
+        console.log('Disconnected from backend');
+      });
     } catch (err) {
       console.error(err);
-      setCameraError(err?.message || 'Unable to access camera');
-      // On errors like NotReadableError, ensure we are fully reset
-      releaseStream();
+      setCameraError(err?.message || 'Unable to connect to backend stream');
+      stopDetection();
     }
   };
 
@@ -127,52 +100,33 @@ function Dashboard() {
       clearInterval(detectionIntervalRef.current);
       detectionIntervalRef.current = null;
     }
-    releaseStream();
+    // disconnect socket and clear frame
+    try { socketRef.current?.disconnect(); } catch (_) {}
+    socketRef.current = null;
+    setFrameSrc(null);
   };
 
   const toggleDetection = () => {
     isDetecting ? stopDetection() : startDetection();
   };
 
-  // Pause/Resume: stop the inference loop (keeps camera preview), and resume on demand
+  // Pause/Resume: stop appending new frames/defects (keeps last frame shown)
   const togglePause = () => {
     setIsPaused((prev) => {
       const next = !prev;
-      const stream = mediaStreamRef.current;
-      if (stream) {
-        stream.getTracks().forEach((t) => { t.enabled = !next; });
-      }
-      // Pause/play the video element for visual feedback
-      try {
-        if (videoRef.current) {
-          if (next) videoRef.current.pause();
-          else videoRef.current.play();
-        }
-      } catch (_) {}
       return next;
     });
   };
 
-  // Fully release the current media stream and reset the video element
-  function releaseStream() {
-    const stream = mediaStreamRef.current;
-    if (stream) {
-      try {
-        stream.getTracks().forEach((track) => {
-          try { track.stop(); } catch (_) {}
-        });
-      } catch (_) {}
-      mediaStreamRef.current = null;
-    }
-    if (videoRef.current) {
-      try { videoRef.current.pause(); } catch (_) {}
-      try { videoRef.current.srcObject = null; } catch (_) { videoRef.current.srcObject = undefined; }
-    }
-  }
 
   function openClearConfirm() { setConfirmClearOpen(true); }
   function closeClearConfirm() { setConfirmClearOpen(false); }
-  function clearDefects() { setCurrentDefects([]); setConfirmClearOpen(false); }
+  function clearDefects() {
+    // Also stop detection when clearing, per requirement
+    stopDetection();
+    setCurrentDefects([]);
+    setConfirmClearOpen(false);
+  }
 
   function downloadCSV() {
     if (currentDefects.length === 0) return;
@@ -239,7 +193,7 @@ function Dashboard() {
         clearInterval(detectionIntervalRef.current);
         detectionIntervalRef.current = null;
       }
-      releaseStream();
+      try { socketRef.current?.disconnect(); } catch (_) {}
     };
   }, []);
 
@@ -324,14 +278,21 @@ function Dashboard() {
                       </div>
                     ) : (
                       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                        <video
-                          ref={videoRef}
-                          className="machine-live-video"
-                          style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#000' }}
-                          autoPlay
-                          muted
-                          playsInline
-                        />
+                        {frameSrc ? (
+                          <img
+                            src={frameSrc}
+                            alt="Live feed"
+                            className="machine-live-video"
+                            style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#000' }}
+                          />
+                        ) : (
+                          <div style={{
+                            width: '100%', height: '100%', backgroundColor: '#000', color: '#ccc',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}>
+                            Waiting for stream...
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="machine-live-indicator">
@@ -379,6 +340,7 @@ function Dashboard() {
                   <button
                     onClick={() => csvInputRef.current.click()}
                     className="action-button upload-button"
+                    disabled={isDetecting}
                   >
                     Upload to Database
                   </button>
@@ -426,20 +388,25 @@ function Dashboard() {
       {modalOpen && (
         <div className="modal">
           <div className="modal-content">
-            <div className="modal-header">
-              <button onClick={closeModal} className="modal-close">
-                <svg className="icon" viewBox="0 0 24 24">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
+            <button onClick={closeModal} className="modal-close">
+              <svg className="icon" viewBox="0 0 24 24">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
             <div className="modal-image-container">
               <img
                 src={currentDefects[currentImageIndex]?.imageUrl}
                 alt="Defect"
                 className="modal-image"
               />
+              <div className="modal-defect-info">
+                {currentDefects[currentImageIndex] && (
+                  <p>
+                    {currentDefects[currentImageIndex].time} Glass Defect: {currentDefects[currentImageIndex].type}
+                  </p>
+                )}
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', padding: '16px 32px 24px' }}>
               {currentImageIndex > 0 && (
@@ -447,7 +414,7 @@ function Dashboard() {
                   <svg className="icon" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}>
                     <polyline points="15 18 9 12 15 6"></polyline>
                   </svg>
-                  Prev
+                  Prev  
                 </button>
               )}
               {currentImageIndex < currentDefects.length - 1 && (
@@ -466,30 +433,37 @@ function Dashboard() {
       {/* Modal to confirm clearing defects */}
       {confirmClearOpen && (
         <div className="modal">
-          <div className="modal-content">
-            <button onClick={closeClearConfirm} className="modal-close">
+          <div className="modal-content" style={{ maxWidth: '400px', padding: '0', position: 'relative' }}>
+            <button onClick={closeClearConfirm} className="modal-close" style={{ 
+              position: 'absolute', 
+              top: '16px', 
+              right: '16px', 
+              zIndex: 10 
+            }}>
               <svg className="icon" viewBox="0 0 24 24">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
                 <line x1="6" y1="6" x2="18" y2="18"></line>
               </svg>
             </button>
-            <div className="modal-image-container" style={{ textAlign: 'center' }}>
-              <div className="modal-defect-info">
-                <p>Clear all detected defects?</p>
+            <div style={{ padding: '48px 32px 32px 32px' }}>
+              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                <h3 style={{ color: '#1a3a52', fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
+                  Clear all detected defects?
+                </h3>
                 {currentDefects.length > 0 && (
-                  <p style={{ fontSize: 14, color: '#6b7280', marginTop: 8 }}>
+                  <p style={{ fontSize: '14px', color: '#6b7280' }}>
                     This will remove {currentDefects.length} item{currentDefects.length !== 1 ? 's' : ''} from the list.
                   </p>
                 )}
               </div>
-            </div>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <button onClick={closeClearConfirm} className="action-button upload-button">
-                Cancel
-              </button>
-              <button onClick={clearDefects} className="action-button clear-button">
-                Clear
-              </button>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '16px' }}>
+                <button onClick={closeClearConfirm} className="action-button upload-button">
+                  Cancel
+                </button>
+                <button onClick={clearDefects} className="action-button clear-button">
+                  Clear
+                </button>
+              </div>
             </div>
           </div>
         </div>

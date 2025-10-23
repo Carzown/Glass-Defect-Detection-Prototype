@@ -1,32 +1,30 @@
-import express from "express";
-import http from "http";
-import { Server } from "socket.io";
-import cors from "cors";
+// CommonJS-based backend server with Socket.IO relays for Jetson -> Dashboard live video
+const express = require("express");
+const http = require("http");
+const cors = require("cors");
+const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: "*" },
+  maxHttpBufferSize: 10 * 1024 * 1024, // allow larger binary/base64 frames (~10MB)
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 
-// Basic route
+// Basic routes
 app.get("/", (req, res) => {
   res.send("Backend connected successfully!");
 });
+app.get("/health", (_req, res) => res.json({ ok: true }));
 
-// WebSocket setup
-io.on("connection", (socket) => {
-  console.log("A client connected");
-
-  socket.on("disconnect", () => {
-    console.log("Client disconnected");
-  });
-});
+// Register Jetson streaming/socket relays
+require("./jetson-handler")(io);
 
 // Run server
-server.listen(5000, () => {
-  console.log("✅ Server running on port 5000");
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
 });

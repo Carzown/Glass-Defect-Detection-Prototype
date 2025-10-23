@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
+import { signOutUser } from '../supabase';
 import './Dashboard.css';
 import './Login.css';
 
@@ -11,8 +12,25 @@ function Help() {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
 
-  function handleLogout() {
+  async function handleLogout() {
+    try {
+      // Sign out from Supabase
+      await signOutUser();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    
+    // Clear session storage
     sessionStorage.removeItem('loggedIn');
+    sessionStorage.removeItem('role');
+    sessionStorage.removeItem('userId');
+    
+    // If "Remember me" is not enabled, clear the email too
+    const remembered = localStorage.getItem('rememberMe') === 'true';
+    if (!remembered) {
+      localStorage.removeItem('email');
+    }
+    
     navigate('/');
   }
 
