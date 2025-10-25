@@ -53,9 +53,10 @@ function Dashboard() {
     setCameraError('');
 
     try {
-      // Connect to backend Socket.IO
+      // Connect to backend Socket.IO (allow test injection via window.__IO__)
       const url = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
-      const socket = io(url, { transports: ['websocket'] });
+      const ioFactory = (typeof window !== 'undefined' && window.__IO__) || io;
+      const socket = ioFactory(url, { transports: ['websocket'] });
       socketRef.current = socket;
 
       // Identify as dashboard client
