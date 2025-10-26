@@ -1,14 +1,17 @@
+// Dashboard: Live preview (Socket.IO) + session-scoped defects (Supabase)
+// - Start/Stop controls Jetson via backend
+// - Preview comes from 'stream:frame' events
+// - Defects list comes from Supabase when enabled; only rows created since Start Detection
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
-import { signOutUser } from '../supabase';
+import { signOutUser, supabase } from '../supabase';
 import './Dashboard.css';
 import { io } from 'socket.io-client';
 
 const DEFECT_ITEM_HEIGHT = 56;
 
-// Fake defect list generator helpers (HTML version parity)
-const defectTypes = ['Bubble', 'Crack', 'Scratch'];
+// Helper: format Date -> [HH:MM:SS]
 function formatTime(date) {
   const h = date.getHours().toString().padStart(2, '0');
   const m = date.getMinutes().toString().padStart(2, '0');
@@ -17,6 +20,7 @@ function formatTime(date) {
 }
 
 function Dashboard() {
+  // Session + UI state
   const [isDetecting, setIsDetecting] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [currentDefects, setCurrentDefects] = useState([]);
@@ -26,13 +30,14 @@ function Dashboard() {
   const csvInputRef = useRef(null);
   const [cameraError, setCameraError] = useState('');
   const [frameSrc, setFrameSrc] = useState(null);
+  // Connections
   const socketRef = useRef(null);
+  const channelRef = useRef(null); // Supabase realtime channel
+  const [sessionStart, setSessionStart] = useState(null); // mark when Start Detection was clicked
   const navigate = useNavigate();
   const defectsListRef = useRef(null);
 
-  // Generator interval ref
-  const detectionIntervalRef = useRef(null);
-  // Track paused state in a ref so the interval callback sees latest value
+  // Keep latest paused state accessible inside event handlers
   const pausedRef = useRef(false);
   useEffect(() => { pausedRef.current = isPaused; }, [isPaused]);
 
@@ -44,16 +49,17 @@ function Dashboard() {
     }
   }, [navigate]);
 
-  // Start socket connection and begin receiving frames
+  // Start detection: connect to backend, listen to frames, and ask Jetsons to start
   const startDetection = async () => {
     setIsDetecting(true);
     setIsPaused(false);
-    // Reset defects and start fake generator (immediate + every 15s)
+  // Reset defects and prepare live socket stream reception
     setCurrentDefects([]);
     setCameraError('');
+    setSessionStart(new Date());
 
     try {
-      // Connect to backend Socket.IO (allow test injection via window.__IO__)
+  // Connect to backend Socket.IO (allow test injection via window.__IO__)
       const url = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
       const ioFactory = (typeof window !== 'undefined' && window.__IO__) || io;
       const socket = ioFactory(url, { transports: ['websocket'] });
@@ -66,27 +72,34 @@ function Dashboard() {
         console.log('Connected to backend for live stream');
       });
 
+  const realtimeEnabled = process.env.REACT_APP_ENABLE_SUPABASE_REALTIME === 'true';
+
       socket.on('stream:frame', (payload) => {
         if (pausedRef.current) return;
         if (payload?.dataUrl) setFrameSrc(payload.dataUrl);
-        // Append any defects into the list (cap to last 20)
-        if (Array.isArray(payload?.defects) && payload.defects.length) {
-          const timeStr = formatTime(new Date(payload.time || Date.now()));
-          const toAdd = payload.defects.map((d) => ({
-            time: timeStr,
-            type: d?.type || 'Defect',
-            imageUrl: payload.dataUrl,
-          }));
-          setCurrentDefects((prev) => {
-            const next = [...prev, ...toAdd];
-            return next.length > 20 ? next.slice(-20) : next;
-          });
+  // If Supabase realtime is enabled, don't append defects from Socket.IO (source = Supabase)
+        if (!realtimeEnabled) {
+          if (Array.isArray(payload?.defects) && payload.defects.length) {
+            const timeStr = formatTime(new Date(payload.time || Date.now()));
+            const toAdd = payload.defects.map((d) => ({
+              time: timeStr,
+              type: d?.type || 'Defect',
+              imageUrl: payload.dataUrl,
+            }));
+            setCurrentDefects((prev) => {
+              const next = [...prev, ...toAdd];
+              return next.length > 20 ? next.slice(-20) : next;
+            });
+          }
         }
       });
 
       socket.on('disconnect', () => {
         console.log('Disconnected from backend');
       });
+
+      // Request Jetson(s) to start streaming and detection
+      socket.emit('dashboard:start', {});
     } catch (err) {
       console.error(err);
       setCameraError(err?.message || 'Unable to connect to backend stream');
@@ -94,17 +107,25 @@ function Dashboard() {
     }
   };
 
+  // Stop detection: signal stop, disconnect socket, reset preview, remove realtime channel
   const stopDetection = () => {
     setIsDetecting(false);
     setIsPaused(false);
-    if (detectionIntervalRef.current) {
-      clearInterval(detectionIntervalRef.current);
-      detectionIntervalRef.current = null;
-    }
     // disconnect socket and clear frame
-    try { socketRef.current?.disconnect(); } catch (_) {}
+    try {
+      // signal Jetson(s) to stop
+      socketRef.current?.emit?.('dashboard:stop', {});
+      socketRef.current?.disconnect();
+    } catch (_) {}
     socketRef.current = null;
     setFrameSrc(null);
+    // remove realtime subscription if any
+    try {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    } catch (_) {}
   };
 
   const toggleDetection = () => {
@@ -190,13 +211,75 @@ function Dashboard() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (detectionIntervalRef.current) {
-        clearInterval(detectionIntervalRef.current);
-        detectionIntervalRef.current = null;
-      }
       try { socketRef.current?.disconnect(); } catch (_) {}
     };
   }, []);
+
+  // Supabase: fetch defects since the moment Start Detection was clicked, then subscribe to new inserts
+  useEffect(() => {
+    const enableRealtime = process.env.REACT_APP_ENABLE_SUPABASE_REALTIME === 'true';
+    const hasConfig = !!(process.env.REACT_APP_SUPABASE_URL && process.env.REACT_APP_SUPABASE_ANON_KEY);
+    if (!enableRealtime || !hasConfig || !sessionStart) return;
+
+    let cancelled = false;
+    const sinceIso = sessionStart.toISOString();
+
+    (async () => {
+      try {
+        // Initial fetch: only rows created at or after session start
+        const { data, error } = await supabase
+          .from('defects')
+          .select('*')
+          .gte('created_at', sinceIso)
+          .order('created_at', { ascending: true })
+          .limit(200);
+        if (!cancelled && data && !error) {
+          const mapped = data.map((row) => ({
+            time: (row.time_text && String(row.time_text)) || formatTime(new Date(row.created_at)),
+            type: row.defect_type || 'Defect',
+            imageUrl: row.image_url || '',
+          }));
+          setCurrentDefects(mapped);
+        }
+
+        // Setup realtime subscription filtered client-side by created_at >= sessionStart
+        channelRef.current = supabase
+          .channel('defects-stream')
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'defects' },
+            (payload) => {
+              const row = payload.new || {};
+              const created = new Date(row.created_at || Date.now());
+              if (created >= sessionStart) {
+                setCurrentDefects((prev) => {
+                  const next = [
+                    ...prev,
+                    {
+                      time: (row.time_text && String(row.time_text)) || formatTime(created),
+                      type: row.defect_type || 'Defect',
+                      imageUrl: row.image_url || '',
+                    },
+                  ];
+                  return next.length > 400 ? next.slice(-400) : next;
+                });
+              }
+            }
+          );
+        await channelRef.current.subscribe();
+      } catch (e) {
+        console.warn('Supabase realtime disabled or failed:', e?.message || e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (channelRef.current) {
+        try { supabase.removeChannel(channelRef.current); } catch (_) {}
+        channelRef.current = null;
+      }
+    };
+  }, [sessionStart]);
 
   // Auto-scroll defects list so newest entries are visible
   useEffect(() => {
@@ -223,7 +306,15 @@ function Dashboard() {
           uploadedDefects.push({ time: time.trim(), type: type.trim(), imageUrl: imageUrl.trim() });
         }
       }
-      alert('CSV parsed and ready to upload to database!\n' + JSON.stringify(uploadedDefects, null, 2));
+      // Display uploaded CSV entries in the defect list
+      if (uploadedDefects.length) {
+        setCurrentDefects((prev) => {
+          const next = [...prev, ...uploadedDefects];
+          return next;
+        });
+      }
+      // Allow re-uploading the same file again if needed
+      try { event.target.value = ''; } catch (_) {}
     };
     reader.readAsText(file);
   }
