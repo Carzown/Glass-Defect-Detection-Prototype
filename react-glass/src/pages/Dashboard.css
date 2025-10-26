@@ -466,7 +466,8 @@ body {
 .modal-content {
   background-color: white;
   border-radius: 12px;
-  padding: 32px;
+  /* Extra right padding to avoid overlap with the X close button */
+  padding: 32px 64px 32px 32px;
   max-width: 800px;
   max-height: 90vh;
   position: relative;
@@ -497,6 +498,8 @@ body {
   flex-direction: column;
   gap: 16px;
   align-items: center;
+  /* Nudge content down slightly to ensure breathing room from close button */
+  margin-top: 4px;
 }
 
 .modal-image {

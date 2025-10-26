@@ -1,43 +1,38 @@
 // Socket.IO Jetson gateway
+// - Broadcast Jetson frames to dashboards as live preview
+// - Relay dashboard control (start/stop/pause/resume) to Jetsons
+// - Emit Jetson online/offline status
 //
-// Purpose
-// - Accept frames from Jetson devices and broadcast to dashboards as a live preview
-// - Relay dashboard control (start/stop) to Jetsons
-// - Fan-out Jetson online/offline status
-//
-// Event contract
+// Events
 // Jetson -> Server:
-//  - 'jetson:register' { deviceId?: string }
-//  - 'jetson:frame' { image: <base64 no prefix>, mime?: 'image/jpeg'|'image/png', time?: string, defects?: Array<{ type:string, bbox?:[x,y,w,h] }> }
-//  - 'jetson:status' { online: boolean, deviceId?: string }
-//
+//  - jetson:register { deviceId? }
+//  - jetson:frame { image(base64), mime?, time?, defects? }
+//  - jetson:status { online, deviceId? }
 // Dashboard -> Server:
-//  - 'dashboard:start' { deviceId?: string } -> relayed to Jetson(s) as 'jetson:start'
-//  - 'dashboard:stop'  { deviceId?: string } -> relayed to Jetson(s) as 'jetson:stop'
-//
+//  - dashboard:start|stop|pause|resume { deviceId? }
 // Server -> Dashboard:
-//  - 'stream:frame' { dataUrl, defects, time, deviceId } (computed dataUrl for display)
-//  - 'jetson:status' { online, deviceId }
+//  - stream:frame { dataUrl, defects, time, deviceId }
+//  - jetson:status { online, deviceId }
 
 module.exports = function registerJetsonHandlers(io) {
 	// Track connected Jetsons by deviceId
 	const jetsons = new Map(); // deviceId -> Set<socket>
 
 	io.on("connection", (socket) => {
-		console.log("🔌 Client connected", socket.id);
+		// client connected
 
 		// Allow clients to identify themselves (optional)
 		socket.on("client:hello", (payload = {}) => {
 			socket.data.role = payload.role || "client";
 			socket.data.deviceId = payload.deviceId;
-			console.log(`👋 hello from ${socket.data.role} (${socket.id})`);
+			// hello handshake
 		});
 
 		// Jetson registration (set role + deviceId and record connection)
 		socket.on("jetson:register", (data = {}) => {
 			socket.data.role = "jetson";
 			socket.data.deviceId = data.deviceId || socket.data.deviceId || "jetson-1";
-			console.log(`🤖 Jetson registered: ${socket.data.deviceId} (${socket.id})`);
+			console.log(`🤖 Jetson registered: ${socket.data.deviceId}`);
 			const set = jetsons.get(socket.data.deviceId) || new Set();
 			set.add(socket);
 			jetsons.set(socket.data.deviceId, set);
@@ -106,10 +101,52 @@ module.exports = function registerJetsonHandlers(io) {
 			console.log(`⏹️ Relayed stop to ${count} jetson client(s)`);
 		});
 
+		// Dashboard control: pause/resume detection on Jetson(s)
+		socket.on("dashboard:pause", (payload = {}) => {
+			const targetId = payload.deviceId;
+			let count = 0;
+			if (targetId) {
+				const set = jetsons.get(targetId);
+				if (set) {
+					for (const js of set) { js.emit("jetson:pause", { deviceId: targetId }); count++; }
+				}
+			} else {
+				for (const [devId, set] of jetsons.entries()) {
+					for (const js of set) { js.emit("jetson:pause", { deviceId: devId }); count++; }
+				}
+			}
+			console.log(`⏸️ Relayed pause to ${count} jetson client(s)`);
+		});
+
+		socket.on("dashboard:resume", (payload = {}) => {
+			const targetId = payload.deviceId;
+			let count = 0;
+			if (targetId) {
+				const set = jetsons.get(targetId);
+				if (set) {
+					for (const js of set) { js.emit("jetson:resume", { deviceId: targetId }); count++; }
+				}
+			} else {
+				for (const [devId, set] of jetsons.entries()) {
+					for (const js of set) { js.emit("jetson:resume", { deviceId: devId }); count++; }
+				}
+			}
+			console.log(`▶️▶️ Relayed resume to ${count} jetson client(s)`);
+		});
+
+		// Dashboard query: list currently connected Jetsons
+		socket.on("dashboard:list-jetsons", () => {
+			const devices = [];
+			for (const [devId, set] of jetsons.entries()) {
+				devices.push({ deviceId: devId, online: true, socketCount: set.size });
+			}
+			socket.emit("jetson:list", { total: devices.length, devices });
+		});
+
 		// Cleanup on disconnect: remove jetson from registry and broadcast offline status
 		socket.on("disconnect", () => {
 			const wasJetson = socket.data.role === "jetson";
-			console.log("🔌 Client disconnected", socket.id);
+			// client disconnected
 			if (wasJetson) {
 				// remove from registry
 				const set = jetsons.get(socket.data.deviceId);

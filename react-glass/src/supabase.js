@@ -1,9 +1,32 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.local.REACT_APP_SUPABASE_URL
-const supabaseKey = process.env.local.REACT_APP_SUPABASE_ANON_KEY
+// Read CRA env vars correctly (REACT_APP_*) and allow graceful fallback when missing
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
+const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseKey)
+let supabase
+if (supabaseUrl && supabaseKey) {
+  supabase = createClient(supabaseUrl, supabaseKey)
+} else {
+  // Minimal no-op stub so the app can run without Supabase configured
+  console.warn('Supabase is not configured. Set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY to enable database features.')
+  const noop = async (..._args) => ({ data: null, error: null })
+  const stubQuery = () => ({ select: noop, gte: () => ({ order: () => ({ limit: () => ({ data: [], error: null }) }) }) })
+  const stubChannel = () => ({ on: () => ({ subscribe: async () => {} }) })
+  supabase = {
+    auth: {
+      signInWithPassword: async () => ({ data: null, error: new Error('Supabase not configured') }),
+      signUp: async () => ({ data: null, error: new Error('Supabase not configured') }),
+      signOut: async () => ({ error: null }),
+      getUser: async () => ({ data: { user: null } }),
+    },
+    from: stubQuery,
+    channel: stubChannel,
+    removeChannel: () => {},
+  }
+}
+
+export { supabase }
 
 // Authentication functions for Supabase
 export async function signInWithEmail(email, password) {

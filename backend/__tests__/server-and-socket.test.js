@@ -42,6 +42,8 @@ describe('Backend HTTP and Socket.IO', () => {
     }, 3000);
 
     dashboard.on('jetson:status', (payload) => {
+      // Ignore any out-of-order offline status from prior sockets; wait for the matching online event
+      if (payload?.deviceId !== 'cam-1' || payload?.online !== true) return;
       try {
         expect(payload).toMatchObject({ online: true, deviceId: 'cam-1' });
         received = true;

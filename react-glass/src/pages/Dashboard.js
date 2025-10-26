@@ -136,6 +136,18 @@ function Dashboard() {
   const togglePause = () => {
     setIsPaused((prev) => {
       const next = !prev;
+      try {
+        const sock = socketRef.current;
+        if (sock && typeof sock.emit === 'function') {
+          if (next) {
+            // Pausing detection on Jetson(s)
+            sock.emit('dashboard:pause', {});
+          } else {
+            // Resuming detection on Jetson(s)
+            sock.emit('dashboard:resume', {});
+          }
+        }
+      } catch (_) {}
       return next;
     });
   };
@@ -487,16 +499,25 @@ function Dashboard() {
               </svg>
             </button>
             <div className="modal-image-container">
-              <img
-                src={currentDefects[currentImageIndex]?.imageUrl}
-                alt="Defect"
-                className="modal-image"
-              />
               <div className="modal-defect-info">
                 {currentDefects[currentImageIndex] && (
-                  <p>
-                    {currentDefects[currentImageIndex].time} Glass Defect: {currentDefects[currentImageIndex].type}
-                  </p>
+                  <>
+                    <p>
+                      {currentDefects[currentImageIndex].time} Glass Defect: {currentDefects[currentImageIndex].type}
+                    </p>
+                    {currentDefects[currentImageIndex].imageUrl && (
+                      <p style={{ wordBreak: 'break-all', fontSize: 12, color: '#6b7280' }}>
+                        Image URL:{" "}
+                        <a
+                          href={currentDefects[currentImageIndex].imageUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open in new tab
+                        </a>
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>
