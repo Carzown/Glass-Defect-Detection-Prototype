@@ -8,8 +8,12 @@
     "scheme": "nativeglass",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "ios": { "supportsTablet": true },
+    "ios": { 
+      "supportsTablet": true,
+      "bundleIdentifier": "com.carzown.nativeglass"
+    },
     "android": {
+      "package": "com.carzown.nativeglass",
       "adaptiveIcon": {
         "foregroundImage": "./assets/AlumpreneurLogo.png",
         "backgroundColor": "#E6F4FE"
@@ -18,8 +22,17 @@
     "web": {
       "favicon": "./assets/AlumpreneurLogo.png"
     },
+    "extra": {
+      "SUPABASE_URL": "${SUPABASE_URL}",
+      "SUPABASE_ANON_KEY": "${SUPABASE_ANON_KEY}",
+      "BACKEND_URL": "${BACKEND_URL:-http://localhost:5000}",
+      "ENABLE_SUPABASE_REALTIME": "${ENABLE_SUPABASE_REALTIME:-true}",
+      "EDGE_UPLOAD_URL": "${EDGE_UPLOAD_URL}",
+      "DEVICE_INGEST_TOKEN": "${DEVICE_INGEST_TOKEN}"
+    },
     "plugins": [
       "expo-router",
+      "expo-image-picker",
       [
         "expo-splash-screen",
         {
