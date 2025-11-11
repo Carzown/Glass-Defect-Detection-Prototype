@@ -20,8 +20,8 @@ app.get("/", (req, res) => {
 });
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-// Register Jetson streaming/socket relays
-require("./jetson-handler")(io);
+// Register Raspberry Pi/device streaming/socket relays
+require("./device-handler")(io);
 
 // Utility: enumerate connected Jetsons based on socket.data.role/deviceId
 function getConnectedJetsons() {

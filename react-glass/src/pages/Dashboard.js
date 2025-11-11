@@ -98,6 +98,13 @@ function Dashboard() {
         console.log('Disconnected from backend');
       });
 
+      // Optional: log device online/offline status updates from Raspberry Pi
+      socket.on('device:status', (status) => {
+        try {
+          console.log('Device status:', status);
+        } catch (_) {}
+      });
+
       // Request Jetson(s) to start streaming and detection
       socket.emit('dashboard:start', {});
     } catch (err) {
