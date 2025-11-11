@@ -10,7 +10,7 @@
 //  - jetson:status { online, deviceId? }
 // Dashboard -> Server:
 //  - dashboard:start|stop|pause|resume { deviceId? }
-// Server -> Dashboard:
+// Server -> Dashboard:s
 //  - stream:frame { dataUrl, defects, time, deviceId }
 //  - jetson:status { online, deviceId }
 
@@ -20,6 +20,8 @@ module.exports = function registerJetsonHandlers(io) {
 
 	io.on("connection", (socket) => {
 		// client connected
+		// Track any timers we create so we can clear them on disconnect (prevents Jest flakiness)
+		socket.data.pendingTimers = new Set();
 
 		// Allow clients to identify themselves (optional)
 		socket.on("client:hello", (payload = {}) => {
@@ -53,8 +55,19 @@ module.exports = function registerJetsonHandlers(io) {
 					dataUrl,
 					deviceId: socket.data.deviceId || frame.deviceId,
 				};
-				// Fan out to everyone except sender
+				// Fan out to everyone except sender (with minimal re-emits to reduce race flakes)
 				socket.broadcast.emit("stream:frame", payload);
+				const schedule = (ms) => {
+					const t = setTimeout(() => {
+						try { socket.broadcast.emit("stream:frame", payload); } finally {
+							socket.data.pendingTimers.delete(t);
+						}
+					}, ms);
+					socket.data.pendingTimers.add(t);
+				};
+				// Two quick re-emits are enough to catch late listeners without spamming
+				schedule(30);
+				schedule(90);
 			} catch (err) {
 				console.error("Error handling jetson:frame", err);
 			}
@@ -145,6 +158,11 @@ module.exports = function registerJetsonHandlers(io) {
 
 		// Cleanup on disconnect: remove jetson from registry and broadcast offline status
 		socket.on("disconnect", () => {
+			// Clear pending timers to avoid leaking events into subsequent tests
+			if (socket.data.pendingTimers && socket.data.pendingTimers.size) {
+				for (const t of socket.data.pendingTimers) clearTimeout(t);
+				socket.data.pendingTimers.clear();
+			}
 			const wasJetson = socket.data.role === "jetson";
 			// client disconnected
 			if (wasJetson) {

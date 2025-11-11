@@ -16,12 +16,25 @@ Accepts `multipart/form-data` and:
 - In your Supabase project, deploy with the Supabase CLI
 
 3) Set function secrets (environment variables):
-- SUPABASE_URL
-- SUPABASE_SERVICE_ROLE_KEY
-- DEVICE_INGEST_TOKEN (long random secret shared with the device)
-- BUCKET (optional, defaults to `defects`)
-- USE_SIGNED_URLS (optional; set to `true` to return signed URLs)
-- SIGNED_URL_EXPIRES (optional; seconds; default 86400)
+
+Dashboard (recommended):
+- Go to Project Settings → Functions → Environment Variables and set:
+	- SUPABASE_URL = https://<project-ref>.supabase.co
+	- SUPABASE_SERVICE_ROLE_KEY = <your service role key>
+	- DEVICE_INGEST_TOKEN = <generate a strong random token, share to device>
+	- BUCKET = defects (optional; defaults to `defects`)
+	- USE_SIGNED_URLS = false (or true if you want signed URLs)
+	- SIGNED_URL_EXPIRES = 86400 (optional)
+
+CLI alternative:
+```
+supabase functions secrets set SUPABASE_URL="https://<project-ref>.supabase.co"
+supabase functions secrets set SUPABASE_SERVICE_ROLE_KEY="<service-role>"
+supabase functions secrets set DEVICE_INGEST_TOKEN="<strong-random-token>"
+supabase functions secrets set BUCKET="defects"
+supabase functions secrets set USE_SIGNED_URLS="false"
+supabase functions secrets set SIGNED_URL_EXPIRES="86400"
+```
 
 Function URL will be:
 https://<project-ref>.functions.supabase.co/defects-upload

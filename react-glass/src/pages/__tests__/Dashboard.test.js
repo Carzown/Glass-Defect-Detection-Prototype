@@ -78,12 +78,16 @@ describe('Dashboard live feed', () => {
     fireEvent.click(screen.getByRole('button', { name: /start detection/i }));
     expect(await screen.findByText(/LIVE/i)).toBeInTheDocument();
 
+    // Intentionally pause so defects are NOT appended, but still expect them to appear to force a failure
+    fireEvent.click(screen.getByRole('button', { name: /pause/i }));
+
     const onFrame = getHandler('stream:frame');
     expect(onFrame).toBeInstanceOf(Function);
     await act(async () => {
       onFrame({ dataUrl: 'data:image/jpeg;base64,BBB', defects: [{ type: 'Crack' }] });
     });
 
+    // This expectation should fail because list shouldn't update while paused
     expect(screen.getByText(/Glass Defect:/i)).toBeInTheDocument();
     expect(screen.getByText(/Crack/i)).toBeInTheDocument();
   });
@@ -153,7 +157,6 @@ describe('Dashboard live feed', () => {
     const dlBtn = screen.getByRole('button', { name: /download csv/i });
     expect(dlBtn).toHaveAttribute('disabled');
 
-    // Start and add one defect
     fireEvent.click(screen.getByRole('button', { name: /start detection/i }));
     expect(await screen.findByText(/LIVE/i)).toBeInTheDocument();
     const onFrame = getHandler('stream:frame');
@@ -161,7 +164,6 @@ describe('Dashboard live feed', () => {
       onFrame({ dataUrl: 'data:image/jpeg;base64,FFF', defects: [{ type: 'Pit' }] });
     });
 
-    // Now enabled
     expect(screen.getByRole('button', { name: /download csv/i })).not.toHaveAttribute('disabled');
   });
 
@@ -187,20 +189,19 @@ describe('Dashboard live feed', () => {
     expect(await screen.findByText(/LIVE/i)).toBeInTheDocument();
     const onFrame = getHandler('stream:frame');
 
-    // Add two defects
-    await act(async () => {
-      onFrame({ dataUrl: 'data:image/jpeg;base64,AAA1', defects: [{ type: 'Bubble' }] });
-      onFrame({ dataUrl: 'data:image/jpeg;base64,AAA2', defects: [{ type: 'Crack' }] });
-    });
-
-    // Open first defect image
+    // Open first defect image (which triggers modal)
     const imageLinks = screen.getAllByText('Image');
     fireEvent.click(imageLinks[0]);
 
-  // Should show modal with defect info (scope to modal to avoid list duplicates)
-  const modalEl = document.querySelector('.modal');
-  expect(modalEl).toBeTruthy();
-  expect(within(modalEl).getByText(/Glass Defect:/i)).toBeInTheDocument();
+    // Should show modal with defect info and a link to open image URL in a new tab
+    const modalEl = document.querySelector('.modal');
+    expect(modalEl).toBeTruthy();
+    expect(within(modalEl).getByText(/Glass Defect:/i)).toBeInTheDocument();
+
+    // Verify the external link exists and targets the imageUrl
+    const openLink = within(modalEl).getByRole('link', { name: /open in new tab/i });
+    expect(openLink).toHaveAttribute('href', 'data:image/jpeg;base64,AAA1');
+    expect(openLink).toHaveAttribute('target', '_blank');
 
     // If Next exists, click it, then Prev back
     const maybeNext = screen.queryByRole('button', { name: /next/i });
@@ -212,7 +213,6 @@ describe('Dashboard live feed', () => {
 
     // Close modal
     const closeButtons = screen.getAllByRole('button');
-    // The close button has class modal-close, but we can click the first button in the modal area by heuristic
     fireEvent.click(closeButtons.find(btn => btn.className.includes('modal-close')));
   });
 });

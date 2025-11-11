@@ -90,6 +90,7 @@ body {
   cursor: pointer;
   color: #1a3a52;
   font-weight: 600;
+  text-transform: none; 
 }
 
 .role-tab.active {
