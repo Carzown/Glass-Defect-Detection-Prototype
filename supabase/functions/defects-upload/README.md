@@ -64,6 +64,8 @@ python smoke_test.py
 
 You should see `HTTP 200 { ok: true, defect: ... }` and the row will appear in the Dashboard (Realtime) if it’s running.
 
+<!-- Testing section removed intentionally. -->
+
 ## Notes
 
 - The dashboard already listens to Supabase Realtime on `public.defects`; once this function inserts the row, it will appear live.
