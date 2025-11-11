@@ -121,3 +121,9 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+
+## Development Convenience: Auto Backend Start
+
+When you click `Start Detection` on the Dashboard in development, the React dev server calls `GET /__start_backend` (provided by `src/setupProxy.js`). This spawns `node backend/server.js` if it is not already running, and proxies Socket.IO traffic through the React dev server. Intended only for local development; avoid in production builds.
+
+Disable by removing or editing `src/setupProxy.js`.

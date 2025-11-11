@@ -1,3 +1,29 @@
+# Environment files (keep secrets out of git)
+.env
+.env.*
+*.env
+*.env.*
+react-glass/.env.local
+react-glass/.env.*
+native-glass/.env
+native-glass/.env.*
+
+# Node artifacts
+**/node_modules/
+**/npm-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+**/.parcel-cache/
+**/.next/
+**/dist/
+**/build/
+**/.expo/
+
+# Python artifacts
+**/__pycache__/
+**/*.pyc
+**/.venv/
+**/venv/
 # ---- Python ----
 __pycache__/
 *.py[cod]

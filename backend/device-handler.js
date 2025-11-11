@@ -47,6 +47,11 @@ module.exports = function registerDeviceHandler(io) {
         const { image, mime = 'image/jpeg', time, defects } = payload;
         if (!image || typeof image !== 'string') return; // ignore malformed
         const deviceId = String(payload.deviceId || socket.data.deviceId || 'unknown');
+        if (process.env.DEBUG_FRAMES === '1') {
+          try {
+            console.log('[device:frame] from', deviceId, 'defects:', Array.isArray(defects) ? defects.length : 0);
+          } catch (_) {}
+        }
         const dataUrl = `data:${mime};base64,${image}`;
         const out = {
           dataUrl,
@@ -54,6 +59,11 @@ module.exports = function registerDeviceHandler(io) {
           defects: Array.isArray(defects) ? defects : [],
           deviceId,
         };
+        if (process.env.DEBUG_FRAMES === '1') {
+          try {
+            console.log('[stream:frame] broadcast to dashboards for', deviceId);
+          } catch (_) {}
+        }
         emitToDashboards(io, STREAM_FRAME, out);
       } catch (_) {}
     };

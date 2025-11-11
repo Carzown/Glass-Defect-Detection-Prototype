@@ -16,6 +16,13 @@ npm install
 npm start
 ```
 
+Or with helper script:
+
+```
+chmod +x scripts/dev-run-backend.sh
+./scripts/dev-run-backend.sh
+```
+
 The server listens on `http://localhost:5000` by default.
 
 Health check:
@@ -36,6 +43,13 @@ SUPABASE_URL=...                  # your project URL
 SUPABASE_SERVICE_ROLE_KEY=...     # service role key (keep secret)
 ADMIN_API_TOKEN=...               # random secret for backend admin routes
 ```
+
+Optional: Admin page without token
+- If you prefer not to set `ADMIN_API_TOKEN`, you can rely on Supabase RLS to allow an authenticated user with role `admin` to read/write `profiles` directly from the frontend.
+- Ensure these are enabled in `supabase/sql/defects.sql` (they are included by default in this repo):
+	- `public.is_admin()` SQL function
+	- `profiles_admin_all` policy using `public.is_admin()`
+	After applying the SQL, logging in as an admin user will let the Admin page list users without the token.
 
 ## Socket Protocol
 
@@ -113,4 +127,5 @@ Notes:
 - Use small resolutions like 640x480 and `yolov8n-seg.pt` for speed on Pi 5.
 - Ensure the Supabase SQL (`supabase/sql/defects.sql`) is applied and the Edge Function is deployed.
 - The backend must be reachable from the Pi (open firewall/ports).
+ - Stream payload alignment: Raspberry Pi client now sends defects as `{ type, bbox: [x,y,w,h] }` with ISO time (`...Z`).
 

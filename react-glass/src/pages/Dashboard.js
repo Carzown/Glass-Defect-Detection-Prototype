@@ -59,6 +59,10 @@ function Dashboard() {
     setSessionStart(new Date());
 
     try {
+  // Attempt to start backend server (development helper)
+      try {
+        await fetch('/__start_backend').then(()=>{}).catch(()=>{});
+      } catch (_) {}
   // Connect to backend Socket.IO (allow test injection via window.__IO__)
       const url = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
       const ioFactory = (typeof window !== 'undefined' && window.__IO__) || io;

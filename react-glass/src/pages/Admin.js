@@ -27,8 +27,8 @@ function Admin() {
     setError('');
     try {
       if (adminToken) {
-        // Prefer employee list for managing passwords
-        const resp = await fetch(ADMIN_API('/admin/employees'), {
+        // Fetch full authentication users list (merged with roles)
+        const resp = await fetch(ADMIN_API('/admin/users'), {
           headers: { 'x-admin-token': adminToken },
         });
         const js = await resp.json();

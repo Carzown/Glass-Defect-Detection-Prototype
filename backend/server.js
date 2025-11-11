@@ -67,12 +67,29 @@ app.get("/jetsons/:deviceId", (req, res) => {
 });
 
 // Run server
-const PORT = process.env.PORT || 5000;
+let basePort = parseInt(process.env.PORT, 10) || 5000;
+const maxAttempts = 10;
+
+function startServer(port, attempt = 1) {
+  const onListening = () => {
+    console.log(`✅ Server running on port ${port}`);
+  };
+
+  server.once('error', (err) => {
+    if (err.code === 'EADDRINUSE' && attempt < maxAttempts) {
+      console.warn(`Port ${port} in use, trying ${port + 1} (attempt ${attempt + 1}/${maxAttempts})`);
+      startServer(port + 1, attempt + 1);
+    } else {
+      console.error('Server failed to start:', err);
+      process.exit(1);
+    }
+  });
+
+  server.listen(port, onListening);
+}
 
 if (require.main === module) {
-  server.listen(PORT, () => {
-    console.log(`✅ Server running on port ${PORT}`);
-  });
+  startServer(basePort);
 }
 
 module.exports = { app, server, io };
