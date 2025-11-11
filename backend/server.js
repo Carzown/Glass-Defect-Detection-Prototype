@@ -1,4 +1,5 @@
 // CommonJS-based backend server with Socket.IO relays for Jetson -> Dashboard live video
+try { require('dotenv').config(); } catch (_) {}
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
@@ -22,6 +23,14 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 
 // Register Raspberry Pi/device streaming/socket relays
 require("./device-handler")(io);
+
+// Admin API (list users, change passwords) protected by x-admin-token
+try {
+  const adminRouter = require('./admin')
+  app.use('/admin', adminRouter)
+} catch (e) {
+  console.warn('Admin routes not loaded:', e?.message || e)
+}
 
 // Utility: enumerate connected Jetsons based on socket.data.role/deviceId
 function getConnectedJetsons() {

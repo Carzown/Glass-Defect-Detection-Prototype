@@ -43,22 +43,22 @@ create policy profiles_update_own_no_role_escalation
   using (id = auth.uid())
   with check (id = auth.uid() and role = 'employee');
 
--- Optional: Admin management helpers (uncomment to enable)
--- drop function if exists public.is_admin();
--- create or replace function public.is_admin() returns boolean
--- language sql stable as $$
---   select exists (
---     select 1 from public.profiles p
---     where p.id = auth.uid() and p.role = 'admin'
---   );
--- $$;
--- drop policy if exists profiles_admin_all on public.profiles;
--- create policy profiles_admin_all
---   on public.profiles
---   for all
---   to authenticated
---   using (public.is_admin())
---   with check (public.is_admin());
+-- Admin management helpers (allow admins to view/manage all profiles)
+drop function if exists public.is_admin();
+create or replace function public.is_admin() returns boolean
+language sql stable as $$
+  select exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role = 'admin'
+  );
+$$;
+drop policy if exists profiles_admin_all on public.profiles;
+create policy profiles_admin_all
+  on public.profiles
+  for all
+  to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- 4) Defects table (fields Dashboard reads)
 create table if not exists public.defects (

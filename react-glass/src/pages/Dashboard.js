@@ -234,6 +234,17 @@ function Dashboard() {
     };
   }, []);
 
+  // Optional: auto-start Supabase subscription on page load (no need to click Start)
+  useEffect(() => {
+    const enableRealtime = process.env.REACT_APP_ENABLE_SUPABASE_REALTIME === 'true';
+    const auto = process.env.REACT_APP_AUTO_SUBSCRIBE_ON_LOAD === 'true';
+    const hasConfig = !!(process.env.REACT_APP_SUPABASE_URL && process.env.REACT_APP_SUPABASE_ANON_KEY);
+    if (enableRealtime && auto && hasConfig && !sessionStart) {
+      setSessionStart(new Date());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Supabase: fetch defects since the moment Start Detection was clicked, then subscribe to new inserts
   useEffect(() => {
     const enableRealtime = process.env.REACT_APP_ENABLE_SUPABASE_REALTIME === 'true';

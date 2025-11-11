@@ -39,6 +39,59 @@ Instead, it will copy all the configuration files and the transitive dependencie
 
 You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
 
+## Supabase Defects Integration
+
+The Dashboard can show live defects inserted by the Supabase Edge Function `defects-upload`.
+
+1. Create a `.env.local` (or copy `.env.example`) with:
+
+```
+REACT_APP_SUPABASE_URL=https://YOUR-PROJECT-ref.supabase.co
+REACT_APP_SUPABASE_ANON_KEY=your_anon_key
+REACT_APP_ENABLE_SUPABASE_REALTIME=true
+REACT_APP_BACKEND_URL=http://localhost:5000
+```
+
+2. Ensure the SQL in `supabase/sql/defects.sql` is applied and Realtime is enabled (`defects` table added to publication).
+
+3. Deploy / run the `supabase/functions/defects-upload` edge function and send multipart form-data with `file`, `defect_type`, `device_id`.
+
+4. Click `Start Detection` on the Dashboard to set a session start marker; all defects inserted after that time appear. If you want defects immediately without clicking Start, set:
+
+```
+REACT_APP_AUTO_SUBSCRIBE_ON_LOAD=true
+```
+
+5. Images: if using a public bucket (`defects`), the `image_url` returned will render directly. If private, adjust the edge function to issue signed URLs (`USE_SIGNED_URLS=true`).
+
+Troubleshooting:
+- No defects appearing: verify env vars loaded (check browser console for Supabase warnings).
+- Realtime not firing: confirm `supabase_realtime` publication includes `public.defects` and your API key has RLS read access.
+- Mixed Socket.IO defects & Supabase: when realtime is enabled, Socket.IO defect array in frames is ignored (source of truth becomes Supabase rows).
+
+## Admin: Manage Users
+
+The Admin page can list users and set passwords via the backend Admin API.
+
+Env required in React (`.env.local`):
+
+```
+REACT_APP_BACKEND_URL=http://localhost:5000
+```
+
+Backend env (in server environment):
+
+```
+SUPABASE_URL=...                     # your project URL
+SUPABASE_SERVICE_ROLE_KEY=...        # service role key (keep secret)
+ADMIN_API_TOKEN=...                  # random secret; paste this into the Admin page token input
+```
+
+Usage:
+1. Start backend and React app.
+2. In the Admin page, paste the ADMIN_API_TOKEN and click "Refresh Users".
+3. To change a password, enter a new password (min 8 chars) and click Set.
+
 ## Learn More
 
 You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
