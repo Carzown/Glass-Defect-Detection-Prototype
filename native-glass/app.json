@@ -1,5 +1,6 @@
 {
   "expo": {
+    "owner": "carzown",
     "name": "native-glass",
     "slug": "native-glass",
     "version": "1.0.0",
@@ -7,10 +8,14 @@
     "icon": "./assets/AlumpreneurLogo.png",
     "scheme": "nativeglass",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "ios": { 
+    "newArchEnabled": false,
+    "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.carzown.nativeglass"
+      "bundleIdentifier": "com.carzown.nativeglass",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to detect glass defects in real time.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.carzown.nativeglass",
@@ -22,13 +27,21 @@
     "web": {
       "favicon": "./assets/AlumpreneurLogo.png"
     },
-    "extra": {
-      "SUPABASE_URL": "${SUPABASE_URL}",
-      "SUPABASE_ANON_KEY": "${SUPABASE_ANON_KEY}",
-      "BACKEND_URL": "${BACKEND_URL:-http://localhost:5000}",
-      "ENABLE_SUPABASE_REALTIME": "${ENABLE_SUPABASE_REALTIME:-true}",
+  "extra": {
+      "SUPABASE_URL": "https://kfeztemgrbkfwaicvgnk.supabase.co",
+      "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmZXp0ZW1ncmJrZndhaWN2Z25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEyMDM4NDIsImV4cCI6MjA3Njc3OTg0Mn0.n4F6v_kywu55Nj2Yx_dcZri4WsdUMaftzPl1FXT-to8",
+      "BACKEND_URL": "http://localhost:5000",
+      "ENABLE_SUPABASE_REALTIME": "true",
+      "DEFECT_CLASS_NAMES": "scratch,bubble,crack",
       "EDGE_UPLOAD_URL": "${EDGE_UPLOAD_URL}",
-      "DEVICE_INGEST_TOKEN": "${DEVICE_INGEST_TOKEN}"
+      "DEVICE_INGEST_TOKEN": "${DEVICE_INGEST_TOKEN}",
+  "CLOUD_INFERENCE_URL": "${CLOUD_INFERENCE_URL}",
+      "CLOUD_INFERENCE_TOKEN": "${CLOUD_INFERENCE_TOKEN}",
+      "CLOUD_INFERENCE_MIN_INTERVAL_MS": "${CLOUD_INFERENCE_MIN_INTERVAL_MS:-1200}",
+      "router": {},
+      "eas": {
+        "projectId": "e5ba2ffc-4d83-43db-b830-82faab80edb6"
+      }
     },
     "plugins": [
       "expo-router",
@@ -40,7 +53,9 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
-          "dark": { "backgroundColor": "#000000" }
+          "dark": {
+            "backgroundColor": "#000000"
+          }
         }
       ]
     ],

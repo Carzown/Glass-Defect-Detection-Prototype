@@ -1,26 +1,57 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, Alert, ActivityIndicator } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, Image, Linking } from 'react-native';
+import Svg, { Polygon } from 'react-native-svg'
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import { supabase, signOutUser } from '../services/supabase';
-import { connectDashboardSocket, disconnectSocket, getSocket } from '../services/socket';
-import { pickImage, uploadDefectImage } from '../services/upload';
+import { signOutUser } from '../services/supabase'
+import { pickImage } from '../services/upload';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { detectFromBase64, type DetectedBox } from '../services/ml';
 
 type Defect = { time: string; type: string; imageUrl?: string }
 
 const extra = (Constants.expoConfig?.extra || {}) as Record<string,string>
-const ENABLE_SUPABASE_REALTIME = String(extra.ENABLE_SUPABASE_REALTIME || 'true') === 'true'
+const CLOUD_INFERENCE_URL = extra.CLOUD_INFERENCE_URL
 
 export default function DashboardScreen() {
   const router = useRouter()
   const [defects, setDefects] = useState<Defect[]>([])
   const [isDetecting, setIsDetecting] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
-  const [frameSrc, setFrameSrc] = useState<string | null>(null)
+  const [boxes, setBoxes] = useState<DetectedBox[]>([])
+  const [sourceMode, setSourceMode] = useState<'camera'|'image'>('camera')
+  const [uploadedBase64, setUploadedBase64] = useState<string | null>(null)
+  const [viewSize, setViewSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 })
+  const [cameraReady, setCameraReady] = useState(false)
   const sessionStartRef = useRef<Date | null>(null)
-  const channelRef = useRef<any>(null)
   const [uploading, setUploading] = useState(false)
+  const cameraRef = useRef<CameraView | null>(null)
+  const [permission, requestPermission] = useCameraPermissions()
+  const isMountedRef = useRef(true)
+  const isLoopRunningRef = useRef(false)
+  const lastAppendRef = useRef<number>(0)
+
+  // Request camera permission and surface actionable guidance if blocked
+  const ensurePermissionOnDemand = useCallback(async () => {
+    const res = await requestPermission()
+    if (!res.granted) {
+      const goToSettings = () => {
+        try { Linking.openSettings() } catch {}
+      }
+      Alert.alert(
+        'Permission required',
+        res.canAskAgain
+          ? 'Camera access is needed to start detection.'
+          : 'Camera access is blocked. Please enable it in system settings to use detection.',
+        [
+          ...(res.canAskAgain ? [] : [{ text: 'Open Settings', onPress: goToSettings as any }]),
+          { text: 'OK' }
+        ]
+      )
+    }
+    return res.granted
+  }, [requestPermission])
 
   // Guard route
   useEffect(() => {
@@ -41,13 +72,8 @@ export default function DashboardScreen() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      try { disconnectSocket() } catch {}
-      try {
-        if (channelRef.current) {
-          supabase.removeChannel(channelRef.current)
-          channelRef.current = null
-        }
-      } catch {}
+      isMountedRef.current = false
+      // no-op: database connections removed
     }
   }, [])
 
@@ -55,95 +81,66 @@ export default function DashboardScreen() {
     setIsDetecting(true)
     setIsPaused(false)
     setDefects([])
+  setBoxes([])
+  setSourceMode('camera')
+  setUploadedBase64(null)
+    setCameraReady(false)
     sessionStartRef.current = new Date()
 
     try {
-      const sock = connectDashboardSocket()
-      sock.on('connect', () => console.log('Connected to backend'))
-      sock.on('stream:frame', (payload: any) => {
-        if (isPaused) return
-        if (payload?.dataUrl) setFrameSrc(payload.dataUrl)
-        if (!ENABLE_SUPABASE_REALTIME) {
-          if (Array.isArray(payload?.defects) && payload.defects.length) {
-            const timeStr = new Date(payload.time || Date.now()).toLocaleTimeString()
-            const toAdd = payload.defects.map((d: any) => ({ time: `[${timeStr}]`, type: d?.type || 'Defect', imageUrl: payload.dataUrl }))
-            setDefects((prev) => {
-              const next = [...prev, ...toAdd]
-              return next.length > 200 ? next.slice(-200) : next
-            })
-          }
+      // Always check/request camera permission at the moment detection starts
+      const res = await requestPermission()
+      if (!res.granted) {
+        const goToSettings = () => {
+          try { Linking.openSettings() } catch {}
         }
-      })
-      sock.emit('dashboard:start', {})
+        Alert.alert(
+          'Permission required',
+          res.canAskAgain
+            ? 'Camera access is needed to start detection.'
+            : 'Camera access is blocked. Please enable it in system settings to use detection.',
+          [
+            ...(res.canAskAgain ? [] : [{ text: 'Open Settings', onPress: goToSettings as any }]),
+            { text: 'OK' }
+          ]
+        )
+        stopDetection()
+        return
+      }
+      // Kick off capture loop
+      if (!isLoopRunningRef.current) {
+        isLoopRunningRef.current = true
+        runCaptureLoop()
+      }
     } catch (e: any) {
-      Alert.alert('Camera error', e?.message || 'Unable to connect to backend stream')
+      Alert.alert('Camera error', e?.message || 'Unable to start camera')
       stopDetection()
     }
 
-    // Supabase realtime fetch+subscribe
-    if (ENABLE_SUPABASE_REALTIME && sessionStartRef.current) {
-      const sinceIso = sessionStartRef.current.toISOString()
-      try {
-        const { data, error } = await supabase
-          .from('defects')
-          .select('*')
-          .gte('created_at', sinceIso)
-          .order('created_at', { ascending: true })
-          .limit(200)
-        if (!error && data) {
-          const mapped = data.map((row: any) => ({
-            time: String(row.time_text || `[${new Date(row.created_at).toLocaleTimeString()}]`),
-            type: row.defect_type || 'Defect',
-            imageUrl: row.image_url || ''
-          }))
-          setDefects(mapped)
-        }
-        channelRef.current = supabase
-          .channel('defects-stream')
-          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'defects' }, (payload: any) => {
-            const row = payload.new || {}
-            const created = new Date(row.created_at || Date.now())
-            if (sessionStartRef.current && created >= sessionStartRef.current) {
-              setDefects((prev) => {
-                const next = [...prev, { time: String(row.time_text || `[${created.toLocaleTimeString()}]`), type: row.defect_type || 'Defect', imageUrl: row.image_url || '' }]
-                return next.length > 400 ? next.slice(-400) : next
-              })
-            }
-          })
-        await channelRef.current.subscribe()
-      } catch (e) {
-        console.warn('Supabase realtime failed or disabled', e)
-      }
-    }
+    // Database connections removed — only local list updates are used now
   }
 
   const stopDetection = () => {
     setIsDetecting(false)
     setIsPaused(false)
-    setFrameSrc(null)
-    try { getSocket()?.emit?.('dashboard:stop', {}) } catch {}
-    try { disconnectSocket() } catch {}
-    try {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
-        channelRef.current = null
-      }
-    } catch {}
+  setBoxes([])
+  setSourceMode('camera')
+  setUploadedBase64(null)
+    setCameraReady(false)
+    isLoopRunningRef.current = false
+    // no-op: database connections removed
   }
 
   const toggleDetection = () => {
-    isDetecting ? stopDetection() : startDetection()
+    if (isDetecting) {
+      stopDetection()
+    } else {
+      startDetection()
+    }
   }
 
   const togglePause = () => {
-    setIsPaused((prev) => {
-      const next = !prev
-      try {
-        const sock = getSocket()
-        if (sock) sock.emit(next ? 'dashboard:pause' : 'dashboard:resume', {})
-      } catch {}
-      return next
-    })
+    setIsPaused((prev) => !prev)
   }
 
   const clearDefects = () => {
@@ -152,6 +149,7 @@ export default function DashboardScreen() {
   }
 
   const logout = async () => {
+    // Use Supabase auth for logout to clear server-side session as well
     try { await signOutUser() } catch {}
     await AsyncStorage.multiRemove(['loggedIn','role','userId'])
     const remembered = (await AsyncStorage.getItem('rememberMe')) === 'true'
@@ -165,18 +163,99 @@ export default function DashboardScreen() {
     setUploading(true)
     try {
       const timeLabel = `[${new Date().toLocaleTimeString()}]`
-      const result = await uploadDefectImage({ asset, defect_type: 'Manual', device_id: 'mobile', time_text: timeLabel })
-      if (!result.ok) {
-        Alert.alert('Upload failed', result.error || 'Unknown error')
-        return
+      // Show on detection screen and run model first
+      if (asset.base64) {
+        setSourceMode('image')
+        setUploadedBase64(asset.base64)
+        try {
+          const detect = await detectFromBase64(asset.base64)
+          setBoxes(detect.boxes || [])
+          if (detect.boxes && detect.boxes.length) {
+            // Append each detected box as a separate entry with timestamp
+            setDefects((prev) => {
+              const additions = detect.boxes.map((b) => ({ time: timeLabel, type: b.label || 'Defect' }))
+              const next = [...prev, ...additions]
+              return next.length > 400 ? next.slice(-400) : next
+            })
+          } else {
+            // No detections: optionally log a placeholder entry
+            setDefects((prev) => {
+              const next = [...prev, { time: timeLabel, type: 'No defect' }]
+              return next.length > 400 ? next.slice(-400) : next
+            })
+          }
+        } catch {}
       }
-      const defect: any = (result as any).defect
-      setDefects((prev) => [...prev, { time: defect?.time_text || timeLabel, type: defect?.defect_type || 'Manual', imageUrl: defect?.image_url }])
-      Alert.alert('Uploaded', 'Image uploaded and defect row inserted')
     } finally {
       setUploading(false)
     }
   }
+
+  // Capture current frame into IMAGE mode (freeze frame) and pause live loop
+  const backToFrame = useCallback(async () => {
+    try {
+      if (!cameraRef.current) return
+      const picture = await cameraRef.current.takePictureAsync({ base64: true, skipProcessing: true, quality: 0.6 })
+      if (!picture?.base64) return
+      setIsPaused(true)
+      setSourceMode('image')
+      setUploadedBase64(picture.base64)
+      try {
+        const detect = await detectFromBase64(picture.base64)
+        setBoxes(detect.boxes || [])
+        if (detect.boxes && detect.boxes.length) {
+          const timeStr = `[${new Date().toLocaleTimeString()}]`
+          const type = detect.boxes[0].label || 'Defect'
+          setDefects((prev) => {
+            const next = [...prev, { time: timeStr, type }]
+            return next.length > 400 ? next.slice(-400) : next
+          })
+        }
+      } catch {}
+    } catch {}
+  }, [])
+
+  const backToCamera = useCallback(() => {
+    setSourceMode('camera')
+    setUploadedBase64(null)
+    setBoxes([])
+    setIsPaused(false)
+  }, [])
+
+  const runCaptureLoop = useCallback(async () => {
+    const intervalMs = CLOUD_INFERENCE_URL ? 1200 : 500
+    // Capture a frame every ~500ms, run detection, and overlay boxes
+    while (isMountedRef.current && isDetecting) {
+      try {
+        if (!isPaused && cameraReady && cameraRef.current) {
+          const picture = await cameraRef.current.takePictureAsync({ base64: true, skipProcessing: true, quality: 0.4 })
+          if (picture?.base64) {
+            const result = await detectFromBase64(picture.base64)
+            setBoxes(result.boxes || [])
+            // If any boxes, append to local list
+            if (result.boxes && result.boxes.length) {
+              const now = Date.now()
+              const cooldownMs = 2000
+              if (now - lastAppendRef.current > cooldownMs) {
+                lastAppendRef.current = now
+                const timeStr = `[${new Date().toLocaleTimeString()}]`
+                const type = result.boxes[0].label || 'Defect'
+                setDefects((prev) => {
+                  const next = [...prev, { time: timeStr, type }]
+                  return next.length > 400 ? next.slice(-400) : next
+                })
+              }
+            }
+          }
+        }
+      } catch {
+        // Swallow errors to keep loop going
+      }
+      // Sleep
+      await new Promise((r) => setTimeout(r, intervalMs))
+    }
+    isLoopRunningRef.current = false
+  }, [isDetecting, isPaused, cameraReady])
 
   return (
     <View style={styles.container}>
@@ -195,19 +274,121 @@ export default function DashboardScreen() {
 
       <View style={styles.monitorContainer}>
         <View style={styles.monitorBorder}>
-          {isDetecting ? (
+          {sourceMode === 'image' && uploadedBase64 ? (
             <View style={styles.liveContainer}>
-              <Text style={styles.liveLabel}>LIVE</Text>
-              {frameSrc ? (
-                <Image source={{ uri: frameSrc }} style={styles.liveImage} />
+              <Text style={styles.liveLabel}>IMAGE</Text>
+              <View style={styles.cameraWrapper} onLayout={(e) => setViewSize(e.nativeEvent.layout)}>
+                <Image source={{ uri: `data:image/jpeg;base64,${uploadedBase64}` }} style={styles.camera} resizeMode="contain" />
+                {/* Masks overlay (SVG) */}
+                {viewSize.width > 0 && viewSize.height > 0 && (
+                  <Svg pointerEvents="none" style={StyleSheet.absoluteFillObject} width={viewSize.width} height={viewSize.height}>
+                    {boxes.flatMap((b, idx) =>
+                      (b.segments || []).map((seg, sidx) => (
+                        <Polygon
+                          key={`poly-${idx}-${sidx}`}
+                          points={seg.map(p => `${p.x * viewSize.width},${p.y * viewSize.height}`).join(' ')}
+                          fill="rgba(34,197,94,0.25)"
+                          stroke="#22c55e"
+                          strokeWidth={2}
+                        />
+                      ))
+                    )}
+                  </Svg>
+                )}
+                {/* Box overlays */}
+                {boxes.map((b, idx) => (
+                  <View key={`box-${idx}`} style={[styles.box, { left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.width * 100}%`, height: `${b.height * 100}%` }]}>
+                    <Text style={styles.boxLabel}>{`${b.label || 'Defect'}${b.score ? ` ${(b.score * 100).toFixed(0)}%` : ''}`}</Text>
+                  </View>
+                ))}
+                {/* Back to Camera - overlay same position as Back to Frame */}
+                <View style={styles.overlayButtonWrap} pointerEvents="box-none">
+                  <TouchableOpacity style={styles.overlayButton} onPress={backToCamera}>
+                    <Text style={styles.overlayButtonText}>Back to Camera</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          ) : isDetecting ? (
+            <View style={styles.liveContainer}>
+              {!isPaused && permission?.granted && cameraReady ? (
+                <>
+                  <Text style={styles.liveLabel}>LIVE</Text>
+                  <View style={styles.cameraWrapper} onLayout={(e) => setViewSize(e.nativeEvent.layout)}>
+                    <CameraView
+                      ref={(r: CameraView | null) => { cameraRef.current = r }}
+                      style={styles.camera}
+                      facing="back"
+                      onCameraReady={() => setCameraReady(true)}
+                    />
+                    {viewSize.width > 0 && viewSize.height > 0 && (
+                      <Svg pointerEvents="none" style={StyleSheet.absoluteFillObject} width={viewSize.width} height={viewSize.height}>
+                        {boxes.flatMap((b, idx) =>
+                          (b.segments || []).map((seg, sidx) => (
+                            <Polygon
+                              key={`poly-live-${idx}-${sidx}`}
+                              points={seg.map(p => `${p.x * viewSize.width},${p.y * viewSize.height}`).join(' ')}
+                              fill="rgba(34,197,94,0.25)"
+                              stroke="#22c55e"
+                              strokeWidth={2}
+                            />
+                          ))
+                        )}
+                      </Svg>
+                    )}
+                    {/* Overlay boxes */}
+                    {boxes.map((b, idx) => (
+                      <View
+                        key={`box-live-${idx}`}
+                        style={[
+                          styles.box,
+                          {
+                            left: `${b.x * 100}%`,
+                            top: `${b.y * 100}%`,
+                            width: `${b.width * 100}%`,
+                            height: `${b.height * 100}%`,
+                          },
+                        ]}
+                      >
+                        <Text style={styles.boxLabel}>{`${b.label || 'Defect'}${b.score ? ` ${(b.score * 100).toFixed(0)}%` : ''}`}</Text>
+                      </View>
+                    ))}
+                    {/* Back to Frame - overlay same position as Back to Camera */}
+                    <View style={styles.overlayButtonWrap} pointerEvents="box-none">
+                      <TouchableOpacity style={styles.overlayButton} onPress={backToFrame}>
+                        <Text style={styles.overlayButtonText}>Back to Frame</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </>
               ) : (
-                <View style={styles.placeholder}><Text style={styles.placeholderSubtitle}>Waiting for stream…</Text></View>
+                <View style={styles.placeholder}>
+                  {isPaused ? (
+                    <>
+                      <Text style={styles.placeholderTitle}>Paused</Text>
+                      <Text style={styles.placeholderSubtitle}>Tap Resume to continue detection</Text>
+                    </>
+                  ) : !permission?.granted ? (
+                    <>
+                      <Text style={styles.placeholderTitle}>Waiting for permission</Text>
+                      <Text style={styles.placeholderSubtitle}>Grant camera access to start</Text>
+                      <TouchableOpacity style={[styles.secondaryBtn, { marginTop: 10 }]} onPress={ensurePermissionOnDemand}>
+                        <Text style={styles.secondaryText}>Grant Permission</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : !cameraReady ? (
+                    <>
+                      <Text style={styles.placeholderTitle}>Starting camera…</Text>
+                      <Text style={styles.placeholderSubtitle}>Please wait</Text>
+                    </>
+                  ) : null}
+                </View>
               )}
             </View>
           ) : (
             <View style={styles.placeholder}>
               <Text style={styles.placeholderTitle}>Camera Ready</Text>
-              <Text style={styles.placeholderSubtitle}>Click "Start Detection" to begin live view</Text>
+              <Text style={styles.placeholderSubtitle}>Click Start Detection to begin live view</Text>
             </View>
           )}
         </View>
@@ -274,7 +455,7 @@ const styles = StyleSheet.create({
   placeholderTitle: { color: '#1a3a52', fontSize: 18, fontWeight: '600' },
   placeholderSubtitle: { color: '#6b7280', fontSize: 13, marginTop: 6 },
 
-  liveContainer: { alignItems: 'center' },
+  liveContainer: { alignItems: 'center', width: '100%' },
   liveLabel: { 
     position: 'absolute',
     top: 8,
@@ -288,7 +469,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     zIndex: 2
   },
-  liveImage: { width: '100%', height: 210, borderRadius: 6, resizeMode: 'contain', backgroundColor: '#000' },
+  cameraWrapper: { width: '100%', height: 210, borderRadius: 6, overflow: 'hidden', backgroundColor: '#000' },
+  camera: { width: '100%', height: '100%' },
+  box: {
+    position: 'absolute',
+    borderColor: '#22c55e',
+    borderWidth: 2,
+    zIndex: 3,
+  },
+  boxLabel: {
+    position: 'absolute',
+    bottom: -18,
+    left: 0,
+    backgroundColor: 'rgba(34,197,94,0.85)',
+    color: '#fff',
+    fontSize: 10,
+    paddingHorizontal: 4,
+    borderTopRightRadius: 4,
+  },
 
   sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1a3a52', marginBottom: 8 },
   defectsList: { flex: 1, backgroundColor: '#fff', borderRadius: 8, padding: 16 },
@@ -301,7 +499,27 @@ const styles = StyleSheet.create({
   secondaryText: { color: '#e5e7eb', fontWeight: '600' },
   clearBtn: { backgroundColor: '#dc2626', padding: 10, borderRadius: 6 },
   clearBtnDisabled: { opacity: 0.4 },
-  clearText: { color: '#fff', fontWeight: '700' }
+  clearText: { color: '#fff', fontWeight: '700' },
+  // Overlay buttons (shared position for Back to Frame / Back to Camera)
+  overlayButtonWrap: {
+    position: 'absolute',
+    bottom: 8,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 4,
+  },
+  overlayButton: {
+    backgroundColor: 'rgba(19,48,69,0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  overlayButtonText: {
+    color: '#e5e7eb',
+    fontWeight: '700',
+  }
 });
+
 
 

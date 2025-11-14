@@ -1,4 +1,2 @@
-import React from 'react'
-// Re-export canonical implementation only
+// Re-export canonical implementation only; .ts file won't be treated as a route
 export * from '../../services/upload'
-export default function UploadServiceShim() { return null }

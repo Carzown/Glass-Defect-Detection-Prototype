@@ -9,7 +9,9 @@ try { require('dotenv').config(); } catch (_) {}
 module.exports = ({ config }) => {
   const fallbackUrl = 'https://kfeztemgrbkfwaicvgnk.supabase.co'
 
+  // Merge existing extra to preserve fields added by tooling (e.g., extra.eas.projectId)
   const extra = {
+    ...(config.extra || {}),
     SUPABASE_URL:
       process.env.SUPABASE_URL || (config.extra && config.extra.SUPABASE_URL) || fallbackUrl,
     SUPABASE_ANON_KEY:
@@ -22,6 +24,16 @@ module.exports = ({ config }) => {
       process.env.EDGE_UPLOAD_URL || (config.extra && config.extra.EDGE_UPLOAD_URL) || '',
     DEVICE_INGEST_TOKEN:
       process.env.DEVICE_INGEST_TOKEN || (config.extra && config.extra.DEVICE_INGEST_TOKEN) || '',
+    // Inference over HTTP for Expo Go (no dev client)
+    CLOUD_INFERENCE_URL:
+      process.env.CLOUD_INFERENCE_URL || (config.extra && config.extra.CLOUD_INFERENCE_URL) || '',
+    CLOUD_INFERENCE_TOKEN:
+      process.env.CLOUD_INFERENCE_TOKEN || (config.extra && config.extra.CLOUD_INFERENCE_TOKEN) || '',
+    CLOUD_INFERENCE_MIN_INTERVAL_MS:
+      process.env.CLOUD_INFERENCE_MIN_INTERVAL_MS || (config.extra && config.extra.CLOUD_INFERENCE_MIN_INTERVAL_MS) || '1200',
+    // Class names mapping for detection labels
+    DEFECT_CLASS_NAMES:
+      process.env.DEFECT_CLASS_NAMES || (config.extra && config.extra.DEFECT_CLASS_NAMES) || 'scratch,bubble,crack',
   }
 
   return {
