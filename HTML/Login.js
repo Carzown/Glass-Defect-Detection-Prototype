@@ -14,7 +14,10 @@ document.getElementById('loginForm').addEventListener('submit', function(event) 
       localStorage.removeItem('username');
     }
 
+    // Mark the user as logged in; set role to admin for the Admin Dashboard
     sessionStorage.setItem('loggedIn', 'true');
+    sessionStorage.setItem('role', 'admin');
+    // Redirect to the Dashboard (Admin view)
     window.location.href = 'Dashboard.html';
   }
 });

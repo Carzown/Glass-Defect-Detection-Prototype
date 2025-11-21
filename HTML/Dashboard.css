@@ -527,3 +527,23 @@ body {
   max-height: 600px; /* Adjust height as needed */
   overflow-y: auto;
 }
+
+/* Users table styling for Admin Dashboard */
+.users-table thead th {
+  text-align: left;
+  padding: 12px 16px;
+  background: #f3f4f6;
+  border-bottom: 1px solid #d1d5db;
+  font-weight: 700;
+}
+.users-table tbody td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #d1d5db;
+  vertical-align: middle;
+}
+.users-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.users-table .td-email {
+  word-break: break-all;
+}

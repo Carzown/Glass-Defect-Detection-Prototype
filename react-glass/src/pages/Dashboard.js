@@ -70,7 +70,14 @@ function Dashboard() {
       socketRef.current = socket;
 
       // Identify as dashboard client
-      socket.emit('client:hello', { role: 'dashboard' });
+      try {
+        socket.emit('client:hello', { role: 'dashboard' });
+      } catch (e) {
+        console.error(e);
+        setCameraError(e?.message || 'Unable to connect to backend stream');
+        stopDetection();
+        return;
+      }
 
       socket.on('connect', () => {
         console.log('Connected to backend for live stream');
@@ -102,6 +109,13 @@ function Dashboard() {
         console.log('Disconnected from backend');
       });
 
+      // Handle connection errors gracefully
+      socket.on('connect_error', (err) => {
+        console.error(err);
+        setCameraError(err?.message || 'Unable to connect to backend stream');
+        stopDetection();
+      });
+
       // Optional: log device online/offline status updates from Raspberry Pi
       socket.on('device:status', (status) => {
         try {
@@ -110,7 +124,14 @@ function Dashboard() {
       });
 
       // Request Jetson(s) to start streaming and detection
-      socket.emit('dashboard:start', {});
+      try {
+        socket.emit('dashboard:start', {});
+      } catch (e) {
+        console.error(e);
+        setCameraError(e?.message || 'Unable to connect to backend stream');
+        stopDetection();
+        return;
+      }
     } catch (err) {
       console.error(err);
       setCameraError(err?.message || 'Unable to connect to backend stream');
@@ -393,7 +414,7 @@ function Dashboard() {
             <div className="machine-video-section">
               <h2 className="machine-section-title">Detection Preview</h2>
               <div className="machine-video-container">
-                {isDetecting ? (
+                {(isDetecting || cameraError) ? (
                   <div className="machine-live-feed">
                     {cameraError ? (
                       <div style={{

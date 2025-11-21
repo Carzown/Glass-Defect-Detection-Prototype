@@ -40,6 +40,31 @@ const DEFECT_CLASS_NAMES: string[] | undefined = ((): string[] | undefined => {
   return arr.length ? arr : undefined
 })()
 
+// Helper: simulated detection for Expo Go or visual testing
+function simulatedDetection(): DetectionResult {
+  // Single obvious defect covering center area
+  return {
+    boxes: [
+      {
+        x: 0.25,
+        y: 0.2,
+        width: 0.5,
+        height: 0.55,
+        score: 0.95,
+        label: 'Simulated Defect',
+        segments: [
+          [
+            { x: 0.25, y: 0.2 },
+            { x: 0.75, y: 0.2 },
+            { x: 0.75, y: 0.75 },
+            { x: 0.25, y: 0.75 },
+          ],
+        ],
+      },
+    ],
+  }
+}
+
 function classNameForIndex(idx: number, nc?: number): string {
   if (Number.isFinite(idx)) {
     if (DEFECT_CLASS_NAMES && idx >= 0 && idx < DEFECT_CLASS_NAMES.length) {
@@ -55,6 +80,19 @@ function classNameForIndex(idx: number, nc?: number): string {
 
 async function tryLoadPyTorchModel(): Promise<boolean> {
   if (pytorchAvailable === false) return false
+  // If running inside Expo Go, native JSI modules aren't available.
+  // Avoid requiring `react-native-pytorch-core` which throws when JSI is missing.
+  try {
+    const appOwnership = (Constants as any)?.appOwnership
+    if (appOwnership === 'expo') {
+      pytorchAvailable = false
+      // eslint-disable-next-line no-console
+      console.warn('Expo Go detected — skipping react-native-pytorch-core and using fallback inference.')
+      return false
+    }
+  } catch {
+    // ignore and continue to attempt require in unknown environments
+  }
   try {
     // Dynamic import to avoid crashing if library not installed
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -122,6 +160,16 @@ async function tryLoadPyTorchModel(): Promise<boolean> {
 }
 
 export async function detectFromBase64(base64Jpeg: string): Promise<DetectionResult> {
+  // Detect whether we're running inside Expo Go (no custom native modules)
+  const isExpoGo = (Constants as any)?.appOwnership === 'expo'
+
+  // If the environment requests simulated detections (or we're in Expo Go), use them
+  if (isExpoGo || (extra as any)?.SIMULATED_DETECTION === 'true') {
+    // eslint-disable-next-line no-console
+    console.warn('Using simulated detection mode')
+    return simulatedDetection()
+  }
+
   // Try on-device PyTorch first
   const canUseLocal = await tryLoadPyTorchModel()
   if (canUseLocal) {
@@ -357,8 +405,8 @@ export async function detectFromBase64(base64Jpeg: string): Promise<DetectionRes
     }
   }
 
-  // Fallback: Cloud inference if configured
-  if (CLOUD_INFERENCE_URL) {
+  // Fallback: Cloud inference if configured (skip in Expo Go to use placeholder)
+  if (CLOUD_INFERENCE_URL && !isExpoGo) {
     // Resolve localhost to LAN IP when using Expo LAN (devices cannot reach host's localhost)
     try {
       const extraCfg = (Constants.expoConfig || {}) as any
@@ -416,7 +464,7 @@ export async function detectFromBase64(base64Jpeg: string): Promise<DetectionRes
     }
   }
 
-  // No on-device and no cloud inference configured — return a minimal
+  // No on-device and no cloud inference configured (or running in Expo Go) — return a minimal
   // placeholder detection so the pipeline can be demonstrated end-to-end.
   // This should be replaced by real model inference or a cloud endpoint.
   return {
