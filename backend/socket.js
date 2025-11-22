@@ -1,5 +1,3 @@
-// Centralized Socket.IO event names
-// Prefer `device:*` for Raspberry Pi (or any edge device). Keep legacy `jetson:*` for backwards compatibility.
 module.exports = {
 	// Generic device events (preferred)
 	DEVICE_REGISTER: 'device:register',

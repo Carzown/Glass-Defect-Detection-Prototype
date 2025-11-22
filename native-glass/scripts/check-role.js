@@ -1,10 +1,4 @@
-/**
- * Simple role verification script.
- * Provide TEST_EMAIL and TEST_PASSWORD in environment (or .env) to attempt login
- * and fetch the associated profile role.
- * Usage:
- *   node .\scripts\check-role.js
- */
+
 const path = require('path')
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') })
 const { createClient } = require('@supabase/supabase-js')

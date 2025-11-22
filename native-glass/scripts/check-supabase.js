@@ -1,9 +1,3 @@
-/**
- * Simple Supabase connectivity check script for the native-glass project.
- * Usage (PowerShell):
- *   node .\scripts\check-supabase.js
- * Ensure .env contains SUPABASE_URL and SUPABASE_ANON_KEY.
- */
 const path = require('path')
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') })
 const { createClient } = require('@supabase/supabase-js')

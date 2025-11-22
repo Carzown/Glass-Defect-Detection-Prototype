@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { signOutUser, supabase } from '../supabase';
 import './Dashboard.css';
+import Chat from '../components/Chat';
 
 const ADMIN_API = (path) => `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}${path}`;
 
@@ -108,38 +109,9 @@ function Admin() {
 
         <div className="machine-content-area">
           <div className="machine-content-wrapper">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%' }}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                <button className="action-button upload-button" onClick={fetchUsers} disabled={loading}>
-                  {loading ? 'Loading…' : 'Refresh Users'}
-                </button>
-              </div>
-
-              {error && (
-                <div style={{ color: '#dc2626', fontSize: 13 }}>{error}</div>
-              )}
-
-              <div style={{ border: '1px solid #d1d5db', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 2fr', gap: 0, padding: 12, background: '#f3f4f6', fontWeight: 600, borderBottom: '1px solid #d1d5db' }}>
-                  <div>Email</div>
-                  <div>Role</div>
-                  <div>Last Sign In</div>
-                </div>
-                <div>
-                  {users.length === 0 ? (
-                    <div style={{ padding: 16, color: '#6b7280' }}>
-                      No employees found. Refresh Users to load data or ensure your account has admin role.
-                    </div>
-                  ) : (
-                    users.map((u) => (
-                      <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 2fr', gap: 0, padding: 12, borderTop: '1px solid #d1d5db', alignItems: 'center' }}>
-                        <div style={{ wordBreak: 'break-all' }}>{u.email || '—'}</div>
-                        <div>{u.role}</div>
-                        <div style={{ fontSize: 12, color: '#6b7280' }}>{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : '—'}</div>
-                      </div>
-                    ))
-                  )}
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', flex: 1, minHeight: 0 }}>
+              <div style={{ marginTop: 8, flex: 1, minHeight: 0 }}>
+                <Chat sender="Admin" />
               </div>
             </div>
           </div>

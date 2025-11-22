@@ -4,6 +4,7 @@ import Sidebar from '../components/Sidebar';
 import { signOutUser } from '../supabase';
 import './Dashboard.css';
 import './Login.css';
+import Chat from '../components/Chat';
 
 function Help() {
   const navigate = useNavigate();
@@ -57,9 +58,9 @@ function Help() {
           { key: 'dashboard', label: 'Dashboard', onClick: () => navigate('/dashboard') },
         ]}
         bottomItems={[
-          { key: 'help', label: '? Help', onClick: () => navigate('/help') },
+          { key: 'help', label: 'Help', onClick: () => navigate('/help') },
         ]}
-        activeKey="help"
+        activeKey="dashboard"
       />
 
       <main className="machine-main-content">
@@ -72,61 +73,9 @@ function Help() {
 
         <div className="machine-content-area">
           <div className="machine-content-wrapper">
-            <div className="machine-defects-panel" style={{ width: '100%', maxWidth: 720 }}>
-              <h2 className="machine-section-title">Send a message</h2>
-              <form className="login-form" onSubmit={handleSend}>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="email">Your Email</label>
-                  <input
-                    id="email"
-                    type="email"
-                    className="form-input"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="subject">Subject</label>
-                  <input
-                    id="subject"
-                    type="text"
-                    className="form-input"
-                    placeholder="Brief summary"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="message">Message</label>
-                  <textarea
-                    id="message"
-                    className="form-input"
-                    style={{ minHeight: 140, resize: 'vertical' }}
-                    placeholder="Describe your question or issue..."
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    required
-                  />
-                </div>
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <button
-                    type="submit"
-                    className="action-button upload-button"
-                    disabled={sending || !email || !message}
-                  >
-                    {sending ? 'Sending…' : 'Send to Admin'}
-                  </button>
-                  <button
-                    type="button"
-                    className="action-button clear-button"
-                    onClick={() => navigate('/dashboard')}
-                  >
-                    Back to Dashboard
-                  </button>
-                </div>
-              </form>
+            <div className="machine-defects-panel" style={{ flex: 1, minWidth: 0 }}>
+              <h2 className="machine-section-title">Help Chat</h2>
+              <Chat sender="User" />
             </div>
           </div>
         </div>
