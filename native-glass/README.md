@@ -38,52 +38,20 @@ You can start developing by editing the files inside the **app** directory. This
 
 The app requests camera permission on first use. On iOS, an Info.plist description is included.
 
-## Using the bundled YOLOv11 small model (.pt/.ptl)
+## On-device inference removed
 
-On-device inference for a PyTorch `.pt` model requires the `react-native-pytorch-core` native module and bundling your TorchScript model with the app. In Expo, this needs a Development Build (dev client) and a prebuild step.
+This repository no longer includes on-device PyTorch inference or bundled TorchScript models. The previous workflow relied on `react-native-pytorch-core` and prebuilt model assets; those parts have been removed to simplify building and distributing the Expo app.
 
-High-level steps:
+Current behavior:
 
-1) Convert your PyTorch model to a TorchScript mobile-compatible file if not already.
+- The app uses a simulated detection result for Expo Go and when no cloud inference endpoint is configured.
+- Optional cloud inference is supported via `CLOUD_INFERENCE_URL` / `CLOUD_INFERENCE_TOKEN` in `app.json > expo.extra` and will be used when provided.
 
-    - If you have an Ultralytics YOLOv11 model (e.g., `yolov11s.pt`), export to TorchScript first:
+If you want to re-enable on-device inference in the future, you'll need to:
 
-       ```powershell
-       pip install ultralytics
-       yolo export model=yolov11s.pt format=torchscript imgsz=640
-       ```
-
-    - Then convert TorchScript to Mobile Lite (.ptl) for better compatibility on React Native:
-
-       ```powershell
-       # From native-glass/
-       pip install torch torchvision
-       python scripts/verify_and_convert_torchscript.py ../yolov11_small_model.pt
-       # Produces ../yolov11_small_model.ptl next to the original file
-       ```
-
-2) Add the native module (requires a dev build):
-
-   ```bash
-   npm install react-native-pytorch-core
-   npx expo prebuild
-   npx expo run:android  # or run:ios
-   ```
-
-3) Bundle the model with the app or provide a path at runtime:
-
-- Recommended: place the model at `native-glass/yolov11_small_model.ptl` (preferred) or `.pt` and the app will load it automatically (see `services/ml.ts`). Metro is configured to bundle both `.pt` and `.ptl` (see `metro.config.js`).
-- Alternatively, set `MODEL_PATH` in `app.json > expo.extra` to an absolute file path on the device (e.g., downloaded at runtime) and the app will attempt to load it.
-
-4) Implement preprocessing/postprocessing:
-
-`services/ml.ts` contains the scaffold to load a model and run detection. You'll need to:
-
-- Convert the `base64` camera frame into the tensor input your model expects.
-- Run inference via `torch.Module` API.
-- Parse model output into `{ x, y, width, height, score, label }` values normalized to 0–1 to draw boxes.
-
-Until the native module and model are wired, the app falls back gracefully with no on-device boxes, while still allowing optional uploads to your Edge flow. When a `.ptl` is present, the app prefers it automatically.
+1. Add `react-native-pytorch-core` back to `package.json` and prebuild a development client with native modules.
+2. Provide a TorchScript/mobile model file and configure Metro/asset bundling accordingly.
+3. Restore or implement model conversion scripts in `scripts/` and ensure PyTorch is installed in a suitable Python environment.
 
 ### Development Build (Dev Client) on Android (Windows)
 

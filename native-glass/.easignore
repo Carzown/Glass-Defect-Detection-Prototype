@@ -12,5 +12,4 @@ android/.cxx
 .idea
 .env.local
 *.keystore
-yolov11_small_model.pt
 __build_inspect__
