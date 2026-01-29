@@ -11,13 +11,13 @@ body {
 
 .login-container {
   min-height: 100vh;
-  min-height: 100svh; /* prefer small viewport height when supported */
-  height: 100dvh; /* handle mobile UI and zoom better */
-  display: grid; /* robust centering at any zoom */
+  min-height: 100svh;
+  height: 100dvh;
+  display: grid;
   place-items: center;
   background-color: #1a3a52;
-  overflow-y: auto; /* allow scrolling when zoom causes overflow */
-  padding: 24px; /* keep card from touching edges at high zoom */
+  overflow-y: auto;
+  padding: 24px;
 }
 
 .login-card {
@@ -53,7 +53,6 @@ body {
   }
 }
 
-/* Scale down vertically on short viewports (e.g., high zoom) */
 @media (max-height: 750px) {
   .login-logo img {
     width: 220px;

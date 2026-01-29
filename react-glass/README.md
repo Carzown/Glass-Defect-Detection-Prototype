@@ -1,114 +1,68 @@
-# Getting Started with Create React App
+# Glass Defect Detection - React Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A React application for detecting glass defects using a Jetson-based backend with Firebase authentication.
 
 ## Available Scripts
 
-In the project directory, you can run:
-
 ### `npm start`
-
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
-
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
-
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Runs the app in development mode at [http://localhost:3000](http://localhost:3000).
 
 ### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Builds the app for production to the `build` folder.
 
 ### `npm run eject`
+**Note: this is a one-way operation.** Ejects from Create React App to have full control over configuration.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Setup
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Prerequisites
+- Node.js 14+ installed
+- Firebase project created
+- Backend server running on `http://localhost:5000`
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### Installation
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Supabase Defects Integration
-
-The Dashboard can show live defects inserted by the Supabase Edge Function `defects-upload`.
-
-1. Create a `.env.local` (or copy `.env.example`) with:
-
+1. Install dependencies:
+```bash
+npm install
 ```
-REACT_APP_SUPABASE_URL=https://YOUR-PROJECT-ref.supabase.co
-REACT_APP_SUPABASE_ANON_KEY=your_anon_key
-REACT_APP_ENABLE_SUPABASE_REALTIME=true
+
+2. Create `.env.local` with Firebase credentials:
+```env
 REACT_APP_BACKEND_URL=http://localhost:5000
+REACT_APP_FIREBASE_API_KEY=your_api_key
+REACT_APP_FIREBASE_AUTH_DOMAIN=your_domain.firebaseapp.com
+REACT_APP_FIREBASE_PROJECT_ID=your_project_id
+REACT_APP_FIREBASE_STORAGE_BUCKET=your_bucket.appspot.com
+REACT_APP_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+REACT_APP_FIREBASE_APP_ID=your_app_id
 ```
 
-2. Ensure the SQL in `supabase/sql/defects.sql` is applied and Realtime is enabled (`defects` table added to publication).
-
-3. Deploy / run the `supabase/functions/defects-upload` edge function and send multipart form-data with `file`, `defect_type`, `device_id`.
-
-4. Click `Start Detection` on the Dashboard to set a session start marker; all defects inserted after that time appear. If you want defects immediately without clicking Start, set:
-
-```
-REACT_APP_AUTO_SUBSCRIBE_ON_LOAD=true
+3. Start the development server:
+```bash
+npm start
 ```
 
-5. Images: if using a public bucket (`defects`), the `image_url` returned will render directly. If private, adjust the edge function to issue signed URLs (`USE_SIGNED_URLS=true`).
+## Features
 
-Troubleshooting:
-- No defects appearing: verify env vars loaded (check browser console for Supabase warnings).
-- Realtime not firing: confirm `supabase_realtime` publication includes `public.defects` and your API key has RLS read access.
-- Mixed Socket.IO defects & Supabase: when realtime is enabled, Socket.IO defect array in frames is ignored (source of truth becomes Supabase rows).
+- **Login/Authentication** - Firebase Auth with role-based access (Admin/Employee)
+- **Dashboard** - Live detection preview with defect tracking
+- **Admin Panel** - User management interface
+- **Help Page** - Support and documentation
+- **Real-time Updates** - Socket.IO connection for live stream and defects
 
-## Admin: Manage Users
+## Architecture
 
-The Admin page can list users and set passwords via the backend Admin API.
+- **Frontend**: React with Firebase Auth
+- **Backend**: Node.js with Socket.IO
+- **Database**: Firestore (Firebase)
+- **Real-time**: Socket.IO for live streaming
 
-Env required in React (`.env.local`):
+## Roles
 
-```
-REACT_APP_BACKEND_URL=http://localhost:5000
-```
+- **Admin**: Full access to user management and settings
+- **Employee**: Access to dashboard for defect detection monitoring
 
-Backend env (in server environment):
-
-```
-SUPABASE_URL=...                     # your project URL
-SUPABASE_SERVICE_ROLE_KEY=...        # service role key (keep secret)
-ADMIN_API_TOKEN=...                  # random secret; paste this into the Admin page token input
-```
-
-Usage:
-1. Start backend and React app.
-2. In the Admin page, paste the ADMIN_API_TOKEN and click "Refresh Users".
-3. To change a password, enter a new password (min 8 chars) and click Set.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
 
 ### Advanced Configuration
 

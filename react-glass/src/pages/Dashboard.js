@@ -292,9 +292,7 @@ function Dashboard() {
         mainItems={[
           { key: 'dashboard', label: 'Dashboard', onClick: () => navigate('/dashboard') },
         ]}
-        bottomItems={[
-          { key: 'help', label: ' Help', onClick: () => navigate('/help') },
-        ]}
+        bottomItems={[]}
         activeKey="dashboard"
       />
 
