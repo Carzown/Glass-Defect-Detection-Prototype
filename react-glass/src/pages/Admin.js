@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
-import { signOutUser, supabase } from '../supabase';
+import { signOutUser } from '../firebase';
 import './Dashboard.css';
 import Chat from '../components/Chat';
 
@@ -36,14 +36,9 @@ function Admin() {
         if (!resp.ok || !js.ok) throw new Error(js.error || 'Failed to load users');
         setUsers(js.users || []);
       } else {
-        // Fallback: use Supabase client (admin must be logged in with role admin; RLS policy enables)
-        const { data, error } = await supabase.from('profiles').select('id,email,role,created_at');
-        if (error) throw new Error(error.message);
-        // Employees only; we lack last_sign_in_at without admin API
-        const mapped = (data || [])
-          .filter(p => p.role === 'employee')
-          .map(p => ({ id: p.id, email: p.email, role: p.role, last_sign_in_at: null }));
-        setUsers(mapped);
+        // Fallback: without Firebase/Firestore integration, we only show a message
+        setError('Please provide an admin token to view users');
+        setUsers([]);
       }
     } catch (e) {
       setError(e.message || String(e));

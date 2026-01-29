@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
-import { signOutUser } from '../supabase';
+import { signOutUser } from '../firebase';
 import './Dashboard.css';
 import './Login.css';
 import Chat from '../components/Chat';
@@ -15,7 +15,7 @@ function Help() {
 
   async function handleLogout() {
     try {
-      // Sign out from Supabase
+      // Sign out from Firebase
       await signOutUser();
     } catch (error) {
       console.error('Logout error:', error);

@@ -1,11 +1,11 @@
-// Dashboard: Live preview (Socket.IO) + session-scoped defects (Supabase)
+// Dashboard: Live preview (Socket.IO) + session-scoped defects
 // - Start/Stop controls Jetson via backend
 // - Preview comes from 'stream:frame' events
-// - Defects list comes from Supabase when enabled; only rows created since Start Detection
+// - Defects list comes from backend socket events
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
-import { signOutUser, supabase } from '../supabase';
+import { signOutUser } from '../firebase';
 import './Dashboard.css';
 import { io } from 'socket.io-client';
 
@@ -32,7 +32,6 @@ function Dashboard() {
   const [frameSrc, setFrameSrc] = useState(null);
   // Connections
   const socketRef = useRef(null);
-  const channelRef = useRef(null); // Supabase realtime channel
   const [sessionStart, setSessionStart] = useState(null); // mark when Start Detection was clicked
   const navigate = useNavigate();
   const defectsListRef = useRef(null);
@@ -83,25 +82,21 @@ function Dashboard() {
         console.log('Connected to backend for live stream');
       });
 
-  const realtimeEnabled = process.env.REACT_APP_ENABLE_SUPABASE_REALTIME === 'true';
-
       socket.on('stream:frame', (payload) => {
         if (pausedRef.current) return;
         if (payload?.dataUrl) setFrameSrc(payload.dataUrl);
-  // If Supabase realtime is enabled, don't append defects from Socket.IO (source = Supabase)
-        if (!realtimeEnabled) {
-          if (Array.isArray(payload?.defects) && payload.defects.length) {
-            const timeStr = formatTime(new Date(payload.time || Date.now()));
-            const toAdd = payload.defects.map((d) => ({
-              time: timeStr,
-              type: d?.type || 'Defect',
-              imageUrl: payload.dataUrl,
-            }));
-            setCurrentDefects((prev) => {
-              const next = [...prev, ...toAdd];
-              return next.length > 20 ? next.slice(-20) : next;
-            });
-          }
+        // Append defects from backend Socket.IO
+        if (Array.isArray(payload?.defects) && payload.defects.length) {
+          const timeStr = formatTime(new Date(payload.time || Date.now()));
+          const toAdd = payload.defects.map((d) => ({
+            time: timeStr,
+            type: d?.type || 'Defect',
+            imageUrl: payload.dataUrl,
+          }));
+          setCurrentDefects((prev) => {
+            const next = [...prev, ...toAdd];
+            return next.length > 20 ? next.slice(-20) : next;
+          });
         }
       });
 
@@ -139,7 +134,7 @@ function Dashboard() {
     }
   };
 
-  // Stop detection: signal stop, disconnect socket, reset preview, remove realtime channel
+  // Stop detection: signal stop, disconnect socket, reset preview
   const stopDetection = () => {
     setIsDetecting(false);
     setIsPaused(false);
@@ -151,13 +146,6 @@ function Dashboard() {
     } catch (_) {}
     socketRef.current = null;
     setFrameSrc(null);
-    // remove realtime subscription if any
-    try {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-    } catch (_) {}
   };
 
   const toggleDetection = () => {
@@ -212,7 +200,7 @@ function Dashboard() {
 
   async function handleLogout() {
     try {
-      // Sign out from Supabase
+      // Sign out from Firebase
       await signOutUser();
     } catch (error) {
       console.error('Logout error:', error);
@@ -258,83 +246,6 @@ function Dashboard() {
       try { socketRef.current?.disconnect(); } catch (_) {}
     };
   }, []);
-
-  // Optional: auto-start Supabase subscription on page load (no need to click Start)
-  useEffect(() => {
-    const enableRealtime = process.env.REACT_APP_ENABLE_SUPABASE_REALTIME === 'true';
-    const auto = process.env.REACT_APP_AUTO_SUBSCRIBE_ON_LOAD === 'true';
-    const hasConfig = !!(process.env.REACT_APP_SUPABASE_URL && process.env.REACT_APP_SUPABASE_ANON_KEY);
-    if (enableRealtime && auto && hasConfig && !sessionStart) {
-      setSessionStart(new Date());
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Supabase: fetch defects since the moment Start Detection was clicked, then subscribe to new inserts
-  useEffect(() => {
-    const enableRealtime = process.env.REACT_APP_ENABLE_SUPABASE_REALTIME === 'true';
-    const hasConfig = !!(process.env.REACT_APP_SUPABASE_URL && process.env.REACT_APP_SUPABASE_ANON_KEY);
-    if (!enableRealtime || !hasConfig || !sessionStart) return;
-
-    let cancelled = false;
-    const sinceIso = sessionStart.toISOString();
-
-    (async () => {
-      try {
-        // Initial fetch: only rows created at or after session start
-        const { data, error } = await supabase
-          .from('defects')
-          .select('*')
-          .gte('created_at', sinceIso)
-          .order('created_at', { ascending: true })
-          .limit(200);
-        if (!cancelled && data && !error) {
-          const mapped = data.map((row) => ({
-            time: (row.time_text && String(row.time_text)) || formatTime(new Date(row.created_at)),
-            type: row.defect_type || 'Defect',
-            imageUrl: row.image_url || '',
-          }));
-          setCurrentDefects(mapped);
-        }
-
-        // Setup realtime subscription filtered client-side by created_at >= sessionStart
-        channelRef.current = supabase
-          .channel('defects-stream')
-          .on(
-            'postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'defects' },
-            (payload) => {
-              const row = payload.new || {};
-              const created = new Date(row.created_at || Date.now());
-              if (created >= sessionStart) {
-                setCurrentDefects((prev) => {
-                  const next = [
-                    ...prev,
-                    {
-                      time: (row.time_text && String(row.time_text)) || formatTime(created),
-                      type: row.defect_type || 'Defect',
-                      imageUrl: row.image_url || '',
-                    },
-                  ];
-                  return next.length > 400 ? next.slice(-400) : next;
-                });
-              }
-            }
-          );
-        await channelRef.current.subscribe();
-      } catch (e) {
-        console.warn('Supabase realtime disabled or failed:', e?.message || e);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      if (channelRef.current) {
-        try { supabase.removeChannel(channelRef.current); } catch (_) {}
-        channelRef.current = null;
-      }
-    };
-  }, [sessionStart]);
 
   // Auto-scroll defects list so newest entries are visible
   useEffect(() => {

@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "glassdefectdetection",
+  "private_key_id": "a62b82df9ad9fc25773d486f9d17e086a8585eaf",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCRi5zFYGF9PLh4\naDncr8wHzcyyFfB11+dvjJBjOfJnOKd8TLKpFWUBpXiXPlCATMVLeO8rD3rFSzv3\nLEWZmYyG4hHMP4YQFZVNvkkXJGn5KTuob/s6Aa1nK51/ycD+ohY0VHUP7djuwfoa\nStpvIGVrquhSbzAkSiaihSHIsFEGzULXhZdMF1Wx6kJ0kUT3xopyrq7uYKY0kLIF\n7GIAXU/tBfesfLPGPjyiem2JnH9aSJolYQunES+zOyfWgovV6UNyGRcMnA5e3Pqe\nJJkChzFrQNuXAIdSVXYecbjaubWaSTt27WUCAvDQAmInh86ACqP0PLtB8HsMRh6N\nciMEt8m/AgMBAAECggEACpbV8vWmXNEYT3OvKLNw90JjDwk8mP5P3CmlxFUOIgdu\nXBiic7MsSaM13l8jcT+PUoSRIMNmuHMBq7lAs8JcWzXt0JFF75FPxGZrSpqUy+go\nQILWjEEHUjcgpZBSu9P5ee4zztMMZ6FHpou6pRTTfDK6O2vT3K1jw+BGyyNU3yyK\nKt9ZG+Pe0LQ3VQBSareC2+95Un8W7XaPTu3KHN9C8D172X7yCEW7zQO0fB56d98H\ncFkWx++sxkp24M+FQZGv15GydXdRJMeqXu245xANiAhyrk5BwqJfEZafD1IT4i8l\nCte5o3R4kK8+IsglmC6D0OGk6gHOEN8HLWb50awTtQKBgQDJb11Zsmi5ZsJ4Eb0T\ngA/XuMGRAVnMV0P6rO36gMLUqZ2ggZi5sfDvaTe115ppx9/z9CU53T0C7zgKRv8B\nADURbisO5lOTKlZhzdF3E6pmm07xMJPnpuk8ZCaI/qfaQnkvh6GTrcRIQhd1yOZ8\nlvX9haowS2sbAV7jFdyIR+fgzQKBgQC4+IuH/fmYOiJbaEdu12s7zp+ezMg1Yle5\n0WVcRMjVpjoizbbypkcx7VyD7ij+1WU5J99QjoEfutz6XIOsR0lwU3fzDwnoyfr/\nE/x8pyB7BnVvKQ09rvD4eGysF1FMOpPJN6e1RpDkP6YaaDCIvI6tY+iE/IN00eOW\ndyfVYqDkuwKBgQCrllO8nn8av3AUe3fGbqYQKm+op6/oosVjeX9Wjexo3vtIyFxi\ngjMsnUI5gikkxn/8/RHg0pawMzpXdtat8ZFDAcdn78dtavkeYwZ1GqlishVy2uCC\nyemP6ffxZotxHoLAfBalB7ZVnwcA7Ft58dYlWYD5lqTr4iUD55Ft/WKGWQKBgC8N\nUnkaewZlK14zLZCdjbKeAe6kSv2Bca1b/bu155ypdzppN/OLpqqlpZYN3DHO2Lvs\nT5svVNtcbl/lbr1BOQYwxV934N5tmsKOM/kFjnadEvxe5fZd7QBXqdUw7UZF1Fgo\nJyoutCbLphYrkMUHqgejVX+WuF3cElexIdnfB+yHAoGANZSxROj1Z23xx1Upp/jx\nyWE8rjLExMZnr2VuvA6YGEWWU5fiPh+/j5hta7oPyHilG2ci87qwGKc/pUxpuH5x\n+PQiRYNOMTO7VzH0XVNubxnNeesM3krpUOKq91H46BfCycL/5kh2BZrqeuazwDy1\nuwOHOonXEFl2uy7ZNFAwHdo=\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@glassdefectdetection.iam.gserviceaccount.com",
+  "client_id": "103308821768406017184",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40glassdefectdetection.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

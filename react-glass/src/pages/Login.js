@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/AlumpreneurLogo.png';
 import './Login.css';
-import { signInAndGetRole, getCurrentUser } from '../supabase';
+import { signInAndGetRole, getCurrentUser } from '../firebase';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -54,7 +54,7 @@ function Login() {
     setLoading(true);
     
     try {
-      // Authenticate with Supabase
+      // Authenticate with Firebase
       const res = await signInAndGetRole(email, password);
       let actualRole = res.role || 'employee';
       
@@ -94,17 +94,17 @@ function Login() {
     } catch (error) {
       console.error('Login error:', error);
       
-      // Handle specific Supabase auth errors
+      // Handle specific Firebase auth errors
       let errorMessage = 'Login failed';
       if (error.message) {
-        if (error.message.includes('Invalid login credentials') || error.message.includes('Invalid email or password')) {
+        if (error.message.includes('auth/invalid-email') || error.message.includes('auth/user-not-found')) {
           errorMessage = 'Invalid email or password';
-        } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = 'Please check your email and confirm your account';
-        } else if (error.message.includes('Too many requests')) {
+        } else if (error.message.includes('auth/wrong-password')) {
+          errorMessage = 'Invalid email or password';
+        } else if (error.message.includes('auth/too-many-requests')) {
           errorMessage = 'Too many login attempts. Please try again later';
-        } else if (error.message.includes('signup is disabled')) {
-          errorMessage = 'Account signup is currently disabled';
+        } else if (error.message.includes('auth/operation-not-allowed')) {
+          errorMessage = 'Login is currently disabled';
         } else {
           errorMessage = error.message;
         }
@@ -190,7 +190,7 @@ function Login() {
         </form>
         
         <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
-          <p>Powered by Supabase Authentication</p>
+          <p>Powered by Firebase Authentication</p>
         </div>
       </div>
     </div>
