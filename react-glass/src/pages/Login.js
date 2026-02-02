@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/AlumpreneurLogo.png';
 import './Login.css';
-import { signInAndGetRole, getCurrentUser } from '../firebase';
+import { signInAndGetRole, getCurrentUser } from '../supabase';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -54,7 +54,7 @@ function Login() {
     setLoading(true);
     
     try {
-      // Authenticate with Firebase
+      // Authenticate with Supabase
       const res = await signInAndGetRole(email, password);
       let actualRole = res.role || 'employee';
       
@@ -94,7 +94,7 @@ function Login() {
     } catch (error) {
       console.error('Login error:', error);
       
-      // Handle specific Firebase auth errors
+      // Handle specific Supabase auth errors
       let errorMessage = 'Login failed';
       if (error.message) {
         if (error.message.includes('auth/invalid-email') || error.message.includes('auth/user-not-found')) {
@@ -190,7 +190,7 @@ function Login() {
         </form>
         
         <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
-          <p>Powered by Firebase Authentication</p>
+          <p>Powered by Supabase Authentication</p>
         </div>
       </div>
     </div>

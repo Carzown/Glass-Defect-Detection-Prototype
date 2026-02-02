@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
-import { signOutUser } from '../firebase';
+import { signOutUser } from '../supabase';
 import './Dashboard.css';
 import Chat from '../components/Chat';
 
@@ -36,7 +36,7 @@ function Admin() {
         if (!resp.ok || !js.ok) throw new Error(js.error || 'Failed to load users');
         setUsers(js.users || []);
       } else {
-        // Fallback: without Firebase/Firestore integration, we only show a message
+        // Fallback: without Supabase integration, we only show a message
         setError('Please provide an admin token to view users');
         setUsers([]);
       }

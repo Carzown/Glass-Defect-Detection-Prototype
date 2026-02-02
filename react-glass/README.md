@@ -1,6 +1,6 @@
 # Glass Defect Detection - React Frontend
 
-A React application for detecting glass defects using a Jetson-based backend with Firebase authentication.
+A React application for detecting glass defects using a Jetson-based backend with Supabase authentication.
 
 ## Available Scripts
 
@@ -17,7 +17,7 @@ Builds the app for production to the `build` folder.
 
 ### Prerequisites
 - Node.js 14+ installed
-- Firebase project created
+- Supabase project created
 - Backend server running on `http://localhost:5000`
 
 ### Installation
@@ -27,15 +27,11 @@ Builds the app for production to the `build` folder.
 npm install
 ```
 
-2. Create `.env.local` with Firebase credentials:
+2. Create `.env.local` with Supabase credentials:
 ```env
 REACT_APP_BACKEND_URL=http://localhost:5000
-REACT_APP_FIREBASE_API_KEY=your_api_key
-REACT_APP_FIREBASE_AUTH_DOMAIN=your_domain.firebaseapp.com
-REACT_APP_FIREBASE_PROJECT_ID=your_project_id
-REACT_APP_FIREBASE_STORAGE_BUCKET=your_bucket.appspot.com
-REACT_APP_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-REACT_APP_FIREBASE_APP_ID=your_app_id
+REACT_APP_SUPABASE_URL=https://your-project.supabase.co
+REACT_APP_SUPABASE_ANON_KEY=your_anon_key_here
 ```
 
 3. Start the development server:
@@ -45,7 +41,7 @@ npm start
 
 ## Features
 
-- **Login/Authentication** - Firebase Auth with role-based access (Admin/Employee)
+- **Login/Authentication** - Supabase Auth with role-based access (Admin/Employee)
 - **Dashboard** - Live detection preview with defect tracking
 - **Admin Panel** - User management interface
 - **Help Page** - Support and documentation
@@ -53,9 +49,9 @@ npm start
 
 ## Architecture
 
-- **Frontend**: React with Firebase Auth
+- **Frontend**: React with Supabase Auth
 - **Backend**: Node.js with Socket.IO
-- **Database**: Firestore (Firebase)
+- **Database**: PostgreSQL (Supabase)
 - **Real-time**: Socket.IO for live streaming
 
 ## Roles
