@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 const { io } = require('socket.io-client');
 
-const URL = process.env.BACKEND_URL || 'http://localhost:5000';
+const URL = process.env.BACKEND_URL || 'http://localhost:3000';
 const DEVICE_ID = process.env.DEVICE_ID || 'test-cam';
 
 // 1x1 PNG (transparent)

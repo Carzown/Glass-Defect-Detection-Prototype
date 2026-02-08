@@ -32,6 +32,15 @@ try {
   console.warn('Admin routes not loaded:', e?.message || e)
 }
 
+// Defects API for glass defect management
+try {
+  const defectsRouter = require('./defects')
+  app.use('/defects', defectsRouter)
+  console.log('✅ Defects API routes loaded')
+} catch (e) {
+  console.warn('Defects routes not loaded:', e?.message || e)
+}
+
 // Utility: enumerate connected Jetsons based on socket.data.role/deviceId
 function getConnectedJetsons() {
   const groups = new Map(); // deviceId -> { deviceId, socketIds: [] }

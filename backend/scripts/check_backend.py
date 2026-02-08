@@ -102,7 +102,7 @@ def socketio_check(base_url: str, timeout: float = 6.0) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(description="Check backend server connectivity")
-    parser.add_argument("--url", default=os.getenv("BACKEND_URL", "http://localhost:5000"), help="Base backend URL")
+    parser.add_argument("--url", default=os.getenv("BACKEND_URL", "http://localhost:3000"), help="Base backend URL")
     parser.add_argument("--path", default=os.getenv("CHECK_PATH", "/"), help="HTTP path to probe (default /)")
     parser.add_argument("--skip-http", action="store_true", help="Skip HTTP check")
     parser.add_argument("--skip-socketio", action="store_true", help="Skip Socket.IO check")

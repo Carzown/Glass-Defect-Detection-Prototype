@@ -18,7 +18,7 @@ Builds the app for production to the `build` folder.
 ### Prerequisites
 - Node.js 14+ installed
 - Supabase project created
-- Backend server running on `http://localhost:5000`
+- Backend server running on `http://localhost:3000`
 
 ### Installation
 
@@ -29,7 +29,7 @@ npm install
 
 2. Create `.env.local` with Supabase credentials:
 ```env
-REACT_APP_BACKEND_URL=http://localhost:5000
+REACT_APP_BACKEND_URL=http://localhost:3000
 REACT_APP_SUPABASE_URL=https://your-project.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=your_anon_key_here
 ```

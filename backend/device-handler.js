@@ -5,10 +5,6 @@ const {
   JETSON_REGISTER,
   JETSON_FRAME,
   JETSON_STATUS,
-  DASHBOARD_START,
-  DASHBOARD_STOP,
-  DASHBOARD_PAUSE,
-  DASHBOARD_RESUME,
   CLIENT_HELLO,
   STREAM_FRAME,
 } = require('./socket');
@@ -69,22 +65,6 @@ module.exports = function registerDeviceHandler(io) {
     };
     socket.on(DEVICE_FRAME, onFrame);
     socket.on(JETSON_FRAME, onFrame);
-
-    // Dashboard control -> forward to all devices (or a specific deviceId if provided)
-    const forwardToDevices = (event) => (payload = {}) => {
-      const targetId = payload.deviceId && String(payload.deviceId);
-      forEachSocket(io, (s) => {
-        if (s.data?.role === 'device') {
-          if (!targetId || s.data.deviceId === targetId) {
-            s.emit(event, { deviceId: s.data.deviceId, ...payload });
-          }
-        }
-      });
-    };
-    socket.on(DASHBOARD_START, forwardToDevices(DASHBOARD_START));
-    socket.on(DASHBOARD_STOP, forwardToDevices(DASHBOARD_STOP));
-    socket.on(DASHBOARD_PAUSE, forwardToDevices(DASHBOARD_PAUSE));
-    socket.on(DASHBOARD_RESUME, forwardToDevices(DASHBOARD_RESUME));
 
     // Handle disconnect -> if it was a device, broadcast offline
     socket.on('disconnect', () => {

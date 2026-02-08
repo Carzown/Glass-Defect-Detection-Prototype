@@ -23,7 +23,7 @@ module.exports = function(app) {
     }
   });
 
-  const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+  const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3000';
   app.use(
     '/socket.io',
     createProxyMiddleware({

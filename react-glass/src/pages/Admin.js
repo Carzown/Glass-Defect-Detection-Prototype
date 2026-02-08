@@ -5,7 +5,7 @@ import { signOutUser } from '../supabase';
 import './Dashboard.css';
 import Chat from '../components/Chat';
 
-const ADMIN_API = (path) => `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}${path}`;
+const ADMIN_API = (path) => `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:3000'}${path}`;
 
 function Admin() {
   const navigate = useNavigate();

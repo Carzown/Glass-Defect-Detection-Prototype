@@ -1,13 +1,14 @@
-// Dashboard: Live preview (Socket.IO) + session-scoped defects
-// - Start/Stop controls Jetson via backend
+// Dashboard: Live preview (Socket.IO) + real-time defects from Supabase
+// - Receives live camera stream from Raspberry Pi via Socket.IO backend
 // - Preview comes from 'stream:frame' events
-// - Defects list comes from backend socket events
+// - Defects list comes from Supabase database polling
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import Sidebar from '../components/Sidebar';
 import { signOutUser } from '../supabase';
+import { fetchDefects, updateDefectStatus } from '../services/defects';
 import './Dashboard.css';
-import { io } from 'socket.io-client';
 
 const DEFECT_ITEM_HEIGHT = 56;
 
@@ -20,25 +21,20 @@ function formatTime(date) {
 }
 
 function Dashboard() {
-  // Session + UI state
-  const [isDetecting, setIsDetecting] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  // State
   const [currentDefects, setCurrentDefects] = useState([]);
+  const [supabaseDefects, setSupabaseDefects] = useState([]); // Supabase database defects
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const csvInputRef = useRef(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false); // UI state for status update
   const [cameraError, setCameraError] = useState('');
   const [frameSrc, setFrameSrc] = useState(null);
   // Connections
   const socketRef = useRef(null);
-  const [sessionStart, setSessionStart] = useState(null); // mark when Start Detection was clicked
+  const csvInputRef = useRef(null);
   const navigate = useNavigate();
   const defectsListRef = useRef(null);
-
-  // Keep latest paused state accessible inside event handlers
-  const pausedRef = useRef(false);
-  useEffect(() => { pausedRef.current = isPaused; }, [isPaused]);
 
   useEffect(() => {
     const role = sessionStorage.getItem('role');
@@ -48,136 +44,108 @@ function Dashboard() {
     }
   }, [navigate]);
 
-  // Start detection: connect to backend, listen to frames, and ask Jetsons to start
-  const startDetection = async () => {
-    setIsDetecting(true);
-    setIsPaused(false);
-  // Reset defects and prepare live socket stream reception
-    setCurrentDefects([]);
-    setCameraError('');
-    setSessionStart(new Date());
+  // Load initial Supabase defects and set up polling
+  useEffect(() => {
+    loadSupabaseDefects();
+    // Set up polling to fetch new defects every 3 seconds
+    const pollInterval = setInterval(() => {
+      loadSupabaseDefects();
+    }, 3000);
+    
+    return () => clearInterval(pollInterval);
+  }, []);
 
-    try {
-  // Attempt to start backend server (development helper)
+  // Connect to backend Socket.IO for live camera stream
+  useEffect(() => {
+    const url = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3000';
+    const socket = io(url, { transports: ['websocket'] });
+    socketRef.current = socket;
+
+    // Identify as dashboard
+    socket.emit('client:hello', { role: 'dashboard' });
+
+    // Receive live camera frames from Raspberry Pi
+    socket.on('stream:frame', (payload) => {
+      if (payload?.dataUrl) {
+        setFrameSrc(payload.dataUrl);
+      }
+    });
+
+    // Listen for device status updates
+    socket.on('device:status', (status) => {
+      console.log('Device status:', status);
+    });
+
+    // Handle connection errors
+    socket.on('connect_error', (err) => {
+      console.error('Socket.IO connection error:', err);
+      setCameraError('Cannot connect to backend for live stream');
+    });
+
+    // Cleanup on unmount
+    return () => {
       try {
-        await fetch('/__start_backend').then(()=>{}).catch(()=>{});
+        socket.disconnect();
       } catch (_) {}
-  // Connect to backend Socket.IO (allow test injection via window.__IO__)
-      const url = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
-      const ioFactory = (typeof window !== 'undefined' && window.__IO__) || io;
-      const socket = ioFactory(url, { transports: ['websocket'] });
-      socketRef.current = socket;
+    };
+  }, []);
 
-      // Identify as dashboard client
-      try {
-        socket.emit('client:hello', { role: 'dashboard' });
-      } catch (e) {
-        console.error(e);
-        setCameraError(e?.message || 'Unable to connect to backend stream');
-        stopDetection();
-        return;
-      }
+  const loadSupabaseDefects = async () => {
+    try {
+      // Fetch latest defects (unlimited to get all)
+      const result = await fetchDefects({ limit: 100, offset: 0 });
+      const supabaseData = result.data || [];
+      
+      // Convert Supabase defects to display format
+      const displayDefects = supabaseData.map(d => ({
+        id: d.id,
+        time: formatTime(new Date(d.detected_at)),
+        type: d.defect_type,
+        imageUrl: d.image_url,
+        status: d.status,
+        // Add full Supabase object for modal
+        detected_at: d.detected_at,
+        device_id: d.device_id,
+        image_path: d.image_path,
+        notes: d.notes,
+        supabaseData: d,
+      }));
 
-      socket.on('connect', () => {
-        console.log('Connected to backend for live stream');
+      // Update the list (keep latest 20)
+      setCurrentDefects(prev => {
+        // Merge with existing, removing duplicates by id
+        const mergedMap = new Map();
+        
+        // Add existing defects
+        prev.forEach(d => {
+          if (d.id) mergedMap.set(d.id, d);
+        });
+        
+        // Add/update with Supabase defects
+        displayDefects.forEach(d => {
+          mergedMap.set(d.id, d);
+        });
+        
+        // Convert back to array, keep latest 20
+        const merged = Array.from(mergedMap.values())
+          .sort((a, b) => new Date(b.detected_at || 0) - new Date(a.detected_at || 0))
+          .slice(0, 20);
+        
+        return merged;
       });
-
-      socket.on('stream:frame', (payload) => {
-        if (pausedRef.current) return;
-        if (payload?.dataUrl) setFrameSrc(payload.dataUrl);
-        // Append defects from backend Socket.IO
-        if (Array.isArray(payload?.defects) && payload.defects.length) {
-          const timeStr = formatTime(new Date(payload.time || Date.now()));
-          const toAdd = payload.defects.map((d) => ({
-            time: timeStr,
-            type: d?.type || 'Defect',
-            imageUrl: payload.dataUrl,
-          }));
-          setCurrentDefects((prev) => {
-            const next = [...prev, ...toAdd];
-            return next.length > 20 ? next.slice(-20) : next;
-          });
-        }
-      });
-
-      socket.on('disconnect', () => {
-        console.log('Disconnected from backend');
-      });
-
-      // Handle connection errors gracefully
-      socket.on('connect_error', (err) => {
-        console.error(err);
-        setCameraError(err?.message || 'Unable to connect to backend stream');
-        stopDetection();
-      });
-
-      // Optional: log device online/offline status updates from Raspberry Pi
-      socket.on('device:status', (status) => {
-        try {
-          console.log('Device status:', status);
-        } catch (_) {}
-      });
-
-      // Request Jetson(s) to start streaming and detection
-      try {
-        socket.emit('dashboard:start', {});
-      } catch (e) {
-        console.error(e);
-        setCameraError(e?.message || 'Unable to connect to backend stream');
-        stopDetection();
-        return;
-      }
-    } catch (err) {
-      console.error(err);
-      setCameraError(err?.message || 'Unable to connect to backend stream');
-      stopDetection();
+      
+      setSupabaseDefects(supabaseData);
+    } catch (error) {
+      console.error('Error loading Supabase defects:', error);
     }
   };
 
-  // Stop detection: signal stop, disconnect socket, reset preview
-  const stopDetection = () => {
-    setIsDetecting(false);
-    setIsPaused(false);
-    // disconnect socket and clear frame
-    try {
-      // signal Jetson(s) to stop
-      socketRef.current?.emit?.('dashboard:stop', {});
-      socketRef.current?.disconnect();
-    } catch (_) {}
-    socketRef.current = null;
-    setFrameSrc(null);
-  };
-
-  const toggleDetection = () => {
-    isDetecting ? stopDetection() : startDetection();
-  };
-
-  // Pause/Resume: stop appending new frames/defects (keeps last frame shown)
-  const togglePause = () => {
-    setIsPaused((prev) => {
-      const next = !prev;
-      try {
-        const sock = socketRef.current;
-        if (sock && typeof sock.emit === 'function') {
-          if (next) {
-            // Pausing detection on Jetson(s)
-            sock.emit('dashboard:pause', {});
-          } else {
-            // Resuming detection on Jetson(s)
-            sock.emit('dashboard:resume', {});
-          }
-        }
-      } catch (_) {}
-      return next;
-    });
-  };
+  // Load Supabase defects (polling happens in useEffect)
 
 
   function openClearConfirm() { setConfirmClearOpen(true); }
   function closeClearConfirm() { setConfirmClearOpen(false); }
   function clearDefects() {
-    // Also stop detection when clearing, per requirement
-    stopDetection();
     setCurrentDefects([]);
     setConfirmClearOpen(false);
   }
@@ -197,62 +165,6 @@ function Dashboard() {
     link.click();
     window.URL.revokeObjectURL(url);
   }
-
-  async function handleLogout() {
-    try {
-      // Sign out from Supabase
-      await signOutUser();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-    
-    // Clear session storage
-    sessionStorage.removeItem('loggedIn');
-    sessionStorage.removeItem('role');
-    sessionStorage.removeItem('userId');
-    
-    // If "Remember me" is not enabled, clear the email too
-    const remembered = localStorage.getItem('rememberMe') === 'true';
-    if (!remembered) {
-      localStorage.removeItem('email');
-    }
-    
-    navigate('/');
-  }
-
-  function openModal(index) {
-    setCurrentImageIndex(index);
-    setModalOpen(true);
-  }
-
-  function closeModal() {
-    setModalOpen(false);
-  }
-
-  function nextImage() {
-    setCurrentImageIndex((idx) => {
-      const last = currentDefects.length - 1;
-      return idx < last ? idx + 1 : idx; // clamp at most recent (right end)
-    });
-  }
-
-  function prevImage() {
-    setCurrentImageIndex((idx) => (idx > 0 ? idx - 1 : idx)); // clamp at oldest (left end)
-  }
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      try { socketRef.current?.disconnect(); } catch (_) {}
-    };
-  }, []);
-
-  // Auto-scroll defects list so newest entries are visible
-  useEffect(() => {
-    if (defectsListRef.current) {
-      defectsListRef.current.scrollTop = defectsListRef.current.scrollHeight;
-    }
-  }, [currentDefects]);
 
   function handleCsvUpload(event) {
     const file = event.target.files[0];
@@ -285,6 +197,89 @@ function Dashboard() {
     reader.readAsText(file);
   }
 
+  async function handleLogout() {
+    try {
+      // Sign out from Supabase
+      await signOutUser();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    
+    // Clear session storage
+    sessionStorage.removeItem('loggedIn');
+    sessionStorage.removeItem('role');
+    sessionStorage.removeItem('userId');
+    
+    // If "Remember me" is not enabled, clear the email too
+    const remembered = localStorage.getItem('rememberMe') === 'true';
+    if (!remembered) {
+      localStorage.removeItem('email');
+    }
+    
+    navigate('/');
+  }
+
+  const handleStatusUpdate = async (defectId, newStatus) => {
+    try {
+      setUpdatingStatus(true);
+      await updateDefectStatus(defectId, newStatus);
+      // Update local state
+      setCurrentDefects(prev => 
+        prev.map(d => d.id === defectId ? { ...d, status: newStatus } : d)
+      );
+      setSupabaseDefects(prev =>
+        prev.map(d => d.id === defectId ? { ...d, status: newStatus } : d)
+      );
+      alert(`Defect marked as ${newStatus}`);
+      closeModal();
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('Failed to update defect status');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch(status) {
+      case 'pending': return '#ff9800';
+      case 'reviewed': return '#2196f3';
+      case 'resolved': return '#4caf50';
+      default: return '#999';
+    }
+  };
+
+  function openModal(index) {
+    setCurrentImageIndex(index);
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+  }
+
+  function nextImage() {
+    setCurrentImageIndex((idx) => {
+      const last = currentDefects.length - 1;
+      return idx < last ? idx + 1 : idx; // clamp at most recent (right end)
+    });
+  }
+
+  function prevImage() {
+    setCurrentImageIndex((idx) => (idx > 0 ? idx - 1 : idx)); // clamp at oldest (left end)
+  }
+
+
+
+  // Auto-scroll defects list so newest entries are visible
+  useEffect(() => {
+    if (defectsListRef.current) {
+      defectsListRef.current.scrollTop = defectsListRef.current.scrollHeight;
+    }
+  }, [currentDefects]);
+
+
+
   return (
     <div className="machine-container">
       <Sidebar
@@ -302,73 +297,40 @@ function Dashboard() {
             <h1 className="machine-header-title">Glass Defect Detector</h1>
             <p className="machine-header-subtitle">CAM-001</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {isDetecting && (
-              <button
-                onClick={togglePause}
-                className="machine-detection-button"
-                title={isPaused ? 'Resume appending detections' : 'Pause appending detections'}
-              >
-                {isPaused ? 'Resume' : 'Pause'}
-              </button>
-            )}
-            <button onClick={toggleDetection} className="machine-detection-button">
-              {isDetecting ? 'Stop Detection' : 'Start Detection'}
-            </button>
-          </div>
         </header>
 
         <div className="machine-content-area">
           <div className="machine-content-wrapper">
             <div className="machine-video-section">
-              <h2 className="machine-section-title">Detection Preview</h2>
+              <h2 className="machine-section-title">Live Detection Stream</h2>
               <div className="machine-video-container">
-                {(isDetecting || cameraError) ? (
-                  <div className="machine-live-feed">
-                    {cameraError ? (
-                      <div style={{
-                        width: '100%', height: '100%', backgroundColor: '#300', color: '#fff',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, textAlign: 'center'
-                      }}>
-                        {cameraError}
-                      </div>
-                    ) : (
-                      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                        {frameSrc ? (
-                          <img
-                            src={frameSrc}
-                            alt="Live feed"
-                            className="machine-live-video"
-                            style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#000' }}
-                          />
-                        ) : (
-                          <div style={{
-                            width: '100%', height: '100%', backgroundColor: '#000', color: '#ccc',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center'
-                          }}>
-                            Waiting for stream...
-                          </div>
-                        )}
-                      </div>
-                    )}
+                {cameraError ? (
+                  <div style={{
+                    width: '100%', height: '100%', backgroundColor: '#300', color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, textAlign: 'center'
+                  }}>
+                    {cameraError}
+                  </div>
+                ) : frameSrc ? (
+                  <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                    <img
+                      src={frameSrc}
+                      alt="Live detection feed"
+                      className="machine-live-video"
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#000' }}
+                    />
                     <div className="machine-live-indicator">
                       <span className="machine-live-dot"></span>
                       LIVE
                     </div>
                   </div>
                 ) : (
-                  <div className="machine-video-placeholder">
-                    <div style={{
-                      width: '100%',
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <p className="machine-placeholder-title" style={{ color: '#1a3a52', fontWeight: 700, fontSize: 18 }}>Camera Ready</p>
-                      <p className="machine-placeholder-subtitle" style={{ color: '#6b7280', fontSize: 14 }}>Click "Start Detection" to begin live view</p>
-                    </div>
+                  <div style={{
+                    width: '100%', height: '100%', backgroundColor: '#000', color: '#ccc',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column'
+                  }}>
+                    <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Waiting for Camera Stream</p>
+                    <p style={{ fontSize: 14 }}>Make sure Raspberry Pi detection is running and backend is started</p>
                   </div>
                 )}
               </div>
@@ -387,18 +349,17 @@ function Dashboard() {
                     Clear
                   </button>
                   <input
+                    ref={csvInputRef}
                     type="file"
                     accept=".csv"
                     style={{ display: 'none' }}
-                    ref={csvInputRef}
                     onChange={handleCsvUpload}
                   />
                   <button
-                    onClick={() => csvInputRef.current.click()}
+                    onClick={() => csvInputRef.current?.click()}
                     className="action-button upload-button"
-                    disabled={isDetecting}
                   >
-                    Upload to Database
+                    Upload CSV
                   </button>
                   <button
                     onClick={downloadCSV}
@@ -417,18 +378,34 @@ function Dashboard() {
                     </div>
                   ) : (
                     currentDefects.map((defect, index) => (
-                      <div className="machine-defect-item" key={index} style={{ height: DEFECT_ITEM_HEIGHT }}>
+                      <div 
+                        className="machine-defect-item" 
+                        key={defect.id || index}
+                        style={{ 
+                          height: DEFECT_ITEM_HEIGHT,
+                          backgroundColor: index % 2 === 0 ? '#f5f5f5' : '#fff',
+                          borderLeft: `4px solid ${getStatusColor(defect.status)}`,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onClick={() => openModal(index)}
+                      >
                         <div className="machine-defect-content">
-                          <span className="machine-defect-time">{defect.time}</span>
-                          <span className="machine-defect-label">Glass Defect:</span>
-                          <span className="machine-defect-type">{defect.type}</span>
-                          <span
-                            className="machine-defect-image-link"
-                            style={{ cursor: 'pointer', color: '#e5a445' }}
-                            onClick={() => openModal(index)}
-                          >
-                            Image
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            <span className="machine-defect-time">{defect.time}</span>
+                            <span className="machine-defect-type">{defect.type}</span>
+                            {defect.imageUrl ? (
+                              <span style={{ fontSize: '11px', backgroundColor: '#e8f5e9', color: '#2e7d32', padding: '2px 6px', borderRadius: '3px' }}>🖼️ Image</span>
+                            ) : (
+                              <span style={{ fontSize: '11px', backgroundColor: '#fff3e0', color: '#e65100', padding: '2px 6px', borderRadius: '3px' }}>⚠️ No Image</span>
+                            )}
+                            <span style={{ fontSize: '11px', backgroundColor: '#f3e5f5', color: '#6a1b9a', padding: '2px 6px', borderRadius: '3px', marginLeft: 'auto' }}>
+                              {defect.status}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#999' }}>
+                            {defect.device_id && <span>📍 {defect.device_id}</span>}
+                          </div>
                         </div>
                       </div>
                     ))
@@ -441,7 +418,7 @@ function Dashboard() {
       </main>
 
       {/* Modal for defect image with X and Next button */}
-      {modalOpen && (
+      {modalOpen && currentDefects[currentImageIndex] && (
         <div className="modal">
           <div className="modal-content">
             <button onClick={closeModal} className="modal-close">
@@ -450,36 +427,75 @@ function Dashboard() {
                 <line x1="6" y1="6" x2="18" y2="18"></line>
               </svg>
             </button>
-            <div className="modal-image-container">
-              <div className="modal-defect-info">
-                {currentDefects[currentImageIndex] && (
-                  <>
-                    <p>
-                      {currentDefects[currentImageIndex].time} Glass Defect: {currentDefects[currentImageIndex].type}
-                    </p>
-                    {currentDefects[currentImageIndex].imageUrl && (
-                      <p style={{ wordBreak: 'break-all', fontSize: 12, color: '#6b7280' }}>
-                        Image URL:{" "}
-                        <a
-                          href={currentDefects[currentImageIndex].imageUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Open in new tab
-                        </a>
-                      </p>
-                    )}
-                  </>
+            <div className="modal-defect-info">
+              <h3 style={{ margin: '0 0 15px 0', color: '#333' }}>
+                🔍 {currentDefects[currentImageIndex].type} Defect
+              </h3>
+              
+              {/* Image Display */}
+              {currentDefects[currentImageIndex].imageUrl && (
+                <div style={{ marginBottom: '15px' }}>
+                  <img 
+                    src={currentDefects[currentImageIndex].imageUrl} 
+                    alt="Defect" 
+                    style={{ width: '100%', maxHeight: '300px', borderRadius: '4px', objectFit: 'cover' }}
+                  />
+                </div>
+              )}
+
+              {/* Defect Details */}
+              <div style={{ backgroundColor: '#f5f5f5', padding: '12px', borderRadius: '4px', marginBottom: '15px', fontSize: '13px', lineHeight: '1.6' }}>
+                <p style={{ margin: '5px 0' }}>
+                  <strong>Detection Time:</strong> {new Date(currentDefects[currentImageIndex].detected_at || Date.now()).toLocaleString()}
+                </p>
+                <p style={{ margin: '5px 0' }}>
+                  <strong>Device:</strong> {currentDefects[currentImageIndex].device_id || 'N/A'}
+                </p>
+                <p style={{ margin: '5px 0' }}>
+                  <strong>Status:</strong> <span style={{ color: getStatusColor(currentDefects[currentImageIndex].status), fontWeight: 'bold' }}>
+                    {currentDefects[currentImageIndex].status || 'pending'}
+                  </span>
+                </p>
+                {currentDefects[currentImageIndex].notes && (
+                  <p style={{ margin: '5px 0' }}>
+                    <strong>Notes:</strong> {currentDefects[currentImageIndex].notes}
+                  </p>
                 )}
               </div>
+
+              {/* Image Link */}
+              {currentDefects[currentImageIndex].imageUrl && (
+                <p style={{ fontSize: '12px', color: '#2196f3', marginBottom: '15px' }}>
+                  📎 <a 
+                    href={currentDefects[currentImageIndex].imageUrl} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    style={{ textDecoration: 'underline', color: '#2196f3' }}
+                  >
+                    Open full image in new tab
+                  </a>
+                </p>
+              )}
             </div>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', padding: '16px 32px 24px' }}>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', padding: '16px 0 0 0', flexWrap: 'wrap', borderTop: '1px solid #eee', paddingTop: '15px' }}>
               {currentImageIndex > 0 && (
-                <button onClick={prevImage} className="modal-next">
+                <button onClick={prevImage} className="modal-next" style={{ flex: 1, minWidth: '100px' }}>
                   <svg className="icon" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}>
                     <polyline points="15 18 9 12 15 6"></polyline>
                   </svg>
                   Prev  
+                </button>
+              )}
+              {currentDefects[currentImageIndex]?.id && currentDefects[currentImageIndex]?.status !== 'resolved' && (
+                <button 
+                  onClick={() => handleStatusUpdate(currentDefects[currentImageIndex].id, currentDefects[currentImageIndex].status === 'pending' ? 'reviewed' : 'resolved')}
+                  className="modal-next"
+                  disabled={updatingStatus}
+                  style={{ flex: 1, minWidth: '100px', backgroundColor: updatingStatus ? '#ccc' : '#2196f3', cursor: updatingStatus ? 'not-allowed' : 'pointer' }}
+                >
+                  {updatingStatus ? 'Updating...' : currentDefects[currentImageIndex].status === 'pending' ? '✓ Mark Reviewed' : '✓ Mark Resolved'}
                 </button>
               )}
               {currentImageIndex < currentDefects.length - 1 && (
