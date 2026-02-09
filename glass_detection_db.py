@@ -85,7 +85,7 @@ def save_defect_to_supabase(defect_type, timestamp, image_url, image_path, confi
             "image_url": image_url,  # Can be None if upload failed
             "image_path": image_path,
             "status": "pending",  # Can be: pending, reviewed, resolved
-            "notes": f"Confidence: {confidence:.2%}" if confidence else None,
+            "Confidence": f" {confidence:.2%}" if confidence else None,
         }
         
         try:
@@ -110,8 +110,12 @@ def emit_camera_frame_to_dashboard(frame, timestamp, device_id="raspberry-pi-1",
         if not sio.connected:
             return  # Silent fail - not critical
         
-        # Encode frame to base64
-        _, buffer = cv2.imencode('.jpg', frame)
+        # Encode frame to JPEG and then to base64
+        success, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        if not success:
+            return
+        
+        # Create base64 image data (without data URL wrapper since backend will convert)
         image_data = base64.b64encode(buffer).decode('utf-8')
         
         # Send to backend with correct event name and format
@@ -126,10 +130,11 @@ def emit_camera_frame_to_dashboard(frame, timestamp, device_id="raspberry-pi-1",
         sio.emit("device:frame", payload)
     except Exception as e:
         # Silent fail - camera streaming is optional bonus
+        print(f"Warning: Could not emit frame: {e}")
         pass
 
 # Load YOLOv11-small segmentation model
-model = YOLO("best.pt")
+model = YOLO("/home/raspi5/glass_segmentation/models/yolov11n_10-6-25.pt")
 
 # Initialize Picamera2
 picam2 = Picamera2()
@@ -144,17 +149,14 @@ picam2.start()
 time.sleep(2)  # Camera warm-up
 
 # Connect to backend (optional - logging only if needed)
-if os.getenv("BACKEND_URL"):
-    try:
-        print("\n⏱️  Connecting to backend for optional real-time notifications...")
-        sio.connect(BACKEND_URL, transports=['websocket'], wait_timeout=3)
-        time.sleep(0.5)
-        print("Connected to backend (optional)")
-    except Exception as e:
-        print(f"Could not connect to backend (non-critical): {e}")
-        print("   Detection will continue - Supabase is primary source\n")
-else:
-    print("⏭️  Backend URL not set - skipping Socket.IO connection (Supabase is primary)\n")
+try:
+    print(f"\n⏱️  Connecting to backend at {BACKEND_URL}...")
+    sio.connect(BACKEND_URL, transports=['websocket'], wait_timeout=5)
+    time.sleep(0.5)
+    print(f"✅ Connected to backend at {BACKEND_URL}")
+except Exception as e:
+    print(f"⚠️  Could not connect to backend: {e}")
+    print("   Camera detection will continue but streaming to website may not work\n")
 
 print("YOLOv11 segmentation running. Press 'q' to quit.")
 print("Sending defects to Supabase database in real-time...\n")
@@ -182,7 +184,7 @@ try:
                 defect_type = model.names[class_id] if class_id < len(model.names) else f"Defect_{class_id}"
                 
                 print(f"\n DEFECT DETECTED: {defect_type}")
-                print(f"   Confidence: {confidence:.2%}")
+                print(f"   {confidence:.2%}")
                 print(f"   Timestamp: {timestamp.strftime('%Y-%m-%d %H:%M:%S.%f')}")
                 
                 # Step 1: Try to upload image to Supabase Storage

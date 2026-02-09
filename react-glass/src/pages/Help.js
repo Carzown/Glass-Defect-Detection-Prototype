@@ -87,7 +87,7 @@ function Help() {
           
           <h3>Export Data</h3>
           <p>
-            Use the CSV download button to export the current session's defect data for analysis.
+            Export options (CSV import/export) were removed from the dashboard. Use the Supabase dashboard or API to export defect data if needed.
           </p>
         </section>
 

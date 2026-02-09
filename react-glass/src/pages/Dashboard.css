@@ -6,10 +6,26 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@500;600;700;800&display=swap');
 
+html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   overflow: hidden;
   background: linear-gradient(135deg, #f8fafb 0%, #f0f3f7 100%);
+  width: 100%;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
 .hidden {
@@ -18,9 +34,10 @@ body {
 
 .machine-container {
   display: flex;
-  min-height: 100vh;
-  width: 100%;
+  width: 100vw;
+  height: 100vh;
   background: linear-gradient(135deg, #f8fafb 0%, #f0f3f7 100%);
+  overflow: hidden;
 }
 
 .machine-sidebar {
@@ -174,6 +191,8 @@ body {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .machine-header {
@@ -234,16 +253,21 @@ body {
 
 .machine-content-area {
   flex: 1;
-  padding: 32px;
+  padding: 24px;
   background: linear-gradient(135deg, #f8fafb 0%, #f0f3f7 100%);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .machine-content-wrapper {
   height: 100%;
   display: flex;
-  gap: 32px;
+  gap: 24px;
   min-height: 0;
+  flex: 1;
+  align-items: stretch;
 }
 
 .machine-video-section {
@@ -252,6 +276,7 @@ body {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  height: 100%;
 }
 
 .machine-section-title {
@@ -261,6 +286,7 @@ body {
   font-family: 'Poppins', sans-serif;
   margin-bottom: 16px;
   letter-spacing: -0.3px;
+  flex-shrink: 0;
 }
 
 .machine-video-container {
@@ -268,13 +294,14 @@ body {
   background: white;
   border: 2px solid #e5e7eb;
   border-radius: 12px;
-  padding: 32px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: all 0.3s ease;
+  overflow: hidden;
 }
 
 .machine-video-container:hover {
@@ -359,12 +386,20 @@ body {
 }
 
 .machine-defects-panel {
-  width: 420px;
+  width: 340px;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   height: 100%;
   min-height: 0;
+  gap: 0;
+}
+
+.defects-panel-header {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .machine-defects-list {
@@ -373,19 +408,58 @@ body {
   background: white;
   border: 2px solid #e5e7eb;
   border-radius: 12px;
-  padding: 24px;
-  overflow-y: auto;
+  padding: 0;
+  overflow-y: scroll;
+  overflow-x: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
 }
 
 .machine-defects-list:hover {
-  border-color: #d1d5db;
+  border-color: #e5a445;
+  box-shadow: 0 8px 24px rgba(229, 164, 69, 0.12);
+}
+
+.machine-defects-list::-webkit-scrollbar {
+  width: 12px;
+}
+
+.machine-defects-list::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.machine-defects-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+  border: 2px solid #f3f4f6;
+  min-height: 40px;
+}
+
+.machine-defects-list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.machine-defects-list > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 100%;
 }
 
 .machine-defect-item {
-  padding: 14px 0;
-  border-bottom: 1px solid #f3f4f6;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
   transition: all 0.2s ease;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  background: white;
 }
 
 .machine-defect-item:hover {
@@ -401,8 +475,10 @@ body {
 .machine-defect-content {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .machine-defect-time {
@@ -457,10 +533,10 @@ body {
 }
 
 .defects-panel-header {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 16px;
 }
 
 .defects-panel-actions {
@@ -538,14 +614,15 @@ body {
   background: white;
   border-radius: 16px;
   padding: 40px 60px 40px 40px;
-  max-width: 800px;
-  max-height: 90vh;
+  max-width: 600px;
+  max-height: 85vh;
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 24px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
   animation: slideIn 0.3s ease;
+  overflow-y: auto;
 }
 
 @keyframes slideIn {
@@ -588,7 +665,7 @@ body {
 
 .modal-image {
   max-width: 100%;
-  max-height: 500px;
+  max-height: 350px;
   object-fit: contain;
   border: 2px solid #e5e7eb;
   border-radius: 12px;

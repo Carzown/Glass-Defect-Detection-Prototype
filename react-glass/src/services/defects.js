@@ -127,6 +127,25 @@ export async function deleteDefect(id) {
 }
 
 /**
+ * Delete all defects
+ * @returns {Promise<boolean>}
+ */
+export async function deleteAllDefects() {
+  try {
+    const { error } = await supabase
+      .from('defects')
+      .delete()
+      .neq('id', ''); // This deletes all records
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting all defects:', error);
+    throw error;
+  }
+}
+
+/**
  * Change defect status (pending -> reviewed -> resolved)
  * @param {string} id - Defect ID
  * @param {string} status - New status (pending, reviewed, resolved)
@@ -236,27 +255,4 @@ export async function fetchDefectsByDateRange(startDate, endDate) {
  * @param {Array} defects - Array of defect records
  * @returns {string} CSV content
  */
-export function defectsToCSV(defects) {
-  if (!defects || defects.length === 0) {
-    return 'No defects to export';
-  }
-
-  const headers = ['ID', 'Device ID', 'Defect Type', 'Detected At', 'Status', 'Image URL', 'Notes', 'Created At'];
-  const rows = defects.map((d) => [
-    d.id,
-    d.device_id,
-    d.defect_type,
-    new Date(d.detected_at).toLocaleString(),
-    d.status,
-    d.image_url || 'N/A',
-    d.notes || 'N/A',
-    new Date(d.created_at).toLocaleString(),
-  ]);
-
-  const csvContent = [
-    headers.join(','),
-    ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
-  ].join('\n');
-
-  return csvContent;
-}
+// CSV export removed; keep defects API utilities only

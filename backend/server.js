@@ -1,5 +1,5 @@
-// CommonJS-based backend server with Socket.IO relays for Jetson -> Dashboard live video
 try { require('dotenv').config(); } catch (_) {}
+
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
@@ -7,9 +7,25 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
+
 const io = new Server(server, {
-  cors: { origin: "*" },
+  cors: { 
+    origin: "*",
+    methods: ["GET", "POST"],
+    credentials: false
+  },
   maxHttpBufferSize: 10 * 1024 * 1024, // allow larger binary/base64 frames (~10MB)
+  transports: ['websocket', 'polling'], // Support both websocket and polling
+  pingInterval: 25000,
+  pingTimeout: 60000,
+});
+
+// Log Socket.IO connection events
+io.on('connection', (socket) => {
+  console.log('[Socket.IO] Client connected:', socket.id);
+  socket.on('disconnect', () => {
+    console.log('[Socket.IO] Client disconnected:', socket.id);
+  });
 });
 
 app.use(cors());
@@ -36,17 +52,16 @@ try {
 try {
   const defectsRouter = require('./defects')
   app.use('/defects', defectsRouter)
-  console.log('✅ Defects API routes loaded')
+  console.log('[SERVER] Defects API routes loaded')
 } catch (e) {
-  console.warn('Defects routes not loaded:', e?.message || e)
+  console.warn('[SERVER] Defects routes not loaded:', e?.message || e)
 }
 
-// Utility: enumerate connected Jetsons based on socket.data.role/deviceId
-function getConnectedJetsons() {
-  const groups = new Map(); // deviceId -> { deviceId, socketIds: [] }
-  // Iterate all connected sockets and group those marked as jetson
+// Utility: enumerate connected devices based on socket.data.role/deviceId
+function getConnectedDevices() {
+  const groups = new Map();
   for (const [sid, socket] of io.sockets.sockets) {
-    if (socket?.data?.role === "jetson") {
+    if (socket?.data?.role === "device" || socket?.data?.role === "jetson") {
       const devId = socket.data.deviceId || "unknown";
       const entry = groups.get(devId) || { deviceId: devId, socketIds: [] };
       entry.socketIds.push(sid);
@@ -62,15 +77,15 @@ function getConnectedJetsons() {
   return { total: devices.length, devices };
 }
 
-// HTTP endpoints to verify Jetson connectivity
-app.get("/jetsons", (_req, res) => {
-  const summary = getConnectedJetsons();
+// HTTP endpoints to verify device connectivity
+app.get("/devices", (_req, res) => {
+  const summary = getConnectedDevices();
   res.json(summary);
 });
 
-app.get("/jetsons/:deviceId", (req, res) => {
+app.get("/devices/:deviceId", (req, res) => {
   const { deviceId } = req.params;
-  const summary = getConnectedJetsons();
+  const summary = getConnectedDevices();
   const match = summary.devices.find((d) => d.deviceId === deviceId);
   res.json({ deviceId, online: !!match, socketCount: match?.socketCount || 0, socketIds: match?.socketIds || [] });
 });
@@ -81,19 +96,22 @@ const maxAttempts = 10;
 
 function startServer(port, attempt = 1) {
   const onListening = () => {
-    console.log(`✅ Server running on port ${port}`);
+    console.log('[SERVER] ✅ listening on port ' + port);
   };
 
-  server.once('error', (err) => {
+  const onError = (err) => {
     if (err.code === 'EADDRINUSE' && attempt < maxAttempts) {
-      console.warn(`Port ${port} in use, trying ${port + 1} (attempt ${attempt + 1}/${maxAttempts})`);
+      console.warn('[SERVER] ⚠️  port ' + port + ' in use, trying ' + (port + 1) + '...');
+      // Close this server instance and try next port
+      server.close();
       startServer(port + 1, attempt + 1);
     } else {
-      console.error('Server failed to start:', err);
+      console.error('[SERVER] ❌ failed to start:', err.message);
       process.exit(1);
     }
-  });
+  };
 
+  server.once('error', onError);
   server.listen(port, onListening);
 }
 
@@ -102,4 +120,3 @@ if (require.main === module) {
 }
 
 module.exports = { app, server, io };
-

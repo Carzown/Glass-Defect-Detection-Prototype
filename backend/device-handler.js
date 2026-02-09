@@ -11,11 +11,14 @@ const {
 
 module.exports = function registerDeviceHandler(io) {
   io.on('connection', (socket) => {
+    console.log('[device-handler] New socket connection:', socket.id);
+    
     // Identify client role
     socket.on(CLIENT_HELLO, (payload = {}) => {
       const role = (payload.role || '').toLowerCase();
       socket.data.role = role;
       if (payload.deviceId) socket.data.deviceId = String(payload.deviceId);
+      console.log(`[device-handler] Client identified: role=${role}, deviceId=${socket.data.deviceId || 'unknown'}`);
     });
 
     // Accept both new device:* and legacy jetson:* events
@@ -41,13 +44,14 @@ module.exports = function registerDeviceHandler(io) {
     const onFrame = (payload = {}) => {
       try {
         const { image, mime = 'image/jpeg', time, defects } = payload;
-        if (!image || typeof image !== 'string') return; // ignore malformed
-        const deviceId = String(payload.deviceId || socket.data.deviceId || 'unknown');
-        if (process.env.DEBUG_FRAMES === '1') {
-          try {
-            console.log('[device:frame] from', deviceId, 'defects:', Array.isArray(defects) ? defects.length : 0);
-          } catch (_) {}
+        if (!image || typeof image !== 'string') {
+          console.warn('[device:frame] Received malformed frame (no image data)');
+          return;
         }
+        const deviceId = String(payload.deviceId || socket.data.deviceId || 'unknown');
+        const defectCount = Array.isArray(defects) ? defects.length : 0;
+        console.log(`[device:frame] Received frame from ${deviceId} with ${defectCount} defects (${Math.round(image.length / 1024)}KB)`);
+        
         const dataUrl = `data:${mime};base64,${image}`;
         const out = {
           dataUrl,
@@ -55,13 +59,14 @@ module.exports = function registerDeviceHandler(io) {
           defects: Array.isArray(defects) ? defects : [],
           deviceId,
         };
-        if (process.env.DEBUG_FRAMES === '1') {
-          try {
-            console.log('[stream:frame] broadcast to dashboards for', deviceId);
-          } catch (_) {}
-        }
+        
+        // Broadcast to all connected dashboards
+        const dashboardCount = countDashboards(io);
+        console.log(`[stream:frame] Broadcasting to ${dashboardCount} dashboard(s)`);
         emitToDashboards(io, STREAM_FRAME, out);
-      } catch (_) {}
+      } catch (err) {
+        console.error('[device:frame] Error processing frame:', err.message);
+      }
     };
     socket.on(DEVICE_FRAME, onFrame);
     socket.on(JETSON_FRAME, onFrame);
@@ -82,6 +87,14 @@ function emitToDashboards(io, event, payload) {
       s.emit(event, payload);
     }
   });
+}
+
+function countDashboards(io) {
+  let count = 0;
+  forEachSocket(io, (s) => {
+    if (s.data?.role === 'dashboard') count++;
+  });
+  return count;
 }
 
 function forEachSocket(io, fn) {
