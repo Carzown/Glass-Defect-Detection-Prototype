@@ -1,4 +1,3 @@
-const { createProxyMiddleware } = require('http-proxy-middleware');
 const { spawn } = require('child_process');
 let backendProc = null;
 
@@ -22,15 +21,5 @@ module.exports = function(app) {
       res.status(500).json({ ok: false, error: e?.message || String(e) });
     }
   });
-
-  const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3000';
-  app.use(
-    '/socket.io',
-    createProxyMiddleware({
-      target: backendUrl,
-      changeOrigin: true,
-      ws: true,
-      logLevel: 'silent',
-    })
-  );
 };
+

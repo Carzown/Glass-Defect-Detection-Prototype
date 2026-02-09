@@ -1,10 +1,7 @@
-// Dashboard: Live preview (Socket.IO) + real-time defects from Supabase
-// - Receives live camera stream from Raspberry Pi via Socket.IO backend
-// - Preview comes from 'stream:frame' events
+// Dashboard: Real-time defects from Supabase
 // - Defects list comes from Supabase database polling
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { io } from 'socket.io-client';
 import Sidebar from '../components/Sidebar';
 import { signOutUser } from '../supabase';
 import { fetchDefects, updateDefectStatus } from '../services/defects';
@@ -35,11 +32,12 @@ function Dashboard() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [updatingStatus, setUpdatingStatus] = useState(false); // UI state for status update
   const [cameraError, setCameraError] = useState('');
-  const [frameSrc, setFrameSrc] = useState(null);
+  const [streamStatus, setStreamStatus] = useState('connecting'); // 'connecting', 'connected', 'error'
   // Connections
-  const socketRef = useRef(null);
   const navigate = useNavigate();
   const defectsListRef = useRef(null);
+  const videoRef = useRef(null);
+  const peerConnectionRef = useRef(null);
 
   useEffect(() => {
     const role = sessionStorage.getItem('role');
@@ -64,56 +62,112 @@ function Dashboard() {
     return () => clearInterval(pollInterval);
   }, []);
 
-  // Connect to backend Socket.IO for live camera stream
+  // WebRTC streaming setup
   useEffect(() => {
-    const url = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5001';
-    console.log('[Dashboard] Connecting to Socket.IO at:', url);
-    
-    const socket = io(url, { 
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
-    });
-    socketRef.current = socket;
-
-    // Connection events
-    socket.on('connect', () => {
-      console.log('[Dashboard] Socket.IO connected:', socket.id);
-      setCameraError('');
-      // Identify as dashboard
-      socket.emit('client:hello', { role: 'dashboard' });
-    });
-
-    socket.on('disconnect', () => {
-      console.log('[Dashboard] Socket.IO disconnected');
-      setCameraError('Disconnected from backend. Reconnecting...');
-    });
-
-    // Receive live camera frames from Raspberry Pi
-    socket.on('stream:frame', (payload) => {
-      if (payload?.dataUrl) {
-        setFrameSrc(payload.dataUrl);
-      }
-    });
-
-    // Listen for device status updates
-    socket.on('device:status', (status) => {
-      console.log('[Dashboard] Device status:', status);
-    });
-
-    // Handle connection errors
-    socket.on('connect_error', (err) => {
-      console.error('[Dashboard] Socket.IO connection error:', err);
-      setCameraError(`Connection error: ${err.message || 'Cannot reach backend at ' + url}`);
-    });
-
-    // Cleanup on unmount
-    return () => {
+    const setupWebRTC = async () => {
       try {
-        socket.disconnect();
-      } catch (_) {}
+        setStreamStatus('connecting');
+        const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+        const deviceId = 'raspberry-pi-1';
+
+        // Create peer connection
+        const pc = new RTCPeerConnection({
+          iceServers: [
+            { urls: ['stun:stun.l.google.com:19302'] },
+            { urls: ['stun:stun1.l.google.com:19302'] }
+          ]
+        });
+
+        // Handle incoming tracks
+        pc.ontrack = (event) => {
+          console.log('[Dashboard] Received track:', event.track.kind);
+          if (event.track.kind === 'video' && videoRef.current) {
+            videoRef.current.srcObject = event.streams[0];
+            setStreamStatus('connected');
+          }
+        };
+
+        pc.onconnectionstatechange = () => {
+          console.log('[Dashboard] Connection state:', pc.connectionState);
+          if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+            setStreamStatus('error');
+            setCameraError(`Connection ${pc.connectionState}`);
+          }
+        };
+
+        // Create offer
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        // Check if backend has offer from Raspberry Pi
+        console.log('[Dashboard] Checking for Raspberry Pi offer...');
+        let attempt = 0;
+        const maxAttempts = 30; // 30 seconds timeout
+
+        while (attempt < maxAttempts) {
+          try {
+            const offerResponse = await fetch(
+              `${backendUrl}/webrtc/offer?deviceId=${deviceId}`
+            );
+
+            if (offerResponse.ok) {
+              const offerData = await offerResponse.json();
+              const piOffer = offerData.offer;
+
+              console.log('[Dashboard] Received offer from Raspberry Pi');
+
+              // Set remote description
+              await pc.setRemoteDescription(
+                new RTCSessionDescription(piOffer)
+              );
+
+              // Send our answer
+              const answerResponse = await fetch(
+                `${backendUrl}/webrtc/answer`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    deviceId,
+                    answer: pc.localDescription
+                  })
+                }
+              );
+
+              if (answerResponse.ok) {
+                console.log('[Dashboard] WebRTC connection established!');
+                peerConnectionRef.current = pc;
+                setStreamStatus('connected');
+                return;
+              }
+            }
+          } catch (e) {
+            // Still waiting for offer
+          }
+
+          attempt++;
+          await new Promise(r => setTimeout(r, 1000)); // Wait 1 second before retry
+        }
+
+        console.warn('[Dashboard] Timeout waiting for Raspberry Pi offer');
+        setStreamStatus('error');
+        setCameraError('Timeout waiting for Raspberry Pi to connect');
+        pc.close();
+
+      } catch (error) {
+        console.error('[Dashboard] WebRTC setup error:', error);
+        setStreamStatus('error');
+        setCameraError(`WebRTC Error: ${error.message}`);
+      }
+    };
+
+    setupWebRTC();
+
+    return () => {
+      // Cleanup on unmount
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+      }
     };
   }, []);
 
@@ -289,33 +343,40 @@ function Dashboard() {
             <div className="machine-video-section">
               <h2 className="machine-section-title">Live Detection Stream</h2>
               <div className="machine-video-container">
-                {cameraError ? (
+                {streamStatus === 'error' ? (
                   <div style={{
                     width: '100%', height: '100%', backgroundColor: '#000', color: '#fff',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, textAlign: 'center', fontSize: 16
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, 
+                    textAlign: 'center', fontSize: 16, flexDirection: 'column'
                   }}>
-                    {cameraError}
+                    <p style={{ marginBottom: 16 }}>❌ {cameraError}</p>
+                    <p style={{ fontSize: 12, color: '#999' }}>Make sure Raspberry Pi is running glass_detection_webrtc.py</p>
                   </div>
-                ) : frameSrc ? (
+                ) : streamStatus === 'connecting' ? (
+                  <div style={{
+                    width: '100%', height: '100%', backgroundColor: '#000', color: '#ccc',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column'
+                  }}>
+                    <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>⏳ Connecting to Raspberry Pi...</div>
+                    <div style={{ fontSize: 12, color: '#999' }}>Waiting for WebRTC offer from camera device</div>
+                  </div>
+                ) : (
                   <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                    <img
-                      src={frameSrc}
-                      alt="Live detection feed"
-                      className="machine-live-video"
-                      style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#000' }}
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsinline
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        backgroundColor: '#000'
+                      }}
                     />
                     <div className="machine-live-indicator">
                       <span className="machine-live-dot"></span>
                       LIVE
                     </div>
-                  </div>
-                ) : (
-                  <div style={{
-                    width: '100%', height: '100%', backgroundColor: '#000', color: '#ccc',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column'
-                  }}>
-                    <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Waiting for Camera Stream</p>
-                    <p style={{ fontSize: 14 }}>Make sure Raspberry Pi detection is running and backend is started</p>
                   </div>
                 )}
               </div>

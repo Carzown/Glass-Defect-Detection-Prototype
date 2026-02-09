@@ -4,7 +4,7 @@
 Checks:
 1. TCP port reachability
 2. HTTP GET / (or specified path) status
-3. Optional Socket.IO websocket connection
+3. WebRTC signaling endpoints
 
 Usage:
     python scripts/check_backend.py --url http://<host>:5000 [--path /]
@@ -16,7 +16,6 @@ Exit codes:
     0 = all requested checks passed
     1 = TCP failure
     2 = HTTP failure
-    3 = Socket.IO failure
 """
 
 from __future__ import annotations
@@ -32,11 +31,6 @@ try:  # optional imports
     import requests  # type: ignore
 except Exception:
     requests = None  # type: ignore
-
-try:
-    import socketio  # type: ignore
-except Exception:
-    socketio = None  # type: ignore
 
 
 def tcp_check(host: str, port: int, timeout: float = 3.0) -> bool:
@@ -69,35 +63,27 @@ def http_check(base_url: str, path: str = "/", timeout: float = 4.0) -> bool:
         return False
 
 
-def socketio_check(base_url: str, timeout: float = 6.0) -> bool:
-    if socketio is None:
-        print("[SIO] python-socketio not installed; skipping Socket.IO check")
+def webrtc_signaling_check(base_url: str, timeout: float = 6.0) -> bool:
+    """Check if WebRTC signaling endpoints are available"""
+    if requests is None:
+        print("[WebRTC] requests not installed; skipping WebRTC check")
         return True
-    cli = socketio.Client(reconnection=False)
-    ok = True
 
-    def _on_connect():  # noqa: ANN001
-        print("[SIO] Connected")
-        cli.disconnect()
-
-    def _on_disconnect():  # noqa: ANN001
-        print("[SIO] Disconnected")
-
-    cli.on("connect", _on_connect)
-    cli.on("disconnect", _on_disconnect)
     try:
-        cli.connect(base_url, transports=["websocket"])
-        # Allow brief time for connect/disconnect cycle
-        time.sleep(0.3)
+        # Check for WebRTC status endpoint
+        resp = requests.get(
+            f"{base_url}/webrtc/status/test",
+            timeout=timeout
+        )
+        if resp.status_code in [200, 400]:  # 400 is ok (means endpoint exists but device not connected)
+            print(f"[WebRTC] OK: Signaling endpoints available at {base_url}")
+            return True
+        else:
+            print(f"[WebRTC] Fail: Signaling endpoint returned {resp.status_code}")
+            return False
     except Exception as e:
-        print(f"[SIO] Fail: {e}")
-        ok = False
-    finally:
-        try:
-            cli.disconnect()
-        except Exception:
-            pass
-    return ok
+        print(f"[WebRTC] Fail: Signaling check failed: {e}")
+        return False
 
 
 def main():
@@ -105,7 +91,7 @@ def main():
     parser.add_argument("--url", default=os.getenv("BACKEND_URL", "http://localhost:3000"), help="Base backend URL")
     parser.add_argument("--path", default=os.getenv("CHECK_PATH", "/"), help="HTTP path to probe (default /)")
     parser.add_argument("--skip-http", action="store_true", help="Skip HTTP check")
-    parser.add_argument("--skip-socketio", action="store_true", help="Skip Socket.IO check")
+    parser.add_argument("--skip-webrtc", action="store_true", help="Skip WebRTC signaling check")
     args = parser.parse_args()
 
     parsed = urlparse(args.url)
@@ -128,10 +114,10 @@ def main():
             sys.exit(2)
 
     sio_ok = True
-    if not args.skip_socketio:
-        sio_ok = socketio_check(args.url)
-        if not sio_ok:
-            print("Result: SOCKET.IO FAILED")
+    if not args.skip_webrtc:
+        webrtc_ok = webrtc_signaling_check(args.url)
+        if not webrtc_ok:
+            print("Result: WEBRTC SIGNALING CHECK FAILED")
             sys.exit(3)
 
     print("Result: ALL CHECKS PASSED")
