@@ -1,19 +1,31 @@
 // ManualWebRTCConnection.js
-// Manual connection to Raspberry Pi via IP address input
+// Manual connection to Raspberry Pi via IP:Port input
 
 import React, { useState, useRef } from 'react';
 
 function ManualWebRTCConnection({ onConnected, videoRef, onError, onStatusChange }) {
-  const [ipAddress, setIpAddress] = useState('192.168.1.');
-  const [port, setPort] = useState('5000');
+  const [backendAddress, setBackendAddress] = useState('192.168.1.:5000');
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const peerConnectionRef = useRef(null);
 
   const handleConnect = async () => {
-    if (!ipAddress.trim()) {
-      onError('Please enter the Raspberry Pi IP address');
+    if (!backendAddress.trim()) {
+      onError('Please enter the Raspberry Pi address (IP:Port)');
+      return;
+    }
+
+    // Validate address format
+    const addressParts = backendAddress.split(':');
+    if (addressParts.length !== 2) {
+      onError('Please enter address in format: IP:Port (e.g., 192.168.1.100:5000)');
+      return;
+    }
+
+    const [ipAddr, port] = addressParts;
+    if (!ipAddr.trim() || !port.trim()) {
+      onError('Please enter both IP address and port');
       return;
     }
 
@@ -22,7 +34,7 @@ function ManualWebRTCConnection({ onConnected, videoRef, onError, onStatusChange
     onStatusChange('connecting');
 
     try {
-      const backendUrl = `http://${ipAddress}:${port}`;
+      const backendUrl = `http://${backendAddress}`;
       console.log('[Manual Connection] Connecting to:', backendUrl);
 
       // Create peer connection
@@ -139,7 +151,7 @@ function ManualWebRTCConnection({ onConnected, videoRef, onError, onStatusChange
     }
     setConnectionStatus('');
     setIsConnected(false);
-    setIpAddress('192.168.1.');
+    setBackendAddress('192.168.1.:5000');
     onStatusChange('disconnected');
   };
 
@@ -152,24 +164,12 @@ function ManualWebRTCConnection({ onConnected, videoRef, onError, onStatusChange
           </div>
 
           <div style={styles.inputGroup}>
-            <label>Raspberry Pi IP Address:</label>
+            <label>Backend Address (IP:Port):</label>
             <input
               type="text"
-              value={ipAddress}
-              onChange={(e) => setIpAddress(e.target.value)}
-              placeholder="192.168.1.100"
-              disabled={isConnecting}
-              style={styles.input}
-            />
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label>Port:</label>
-            <input
-              type="text"
-              value={port}
-              onChange={(e) => setPort(e.target.value)}
-              placeholder="5000"
+              value={backendAddress}
+              onChange={(e) => setBackendAddress(e.target.value)}
+              placeholder="192.168.1.100:5000"
               disabled={isConnecting}
               style={styles.input}
             />
