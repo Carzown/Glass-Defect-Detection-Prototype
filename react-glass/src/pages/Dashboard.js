@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
+import ManualWebRTCConnection from '../components/ManualWebRTCConnection';
 import { signOutUser } from '../supabase';
 import { fetchDefects, updateDefectStatus } from '../services/defects';
 import './Dashboard.css';
@@ -33,6 +34,8 @@ function Dashboard() {
   const [updatingStatus, setUpdatingStatus] = useState(false); // UI state for status update
   const [cameraError, setCameraError] = useState('');
   const [streamStatus, setStreamStatus] = useState('connecting'); // 'connecting', 'connected', 'error'
+  const [useManualConnection, setUseManualConnection] = useState(true); // Use manual IP connection by default
+  const [showAutoConnection, setShowAutoConnection] = useState(false); // Show auto-connection option
   // Connections
   const navigate = useNavigate();
   const defectsListRef = useRef(null);
@@ -64,6 +67,12 @@ function Dashboard() {
 
   // WebRTC streaming setup
   useEffect(() => {
+    if (useManualConnection) {
+      // Skip auto-connection, wait for manual connection
+      setStreamStatus('disconnected');
+      return;
+    }
+
     const setupWebRTC = async () => {
       try {
         setStreamStatus('connecting');
@@ -169,7 +178,7 @@ function Dashboard() {
         peerConnectionRef.current.close();
       }
     };
-  }, []);
+  }, [useManualConnection]);
 
   const loadSupabaseDefects = async (filterAfterTime = null) => {
     try {
@@ -342,8 +351,20 @@ function Dashboard() {
           <div className="machine-content-wrapper">
             <div className="machine-video-section">
               <h2 className="machine-section-title">Live Detection Stream</h2>
+
+              {/* Unified Container: Shows connection form OR video stream */}
               <div className="machine-video-container">
-                {streamStatus === 'error' ? (
+                {/* Show connection form when manual mode and not connected */}
+                {useManualConnection && streamStatus !== 'connected' ? (
+                  <ManualWebRTCConnection
+                    onConnected={(pc) => {
+                      peerConnectionRef.current = pc;
+                    }}
+                    videoRef={videoRef}
+                    onError={(error) => setCameraError(error)}
+                    onStatusChange={(status) => setStreamStatus(status)}
+                  />
+                ) : streamStatus === 'error' ? (
                   <div style={{
                     width: '100%', height: '100%', backgroundColor: '#000', color: '#fff',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, 
@@ -377,6 +398,38 @@ function Dashboard() {
                       <span className="machine-live-dot"></span>
                       LIVE
                     </div>
+                    {/* Change Connection button overlay */}
+                    {useManualConnection && (
+                      <button
+                        onClick={() => {
+                          setStreamStatus('disconnected');
+                          setUseManualConnection(true);
+                          if (peerConnectionRef.current) {
+                            peerConnectionRef.current.close();
+                            peerConnectionRef.current = null;
+                          }
+                          if (videoRef.current) {
+                            videoRef.current.srcObject = null;
+                          }
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: '10px',
+                          right: '10px',
+                          padding: '8px 16px',
+                          background: '#3498db',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          zIndex: 100
+                        }}
+                      >
+                        🔄 Change Connection
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
