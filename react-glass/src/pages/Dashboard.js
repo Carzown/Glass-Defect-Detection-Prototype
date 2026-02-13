@@ -31,10 +31,12 @@ function Dashboard() {
   const [sessionStartTime, setSessionStartTime] = useState(null); // Track when dashboard loaded
   const [modalOpen, setModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [selectedDefectId, setSelectedDefectId] = useState(null); // Track by ID instead of index
   const [updatingStatus, setUpdatingStatus] = useState(false); // UI state for status update
   const [cameraError, setCameraError] = useState('');
   const [streamStatus, setStreamStatus] = useState('connecting'); // 'connecting', 'connected', 'error'
   const [useManualConnection, setUseManualConnection] = useState(true); // Use manual IP connection by default
+  const [showManualPanel, setShowManualPanel] = useState(true); // control visibility of manual panel
   const [showAutoConnection, setShowAutoConnection] = useState(false); // Show auto-connection option
   // Connections
   const navigate = useNavigate();
@@ -300,24 +302,58 @@ function Dashboard() {
   };
 
   function openModal(index) {
-    setCurrentImageIndex(index);
-    setModalOpen(true);
+    const defect = currentDefects[index];
+    if (defect && defect.id) {
+      setSelectedDefectId(defect.id);
+      setCurrentImageIndex(index);
+      setModalOpen(true);
+    }
   }
 
   function closeModal() {
     setModalOpen(false);
+    setSelectedDefectId(null);
   }
 
   function nextImage() {
     setCurrentImageIndex((idx) => {
       const last = currentDefects.length - 1;
-      return idx < last ? idx + 1 : idx; // clamp at most recent (right end)
+      if (idx < last) {
+        const nextIdx = idx + 1;
+        if (currentDefects[nextIdx]) {
+          setSelectedDefectId(currentDefects[nextIdx].id);
+        }
+        return nextIdx;
+      }
+      return idx;
     });
   }
 
   function prevImage() {
-    setCurrentImageIndex((idx) => (idx > 0 ? idx - 1 : idx)); // clamp at oldest (left end)
+    setCurrentImageIndex((idx) => {
+      if (idx > 0) {
+        const prevIdx = idx - 1;
+        if (currentDefects[prevIdx]) {
+          setSelectedDefectId(currentDefects[prevIdx].id);
+        }
+        return prevIdx;
+      }
+      return idx;
+    });
   }
+
+  // Sync modal index if selected defect ID is still valid
+  useEffect(() => {
+    if (modalOpen && selectedDefectId) {
+      const foundIndex = currentDefects.findIndex(d => d.id === selectedDefectId);
+      if (foundIndex !== -1 && foundIndex !== currentImageIndex) {
+        setCurrentImageIndex(foundIndex);
+      } else if (foundIndex === -1) {
+        // Defect was removed, close modal
+        closeModal();
+      }
+    }
+  }, [currentDefects, modalOpen, selectedDefectId, currentImageIndex]);
 
 
 
@@ -356,14 +392,40 @@ function Dashboard() {
               <div className="machine-video-container">
                 {/* Show connection form when manual mode and not connected */}
                 {useManualConnection && streamStatus !== 'connected' ? (
-                  <ManualWebRTCConnection
-                    onConnected={(pc) => {
-                      peerConnectionRef.current = pc;
-                    }}
-                    videoRef={videoRef}
-                    onError={(error) => setCameraError(error)}
-                    onStatusChange={(status) => setStreamStatus(status)}
-                  />
+                  showManualPanel ? (
+                    <ManualWebRTCConnection
+                      onConnected={(pc) => {
+                        peerConnectionRef.current = pc;
+                      }}
+                      videoRef={videoRef}
+                      onError={(error) => setCameraError(error)}
+                      onStatusChange={(status) => setStreamStatus(status)}
+                      onClose={() => setShowManualPanel(false)}
+                      onDisconnect={() => {
+                        if (peerConnectionRef.current) {
+                          try { peerConnectionRef.current.close(); } catch(e){}
+                          peerConnectionRef.current = null;
+                        }
+                        if (videoRef.current) videoRef.current.srcObject = null;
+                        setStreamStatus('disconnected');
+                      }}
+                    />
+                  ) : (
+                    <div style={{ padding: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <button
+                        onClick={() => setShowManualPanel(true)}
+                        style={{ padding: '8px 12px', background: '#3498db', color: '#fff', border: 'none', borderRadius: 4 }}
+                      >
+                        Open Manual Connection
+                      </button>
+                      <button
+                        onClick={() => { setUseManualConnection(false); setStreamStatus('connecting'); }}
+                        style={{ padding: '8px 12px', background: '#27ae60', color: '#fff', border: 'none', borderRadius: 4 }}
+                      >
+                        Use Auto Connection
+                      </button>
+                    </div>
+                  )
                 ) : streamStatus === 'error' ? (
                   <div style={{
                     width: '100%', height: '100%', backgroundColor: '#000', color: '#fff',
@@ -488,97 +550,102 @@ function Dashboard() {
       </main>
 
       {/* Modal for defect image with X and Next button */}
-      {modalOpen && currentDefects[currentImageIndex] && (
-        <div className="modal">
-          <div className="modal-content">
-            <button onClick={closeModal} className="modal-close">
-              <svg className="icon" viewBox="0 0 24 24">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-            <div className="modal-defect-info">
-              <h3 style={{ margin: '0 0 15px 0', color: '#333' }}>
-                {currentDefects[currentImageIndex].type} Defect
-              </h3>
-              
-              {/* Image Display */}
-              {currentDefects[currentImageIndex].imageUrl && (
-                <div style={{ marginBottom: '15px', maxWidth: '100%' }}>
-                  <img 
-                    src={currentDefects[currentImageIndex].imageUrl} 
-                    alt="Defect" 
-                    style={{ width: '100%', maxHeight: '300px', borderRadius: '4px', objectFit: 'cover' }}
-                  />
+      {modalOpen && currentImageIndex >= 0 && currentDefects[currentImageIndex] && (
+        (() => {
+          const modalDefect = currentDefects[currentImageIndex];
+          return (
+            <div className="modal">
+              <div className="modal-content">
+                <button onClick={closeModal} className="modal-close">
+                  <svg className="icon" viewBox="0 0 24 24">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+                <div className="modal-defect-info">
+                  <h3 style={{ margin: '0 0 15px 0', color: '#333' }}>
+                    {modalDefect.type} Defect
+                  </h3>
+                  
+                  {/* Image Display */}
+                  {modalDefect.imageUrl && (
+                    <div style={{ marginBottom: '15px', maxWidth: '100%' }}>
+                      <img 
+                        src={modalDefect.imageUrl} 
+                        alt="Defect" 
+                        style={{ width: '100%', maxHeight: '300px', borderRadius: '4px', objectFit: 'cover' }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Defect Details */}
+                  <div style={{ backgroundColor: '#f5f5f5', padding: '12px', borderRadius: '4px', marginBottom: '15px', fontSize: '13px', lineHeight: '1.6' }}>
+                    <p style={{ margin: '5px 0' }}>
+                      <strong>Detection Time:</strong> {new Date(modalDefect.detected_at || Date.now()).toLocaleString()}
+                    </p>
+                    <p style={{ margin: '5px 0' }}>
+                      <strong>Device:</strong> {modalDefect.device_id || 'N/A'}
+                    </p>
+                    <p style={{ margin: '5px 0' }}>
+                      <strong>Status:</strong> <span style={{ color: getStatusColor(modalDefect.status), fontWeight: 'bold' }}>
+                        {modalDefect.status || 'pending'}
+                      </span>
+                    </p>
+                    {modalDefect.notes && (
+                      <p style={{ margin: '5px 0' }}>
+                        <strong>Notes:</strong> {modalDefect.notes}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Image Link */}
+                  {modalDefect.imageUrl && (
+                    <p style={{ fontSize: '12px', color: '#2196f3', marginBottom: '15px' }}>
+                      <a 
+                        href={modalDefect.imageUrl} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        style={{ textDecoration: 'underline', color: '#2196f3' }}
+                      >
+                        Open full image in new tab
+                      </a>
+                    </p>
+                  )}
                 </div>
-              )}
 
-              {/* Defect Details */}
-              <div style={{ backgroundColor: '#f5f5f5', padding: '12px', borderRadius: '4px', marginBottom: '15px', fontSize: '13px', lineHeight: '1.6' }}>
-                <p style={{ margin: '5px 0' }}>
-                  <strong>Detection Time:</strong> {new Date(currentDefects[currentImageIndex].detected_at || Date.now()).toLocaleString()}
-                </p>
-                <p style={{ margin: '5px 0' }}>
-                  <strong>Device:</strong> {currentDefects[currentImageIndex].device_id || 'N/A'}
-                </p>
-                <p style={{ margin: '5px 0' }}>
-                  <strong>Status:</strong> <span style={{ color: getStatusColor(currentDefects[currentImageIndex].status), fontWeight: 'bold' }}>
-                    {currentDefects[currentImageIndex].status || 'pending'}
-                  </span>
-                </p>
-                {currentDefects[currentImageIndex].notes && (
-                  <p style={{ margin: '5px 0' }}>
-                    <strong>Notes:</strong> {currentDefects[currentImageIndex].notes}
-                  </p>
-                )}
+                {/* Modal Actions */}
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', padding: '16px 0 0 0', flexWrap: 'wrap', borderTop: '1px solid #eee', paddingTop: '15px' }}>
+                  {currentImageIndex > 0 && (
+                    <button onClick={prevImage} className="modal-next" style={{ flex: 1, minWidth: '100px' }}>
+                      <svg className="icon" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}>
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                      </svg>
+                      Prev  
+                    </button>
+                  )}
+                  {modalDefect?.id && modalDefect?.status !== 'resolved' && (
+                    <button 
+                      onClick={() => handleStatusUpdate(modalDefect.id, modalDefect.status === 'pending' ? 'reviewed' : 'resolved')}
+                      className="modal-next"
+                      disabled={updatingStatus}
+                      style={{ flex: 1, minWidth: '100px', backgroundColor: updatingStatus ? '#ccc' : '#2196f3', cursor: updatingStatus ? 'not-allowed' : 'pointer' }}
+                    >
+                      {updatingStatus ? 'Updating...' : modalDefect.status === 'pending' ? '✓ Mark Reviewed' : '✓ Mark Resolved'}
+                    </button>
+                  )}
+                  {currentImageIndex < currentDefects.length - 1 && (
+                    <button onClick={nextImage} className="modal-next">
+                      Next
+                      <svg className="icon" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}>
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                      </svg>
+                    </button>
+                  )}
+                </div>
               </div>
-
-              {/* Image Link */}
-              {currentDefects[currentImageIndex].imageUrl && (
-                <p style={{ fontSize: '12px', color: '#2196f3', marginBottom: '15px' }}>
-                  <a 
-                    href={currentDefects[currentImageIndex].imageUrl} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    style={{ textDecoration: 'underline', color: '#2196f3' }}
-                  >
-                    Open full image in new tab
-                  </a>
-                </p>
-              )}
             </div>
-
-            {/* Modal Actions */}
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', padding: '16px 0 0 0', flexWrap: 'wrap', borderTop: '1px solid #eee', paddingTop: '15px' }}>
-              {currentImageIndex > 0 && (
-                <button onClick={prevImage} className="modal-next" style={{ flex: 1, minWidth: '100px' }}>
-                  <svg className="icon" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}>
-                    <polyline points="15 18 9 12 15 6"></polyline>
-                  </svg>
-                  Prev  
-                </button>
-              )}
-              {currentDefects[currentImageIndex]?.id && currentDefects[currentImageIndex]?.status !== 'resolved' && (
-                <button 
-                  onClick={() => handleStatusUpdate(currentDefects[currentImageIndex].id, currentDefects[currentImageIndex].status === 'pending' ? 'reviewed' : 'resolved')}
-                  className="modal-next"
-                  disabled={updatingStatus}
-                  style={{ flex: 1, minWidth: '100px', backgroundColor: updatingStatus ? '#ccc' : '#2196f3', cursor: updatingStatus ? 'not-allowed' : 'pointer' }}
-                >
-                  {updatingStatus ? 'Updating...' : currentDefects[currentImageIndex].status === 'pending' ? '✓ Mark Reviewed' : '✓ Mark Resolved'}
-                </button>
-              )}
-              {currentImageIndex < currentDefects.length - 1 && (
-                <button onClick={nextImage} className="modal-next">
-                  Next
-                  <svg className="icon" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}>
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                  </svg>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+          );
+        })()
       )}
 
     </div>

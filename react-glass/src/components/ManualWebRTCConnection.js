@@ -3,7 +3,7 @@
 
 import React, { useState, useRef } from 'react';
 
-function ManualWebRTCConnection({ onConnected, videoRef, onError, onStatusChange }) {
+function ManualWebRTCConnection({ onConnected, videoRef, onError, onStatusChange, onClose, onDisconnect }) {
   const [backendAddress, setBackendAddress] = useState('192.168.1.:5000');
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('');
@@ -143,7 +143,11 @@ function ManualWebRTCConnection({ onConnected, videoRef, onError, onStatusChange
 
   const handleDisconnect = () => {
     if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
+      try {
+        peerConnectionRef.current.close();
+      } catch (e) {
+        // ignore
+      }
       peerConnectionRef.current = null;
     }
     if (videoRef.current) {
@@ -152,7 +156,8 @@ function ManualWebRTCConnection({ onConnected, videoRef, onError, onStatusChange
     setConnectionStatus('');
     setIsConnected(false);
     setBackendAddress('192.168.1.:5000');
-    onStatusChange('disconnected');
+    onStatusChange && onStatusChange('disconnected');
+    onDisconnect && onDisconnect();
   };
 
   return (
@@ -197,8 +202,44 @@ function ManualWebRTCConnection({ onConnected, videoRef, onError, onStatusChange
               {connectionStatus}
             </div>
           )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12 }}>
+            <button
+              onClick={handleDisconnect}
+              disabled={!isConnected && !isConnecting}
+              style={{ ...styles.button, background: '#e74c3c', color: 'white' }}
+            >
+              Disconnect
+            </button>
+            <button
+              onClick={() => onClose && onClose()}
+              style={{ ...styles.button, background: '#3498db', color: 'white' }}
+            >
+              Close
+            </button>
+          </div>
         </div>
-      ) : null}
+      ) : (
+        <div style={{ ...styles.formContainer, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h3>✅ Manual WebRTC Connected</h3>
+            <div style={{ marginTop: 6 }}>{connectionStatus || 'Connected to Raspberry Pi'}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={handleDisconnect}
+              style={{ ...styles.button, background: '#e74c3c', color: 'white' }}
+            >
+              Disconnect
+            </button>
+            <button
+              onClick={() => onClose && onClose()}
+              style={{ ...styles.button, background: '#3498db', color: 'white' }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
