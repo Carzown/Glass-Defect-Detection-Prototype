@@ -1,9 +1,9 @@
-// Dashboard: Real-time defects from Supabase
+// Dashboard: Real-time defects from Supabase + WebSocket video stream
 // - Defects list comes from Supabase database polling
+// - Live video stream comes from WebSocket backend on Railway
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
-import ManualWebRTCConnection from '../components/ManualWebRTCConnection';
 import { signOutUser } from '../supabase';
 import { fetchDefects, updateDefectStatus } from '../services/defects';
 import './Dashboard.css';
@@ -31,26 +31,18 @@ function Dashboard() {
   const [sessionStartTime, setSessionStartTime] = useState(null); // Track when dashboard loaded
   const [modalOpen, setModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [selectedDefectId, setSelectedDefectId] = useState(null); // Track by ID instead of index
+  const [selectedDefectId, setSelectedDefectId] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(false); // UI state for status update
-  const [cameraError, setCameraError] = useState('');
   const [streamStatus, setStreamStatus] = useState('connecting'); // 'connecting', 'connected', 'error'
-  const [useManualConnection, setUseManualConnection] = useState(true); // Use manual IP connection by default
-  const [showManualPanel, setShowManualPanel] = useState(true); // control visibility of manual panel
-  const [showAutoConnection, setShowAutoConnection] = useState(false); // Show auto-connection option
+  const [streamMessage, setStreamMessage] = useState('Connecting to backend...');
+  const [videoFrame, setVideoFrame] = useState(null);
+
   // Connections
   const navigate = useNavigate();
   const defectsListRef = useRef(null);
   const videoRef = useRef(null);
-  const peerConnectionRef = useRef(null);
-
-  useEffect(() => {
-    const role = sessionStorage.getItem('role');
-    if (role === 'admin') {
-      alert('Admins cannot access the Employee Dashboard. Redirecting to Admin.');
-      navigate('/admin');
-    }
-  }, [navigate]);
+  const wsRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
 
   // Load initial Supabase defects and set up polling
   useEffect(() => {
@@ -58,8 +50,10 @@ function Dashboard() {
     const now = new Date();
     setSessionStartTime(now);
     
-    // Don't load old defects on initial mount
-    // Only start polling for new defects from this point forward
+    // Load initial defects
+    loadSupabaseDefects(now);
+    
+    // Poll for new defects every 3 seconds
     const pollInterval = setInterval(() => {
       loadSupabaseDefects(now);
     }, 3000);
@@ -67,190 +61,72 @@ function Dashboard() {
     return () => clearInterval(pollInterval);
   }, []);
 
-  // WebRTC streaming setup
+  // WebSocket connection for real-time video frames from Railway backend
   useEffect(() => {
-    if (useManualConnection) {
-      // Skip auto-connection, wait for manual connection
-      setStreamStatus('disconnected');
-      return;
-    }
-
-    const setupWebRTC = async () => {
-      try {
-        setStreamStatus('connecting');
-        const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
-        const deviceId = 'raspberry-pi-1';
-
-        // Create peer connection
-        const pc = new RTCPeerConnection({
-          iceServers: [
-            { urls: ['stun:stun.l.google.com:19302'] },
-            { urls: ['stun:stun1.l.google.com:19302'] }
-          ]
-        });
-
-        // Handle incoming tracks
-        pc.ontrack = (event) => {
-          console.log('[Dashboard] Received track:', event.track.kind);
-          if (event.track.kind === 'video' && videoRef.current) {
-            videoRef.current.srcObject = event.streams[0];
-            setStreamStatus('connected');
-          }
-        };
-
-        pc.onconnectionstatechange = () => {
-          console.log('[Dashboard] Connection state:', pc.connectionState);
-          if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-            setStreamStatus('error');
-            setCameraError(`Connection ${pc.connectionState}`);
-          }
-        };
-
-        // Create offer
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
-        // Check if backend has offer from Raspberry Pi
-        console.log('[Dashboard] Checking for Raspberry Pi offer...');
-        let attempt = 0;
-        const maxAttempts = 30; // 30 seconds timeout
-
-        while (attempt < maxAttempts) {
-          try {
-            const offerResponse = await fetch(
-              `${backendUrl}/webrtc/offer?deviceId=${deviceId}`
-            );
-
-            if (offerResponse.ok) {
-              const offerData = await offerResponse.json();
-              const piOffer = offerData.offer;
-
-              console.log('[Dashboard] Received offer from Raspberry Pi');
-
-              // Set remote description
-              await pc.setRemoteDescription(
-                new RTCSessionDescription(piOffer)
-              );
-
-              // Send our answer
-              const answerResponse = await fetch(
-                `${backendUrl}/webrtc/answer`,
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    deviceId,
-                    answer: pc.localDescription
-                  })
-                }
-              );
-
-              if (answerResponse.ok) {
-                console.log('[Dashboard] WebRTC connection established!');
-                peerConnectionRef.current = pc;
-                setStreamStatus('connected');
-                return;
-              }
-            }
-          } catch (e) {
-            // Still waiting for offer
-          }
-
-          attempt++;
-          await new Promise(r => setTimeout(r, 1000)); // Wait 1 second before retry
-        }
-
-        console.warn('[Dashboard] Timeout waiting for Raspberry Pi offer');
-        setStreamStatus('error');
-        setCameraError('Timeout waiting for Raspberry Pi to connect');
-        pc.close();
-
-      } catch (error) {
-        console.error('[Dashboard] WebRTC setup error:', error);
-        setStreamStatus('error');
-        setCameraError(`WebRTC Error: ${error.message}`);
-      }
-    };
-
-    setupWebRTC();
-
-    return () => {
-      // Cleanup on unmount
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-      }
-    };
-  }, [useManualConnection]);
-
-  // WebSocket connection for real-time frame streaming
-  useEffect(() => {
-    let ws = null;
-    let reconnectTimeout = null;
-
     const connectWebSocket = () => {
       try {
         const wsUrl = process.env.REACT_APP_WS_URL || 'wss://glass-defect-detection-prototype-production.up.railway.app:8080';
         console.log('[Dashboard] Attempting WebSocket connection to:', wsUrl);
 
-        ws = new WebSocket(wsUrl);
+        wsRef.current = new WebSocket(wsUrl);
 
-        ws.onopen = () => {
-          console.log('[Dashboard] WebSocket connected');
+        wsRef.current.onopen = () => {
+          console.log('[Dashboard] WebSocket connected, registering as web_client');
           setStreamStatus('connected');
+          setStreamMessage('Connected to backend');
+          
+          // Register as web_client
+          if (wsRef.current) {
+            wsRef.current.send(JSON.stringify({
+              type: 'register',
+              client_type: 'web_client'
+            }));
+          }
         };
 
-        ws.onmessage = (event) => {
+        wsRef.current.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
 
-            // Handle frame data
+            // Handle frame data (for live video display)
             if (data.type === 'frame' && data.frame) {
-              // Display frame in video element if available
-              if (videoRef.current && data.frame) {
-                const blob = new Blob([Buffer.from(data.frame, 'base64')], { type: 'image/jpeg' });
+              try {
+                const blob = new Blob([Uint8Array.from(atob(data.frame), c => c.charCodeAt(0))], { type: 'image/jpeg' });
                 const url = URL.createObjectURL(blob);
-                videoRef.current.src = url;
+                setVideoFrame(url);
+              } catch (e) {
+                console.error('[Dashboard] Error creating blob from frame:', e);
               }
             }
 
             // Handle defect detection
-            if (data.type === 'defect' && data.defect) {
-              const defect = data.defect;
-              // Add to current defects list
-              const newDefect = {
-                id: defect.id || `ws-${Date.now()}`,
-                time: formatTime(new Date()),
-                type: capitalizeDefectType(defect.type || defect.defect_type || 'Unknown'),
-                imageUrl: defect.image_url,
-                status: 'pending',
-                detected_at: new Date().toISOString(),
-                confidence: defect.confidence,
-              };
+            // Note: Defects are now fetched from Supabase polling, not WebSocket
+            // to ensure we get the full defect list with proper status tracking
 
-              setCurrentDefects(prev => [newDefect, ...prev.slice(0, 19)]);
-            }
-
-            // Handle connection status
+            // Handle connection status messages
             if (data.type === 'status') {
               console.log('[Dashboard] Server status:', data.message);
+              setStreamMessage(data.message);
             }
+
           } catch (e) {
             console.error('[Dashboard] Error parsing WebSocket message:', e);
           }
         };
 
-        ws.onerror = (error) => {
+        wsRef.current.onerror = (error) => {
           console.error('[Dashboard] WebSocket error:', error);
           setStreamStatus('error');
-          setCameraError('WebSocket connection error');
+          setStreamMessage('Backend connection error');
         };
 
-        ws.onclose = () => {
+        wsRef.current.onclose = () => {
           console.log('[Dashboard] WebSocket disconnected');
           setStreamStatus('disconnected');
+          setStreamMessage('Connection lost. Reconnecting...');
           
           // Attempt reconnection after 3 seconds
-          reconnectTimeout = setTimeout(() => {
+          reconnectTimeoutRef.current = setTimeout(() => {
             console.log('[Dashboard] Attempting to reconnect WebSocket...');
             connectWebSocket();
           }, 3000);
@@ -259,10 +135,10 @@ function Dashboard() {
       } catch (error) {
         console.error('[Dashboard] WebSocket setup error:', error);
         setStreamStatus('error');
-        setCameraError(`WebSocket Error: ${error.message}`);
+        setStreamMessage(`WebSocket Error: ${error.message}`);
         
         // Retry connection after 3 seconds
-        reconnectTimeout = setTimeout(() => {
+        reconnectTimeoutRef.current = setTimeout(() => {
           connectWebSocket();
         }, 3000);
       }
@@ -272,14 +148,48 @@ function Dashboard() {
 
     return () => {
       // Cleanup on unmount
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
       }
-      if (ws) {
-        ws.close();
+      if (wsRef.current) {
+        wsRef.current.close();
       }
     };
   }, []);
+
+  // Update video element with new frame
+  useEffect(() => {
+    if (videoFrame && videoRef.current) {
+      videoRef.current.src = videoFrame;
+    }
+  }, [videoFrame]);
+
+  async function handleLogout() {
+    try {
+      // Sign out from Supabase
+      await signOutUser();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    
+    // Clear session storage
+    sessionStorage.removeItem('loggedIn');
+    sessionStorage.removeItem('role');
+    sessionStorage.removeItem('userId');
+    
+    // If "Remember me" is not enabled, clear the email too
+    const remembered = localStorage.getItem('rememberMe') === 'true';
+    if (!remembered) {
+      localStorage.removeItem('email');
+    }
+    
+    // Close WebSocket
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
+    
+    navigate('/');
+  }
 
   const loadSupabaseDefects = async (filterAfterTime = null) => {
     try {
@@ -348,28 +258,6 @@ function Dashboard() {
     }
   };
 
-  async function handleLogout() {
-    try {
-      // Sign out from Supabase
-      await signOutUser();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-    
-    // Clear session storage
-    sessionStorage.removeItem('loggedIn');
-    sessionStorage.removeItem('role');
-    sessionStorage.removeItem('userId');
-    
-    // If "Remember me" is not enabled, clear the email too
-    const remembered = localStorage.getItem('rememberMe') === 'true';
-    if (!remembered) {
-      localStorage.removeItem('email');
-    }
-    
-    navigate('/');
-  }
-
   const handleStatusUpdate = async (defectId, newStatus) => {
     try {
       setUpdatingStatus(true);
@@ -389,7 +277,7 @@ function Dashboard() {
     } finally {
       setUpdatingStatus(false);
     }
-  };
+  }
 
   const getStatusColor = (status) => {
     switch(status) {
@@ -454,14 +342,25 @@ function Dashboard() {
     }
   }, [currentDefects, modalOpen, selectedDefectId, currentImageIndex]);
 
-
-
   // Auto-scroll defects list so newest entries are visible
   useEffect(() => {
     if (defectsListRef.current) {
       defectsListRef.current.scrollTop = defectsListRef.current.scrollHeight;
     }
   }, [currentDefects]);
+
+  const videoContainerStyle = {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#fff',
+    flexDirection: 'column',
+    padding: '16px',
+    textAlign: 'center'
+  };
 
   return (
     <div className="machine-container">
@@ -478,7 +377,7 @@ function Dashboard() {
         <header className="machine-header">
           <div className="machine-header-left">
             <h1 className="machine-header-title">Glass Defect Detector</h1>
-            <p className="machine-header-subtitle">CAM-001</p>
+            <p className="machine-header-subtitle">Live WebSocket Stream + Supabase History</p>
           </div>
         </header>
 
@@ -487,110 +386,41 @@ function Dashboard() {
             <div className="machine-video-section">
               <h2 className="machine-section-title">Live Detection Stream</h2>
 
-              {/* Unified Container: Shows connection form OR video stream */}
+              {/* Video Container */}
               <div className="machine-video-container">
-                {/* Show connection form when manual mode and not connected */}
-                {useManualConnection && streamStatus !== 'connected' ? (
-                  showManualPanel ? (
-                    <ManualWebRTCConnection
-                      onConnected={(pc) => {
-                        peerConnectionRef.current = pc;
-                      }}
-                      videoRef={videoRef}
-                      onError={(error) => setCameraError(error)}
-                      onStatusChange={(status) => setStreamStatus(status)}
-                      onClose={() => setShowManualPanel(false)}
-                      onDisconnect={() => {
-                        if (peerConnectionRef.current) {
-                          try { peerConnectionRef.current.close(); } catch(e){}
-                          peerConnectionRef.current = null;
-                        }
-                        if (videoRef.current) videoRef.current.srcObject = null;
-                        setStreamStatus('disconnected');
-                      }}
-                    />
-                  ) : (
-                    <div style={{ padding: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <button
-                        onClick={() => setShowManualPanel(true)}
-                        style={{ padding: '8px 12px', background: '#3498db', color: '#fff', border: 'none', borderRadius: 4 }}
-                      >
-                        Open Manual Connection
-                      </button>
-                      <button
-                        onClick={() => { setUseManualConnection(false); setStreamStatus('connecting'); }}
-                        style={{ padding: '8px 12px', background: '#27ae60', color: '#fff', border: 'none', borderRadius: 4 }}
-                      >
-                        Use Auto Connection
-                      </button>
-                    </div>
-                  )
-                ) : streamStatus === 'error' ? (
-                  <div style={{
-                    width: '100%', height: '100%', backgroundColor: '#000', color: '#fff',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, 
-                    textAlign: 'center', fontSize: 16, flexDirection: 'column'
-                  }}>
-                    <p style={{ marginBottom: 16 }}>❌ {cameraError}</p>
-                    <p style={{ fontSize: 12, color: '#999' }}>Make sure Raspberry Pi is running glass_detection_webrtc.py</p>
+                {streamStatus === 'error' ? (
+                  <div style={videoContainerStyle}>
+                    <p style={{ marginBottom: 16, fontSize: 16 }}>❌ Connection Error</p>
+                    <p style={{ fontSize: 12, color: '#999' }}>{streamMessage}</p>
+                    <p style={{ fontSize: 12, color: '#999', marginTop: 8 }}>Make sure backend is running on Railway</p>
                   </div>
                 ) : streamStatus === 'connecting' ? (
-                  <div style={{
-                    width: '100%', height: '100%', backgroundColor: '#000', color: '#ccc',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column'
-                  }}>
-                    <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>⏳ Connecting to Raspberry Pi...</div>
-                    <div style={{ fontSize: 12, color: '#999' }}>Waiting for WebRTC offer from camera device</div>
+                  <div style={videoContainerStyle}>
+                    <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>⏳ Connecting...</div>
+                    <div style={{ fontSize: 12, color: '#999' }}>{streamMessage}</div>
                   </div>
                 ) : (
                   <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsinline
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'contain',
-                        backgroundColor: '#000'
-                      }}
-                    />
+                    {videoFrame ? (
+                      <img 
+                        ref={videoRef}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'contain',
+                          backgroundColor: '#000'
+                        }}
+                        alt="Live detection stream"
+                      />
+                    ) : (
+                      <div style={videoContainerStyle}>
+                        <p style={{ fontSize: 14 }}>Waiting for video stream...</p>
+                      </div>
+                    )}
                     <div className="machine-live-indicator">
                       <span className="machine-live-dot"></span>
                       LIVE
                     </div>
-                    {/* Change Connection button overlay */}
-                    {useManualConnection && (
-                      <button
-                        onClick={() => {
-                          setStreamStatus('disconnected');
-                          setUseManualConnection(true);
-                          if (peerConnectionRef.current) {
-                            peerConnectionRef.current.close();
-                            peerConnectionRef.current = null;
-                          }
-                          if (videoRef.current) {
-                            videoRef.current.srcObject = null;
-                          }
-                        }}
-                        style={{
-                          position: 'absolute',
-                          top: '10px',
-                          right: '10px',
-                          padding: '8px 16px',
-                          background: '#3498db',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          zIndex: 100
-                        }}
-                      >
-                        🔄 Change Connection
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
@@ -599,13 +429,13 @@ function Dashboard() {
             {/* Defect List Section */}
             <div className="machine-defects-panel">
               <div className="defects-panel-header">
-                <h2 className="machine-section-title">Detected Defects</h2>
+                <h2 className="machine-section-title">Detected Defects ({currentDefects.length})</h2>
               </div>
               <div className="machine-defects-list" ref={defectsListRef}>
                 <div>
                   {currentDefects.length === 0 ? (
                     <div className="machine-empty-state">
-                      <p className="machine-empty-state-text">No detections yet</p>
+                      <p className="machine-empty-state-text">No defects detected yet</p>
                     </div>
                   ) : (
                     currentDefects.map((defect, index) => (
@@ -648,7 +478,7 @@ function Dashboard() {
         </div>
       </main>
 
-      {/* Modal for defect image with X and Next button */}
+      {/* Modal for defect image with navigation */}
       {modalOpen && currentImageIndex >= 0 && currentDefects[currentImageIndex] && (
         (() => {
           const modalDefect = currentDefects[currentImageIndex];
@@ -690,9 +520,9 @@ function Dashboard() {
                         {modalDefect.status || 'pending'}
                       </span>
                     </p>
-                    {modalDefect.notes && (
+                    {modalDefect.confidence && (
                       <p style={{ margin: '5px 0' }}>
-                        <strong>Notes:</strong> {modalDefect.notes}
+                        <strong>Confidence:</strong> {(modalDefect.confidence * 100).toFixed(1)}%
                       </p>
                     )}
                   </div>
@@ -712,7 +542,7 @@ function Dashboard() {
                   )}
                 </div>
 
-                {/* Modal Actions */}
+                {/* Modal Navigation and Actions */}
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center', padding: '16px 0 0 0', flexWrap: 'wrap', borderTop: '1px solid #eee', paddingTop: '15px' }}>
                   {currentImageIndex > 0 && (
                     <button onClick={prevImage} className="modal-next" style={{ flex: 1, minWidth: '100px' }}>
