@@ -378,7 +378,7 @@ function Dashboard() {
         <header className="machine-header">
           <div className="machine-header-left">
             <h1 className="machine-header-title">Glass Defect Detector</h1>
-            <p className="machine-header-subtitle">Live WebSocket Stream + Supabase History</p>
+            <p className="machine-header-subtitle">CAM-001</p>
           </div>
         </header>
 
@@ -418,10 +418,6 @@ function Dashboard() {
                         <p style={{ fontSize: 14 }}>Waiting for video stream...</p>
                       </div>
                     )}
-                    <div className="machine-live-indicator">
-                      <span className="machine-live-dot"></span>
-                      LIVE
-                    </div>
                   </div>
                 )}
               </div>
