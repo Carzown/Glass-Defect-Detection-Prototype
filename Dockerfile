@@ -1,13 +1,13 @@
-FROM node:18.20.0-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
 # Copy all files
 COPY . .
 
-# Install backend dependencies with clean cache
+# Install backend dependencies
 WORKDIR /app/backend
-RUN npm cache clean --force && npm ci --production --no-cache
+RUN npm install --production
 
 # Expose port
 EXPOSE 8080

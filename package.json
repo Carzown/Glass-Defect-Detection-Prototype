@@ -4,7 +4,7 @@
   "description": "Glass Defect Detection System - Backend API",
   "private": true,
   "engines": {
-    "node": "18.20.0",
+    "node": "20.x",
     "npm": "10.x"
   },
   "scripts": {
