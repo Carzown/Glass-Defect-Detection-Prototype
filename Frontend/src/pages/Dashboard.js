@@ -27,7 +27,8 @@ function capitalizeDefectType(type) {
 function Dashboard() {
   // State
   const [currentDefects, setCurrentDefects] = useState([]);
-  const [supabaseDefects, setSupabaseDefects] = useState([]); // Supabase database defects
+  // eslint-disable-next-line no-unused-vars
+  const [supabaseDefects, setSupabaseDefects] = useState([]); // Supabase database defects (stored for consistency)
   const [sessionStartTime, setSessionStartTime] = useState(null); // Track when dashboard loaded
   const [modalOpen, setModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
