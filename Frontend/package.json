@@ -1,6 +1,7 @@
 {
-  "name": "react-glass",
+  "name": "glass-defect-detection",
   "version": "0.1.0",
+  "homepage": "https://Carzown.github.io/Glass-Defect-Detection-Prototype/",
   "private": true,
   "dependencies": {
     "@supabase/supabase-js": "^2.46.1",
@@ -15,12 +16,15 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build",
     "eject": "react-scripts eject"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.25.0",
     "@babel/preset-react": "^7.25.0",
-    "eslint": "^8.57.1"
+    "eslint": "^8.57.1",
+    "gh-pages": "^6.1.0"
   },
   "eslintConfig": {
     "extends": [
