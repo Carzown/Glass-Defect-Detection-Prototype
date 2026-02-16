@@ -1,0 +1,5 @@
+{
+  "builder": "nixpacks",
+  "buildCommand": "bash build.sh",
+  "startCommand": "npm start"
+}

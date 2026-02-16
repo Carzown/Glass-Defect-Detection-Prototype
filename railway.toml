@@ -1,6 +1,7 @@
-# Railway Configuration for Glass Defect Detection
-# Railway will auto-detect Node.js and use package.json for build/start
+# Railway Configuration for Backend
+# Auto-detected as Node.js project
+# startCommand specified in Procfile
 
 [deploy]
 startCommand = "npm start"
-restartPolicyMaxRetries = 5
+restartPolicyMaxRetries = 3

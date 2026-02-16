@@ -1,15 +1,10 @@
 {
   "name": "glass-defect-detection",
   "version": "1.0.0",
-  "description": "Glass Defect Detection System - Backend + Frontend + Desktop App",
+  "description": "Glass Defect Detection System - Backend API",
   "private": true,
   "scripts": {
     "start": "cd backend && npm start",
-    "dev": "cd backend && npm run dev",
-    "install-all": "cd backend && npm install && cd ../react-glass && npm install",
-    "postinstall": "cd backend && npm install"
-  },
-  "workspaces": [
-    "backend"
-  ]
+    "dev": "cd backend && npm run dev"
+  }
 }
