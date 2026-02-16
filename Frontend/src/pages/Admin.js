@@ -9,11 +9,7 @@ const ADMIN_API = (path) => `${process.env.REACT_APP_BACKEND_URL || 'http://loca
 
 function Admin() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [users, setUsers] = useState([]);
-  const [adminToken, setAdminToken] = useState(localStorage.getItem('ADMIN_API_TOKEN') || '');
-  const [pwdById, setPwdById] = useState({});
+  const [adminToken] = useState(localStorage.getItem('ADMIN_API_TOKEN') || '');
 
   useEffect(() => {
     const role = sessionStorage.getItem('role');
@@ -24,8 +20,6 @@ function Admin() {
   }, [navigate]);
 
   async function fetchUsers() {
-    setLoading(true);
-    setError('');
     try {
       if (adminToken) {
         // Fetch full authentication users list (merged with roles)
@@ -34,16 +28,12 @@ function Admin() {
         });
         const js = await resp.json();
         if (!resp.ok || !js.ok) throw new Error(js.error || 'Failed to load users');
-        setUsers(js.users || []);
       } else {
         // Fallback: without Supabase integration, we only show a message
-        setError('Please provide an admin token to view users');
-        setUsers([]);
+        throw new Error('Please provide an admin token to view users');
       }
     } catch (e) {
-      setError(e.message || String(e));
-    } finally {
-      setLoading(false);
+      console.error('Failed to fetch users:', e);
     }
   }
 

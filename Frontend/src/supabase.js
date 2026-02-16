@@ -74,7 +74,7 @@ export async function createUserWithRole(email, password, role) {
   if (authError) throw authError;
 
   // Store user role in profiles table
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('profiles')
     .insert([
       {

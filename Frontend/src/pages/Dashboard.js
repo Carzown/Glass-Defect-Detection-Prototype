@@ -1,6 +1,6 @@
 // Dashboard: Real-time defects from Supabase
 // - Defects list comes from Supabase database polling
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import ManualWebRTCConnection from '../components/ManualWebRTCConnection';
@@ -27,7 +27,6 @@ function capitalizeDefectType(type) {
 function Dashboard() {
   // State
   const [currentDefects, setCurrentDefects] = useState([]);
-  const [supabaseDefects, setSupabaseDefects] = useState([]); // Supabase database defects
   const [sessionStartTime, setSessionStartTime] = useState(null); // Track when dashboard loaded
   const [modalOpen, setModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -37,7 +36,6 @@ function Dashboard() {
   const [streamStatus, setStreamStatus] = useState('connecting'); // 'connecting', 'connected', 'error'
   const [useManualConnection, setUseManualConnection] = useState(true); // Use manual IP connection by default
   const [showManualPanel, setShowManualPanel] = useState(true); // control visibility of manual panel
-  const [showAutoConnection, setShowAutoConnection] = useState(false); // Show auto-connection option
   // Connections
   const navigate = useNavigate();
   const defectsListRef = useRef(null);
@@ -53,6 +51,68 @@ function Dashboard() {
   }, [navigate]);
 
   // Load initial Supabase defects and set up polling
+  const loadSupabaseDefects = useCallback(async (filterAfterTime = null) => {
+    try {
+      // Save current scroll position before updating defects
+      const scrollPos = defectsListRef.current?.scrollTop || 0;
+      
+      // Fetch latest defects (unlimited to get all)
+      const result = await fetchDefects({ limit: 100, offset: 0 });
+      const supabaseData = result.data || [];
+      
+      // Filter defects to only show ones detected after session start
+      const timeToFilter = filterAfterTime || sessionStartTime;
+      const filteredData = timeToFilter 
+        ? supabaseData.filter(d => new Date(d.detected_at) >= timeToFilter)
+        : supabaseData;
+      
+      // Convert Supabase defects to display format
+      const displayDefects = filteredData.map(d => ({
+        id: d.id,
+        time: formatTime(new Date(d.detected_at)),
+        type: capitalizeDefectType(d.defect_type),
+        imageUrl: d.image_url,
+        status: d.status,
+        // Add full Supabase object for modal
+        detected_at: d.detected_at,
+        device_id: d.device_id,
+        image_path: d.image_path,
+        notes: d.notes,
+        supabaseData: d,
+      }));
+
+      // Update the list (keep latest 20)
+      setCurrentDefects(prev => {
+        // Merge with existing, removing duplicates by id
+        const mergedMap = new Map();
+        
+        // Add existing defects
+        prev.forEach(d => {
+          if (d.id) mergedMap.set(d.id, d);
+        });
+        
+        // Add/update with Supabase defects
+        displayDefects.forEach(d => {
+          mergedMap.set(d.id, d);
+        });
+        
+        // Convert back to array, keep latest 20
+        const merged = Array.from(mergedMap.values())
+          .sort((a, b) => new Date(b.detected_at || 0) - new Date(a.detected_at || 0))
+          .slice(0, 20);
+        
+        return merged;
+      });
+      
+      // Restore scroll position
+      if (defectsListRef.current) {
+        defectsListRef.current.scrollTop = scrollPos;
+      }
+    } catch (error) {
+      console.error('Error loading Supabase defects:', error);
+    }
+  }, [sessionStartTime]);
+
   useEffect(() => {
     // Set session start time when component mounts
     const now = new Date();
@@ -65,7 +125,7 @@ function Dashboard() {
     }, 3000);
     
     return () => clearInterval(pollInterval);
-  }, []);
+  }, [loadSupabaseDefects]);
 
   // WebRTC streaming setup
   useEffect(() => {
@@ -280,73 +340,6 @@ function Dashboard() {
       }
     };
   }, []);
-
-  const loadSupabaseDefects = async (filterAfterTime = null) => {
-    try {
-      // Save current scroll position before updating defects
-      const scrollPos = defectsListRef.current?.scrollTop || 0;
-      
-      // Fetch latest defects (unlimited to get all)
-      const result = await fetchDefects({ limit: 100, offset: 0 });
-      const supabaseData = result.data || [];
-      
-      // Filter defects to only show ones detected after session start
-      const timeToFilter = filterAfterTime || sessionStartTime;
-      const filteredData = timeToFilter 
-        ? supabaseData.filter(d => new Date(d.detected_at) >= timeToFilter)
-        : supabaseData;
-      
-      // Convert Supabase defects to display format
-      const displayDefects = filteredData.map(d => ({
-        id: d.id,
-        time: formatTime(new Date(d.detected_at)),
-        type: capitalizeDefectType(d.defect_type),
-        imageUrl: d.image_url,
-        status: d.status,
-        // Add full Supabase object for modal
-        detected_at: d.detected_at,
-        device_id: d.device_id,
-        image_path: d.image_path,
-        notes: d.notes,
-        supabaseData: d,
-      }));
-
-      // Update the list (keep latest 20)
-      setCurrentDefects(prev => {
-        // Merge with existing, removing duplicates by id
-        const mergedMap = new Map();
-        
-        // Add existing defects
-        prev.forEach(d => {
-          if (d.id) mergedMap.set(d.id, d);
-        });
-        
-        // Add/update with Supabase defects
-        displayDefects.forEach(d => {
-          mergedMap.set(d.id, d);
-        });
-        
-        // Convert back to array, keep latest 20
-        const merged = Array.from(mergedMap.values())
-          .sort((a, b) => new Date(b.detected_at || 0) - new Date(a.detected_at || 0))
-          .slice(0, 20);
-        
-        return merged;
-      });
-      
-      // Restore scroll position after state update
-      // Use requestAnimationFrame to ensure DOM has updated
-      requestAnimationFrame(() => {
-        if (defectsListRef.current) {
-          defectsListRef.current.scrollTop = scrollPos;
-        }
-      });
-      
-      setSupabaseDefects(supabaseData);
-    } catch (error) {
-      console.error('Error loading Supabase defects:', error);
-    }
-  };
 
   async function handleLogout() {
     try {
