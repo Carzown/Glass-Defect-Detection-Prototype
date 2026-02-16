@@ -490,44 +490,35 @@ function Dashboard() {
                   </svg>
                 </button>
                 <div className="modal-defect-info">
-                  <h3 style={{ margin: '0 0 15px 0', color: '#333' }}>
-                    {modalDefect.type} Defect
-                  </h3>
-                  
-                  {/* Image Display */}
+                  {/* Image Display - Top */}
                   {modalDefect.imageUrl && (
-                    <div style={{ marginBottom: '15px', maxWidth: '100%' }}>
+                    <div style={{ marginBottom: '20px', maxWidth: '100%' }}>
                       <img 
                         src={modalDefect.imageUrl} 
                         alt="Defect" 
-                        style={{ width: '100%', maxHeight: '300px', borderRadius: '4px', objectFit: 'cover' }}
+                        style={{ width: '100%', maxHeight: '350px', borderRadius: '4px', objectFit: 'cover' }}
                       />
                     </div>
                   )}
 
                   {/* Defect Details */}
-                  <div style={{ backgroundColor: '#f5f5f5', padding: '12px', borderRadius: '4px', marginBottom: '15px', fontSize: '13px', lineHeight: '1.6' }}>
-                    <p style={{ margin: '5px 0' }}>
+                  <div style={{ backgroundColor: '#f5f5f5', padding: '15px', borderRadius: '4px', marginBottom: '20px', fontSize: '13px', lineHeight: '1.8' }}>
+                    <p style={{ margin: '8px 0' }}>
                       <strong>Detection Time:</strong> {new Date(modalDefect.detected_at || Date.now()).toLocaleString()}
                     </p>
-                    <p style={{ margin: '5px 0' }}>
-                      <strong>Device:</strong> {modalDefect.device_id || 'N/A'}
-                    </p>
-                    <p style={{ margin: '5px 0' }}>
-                      <strong>Status:</strong> <span style={{ color: getStatusColor(modalDefect.status), fontWeight: 'bold' }}>
-                        {modalDefect.status || 'pending'}
-                      </span>
+                    <p style={{ margin: '8px 0' }}>
+                      <strong>Type of Defect:</strong> {modalDefect.type}
                     </p>
                     {modalDefect.confidence && (
-                      <p style={{ margin: '5px 0' }}>
-                        <strong>Confidence:</strong> {(modalDefect.confidence * 100).toFixed(1)}%
+                      <p style={{ margin: '8px 0' }}>
+                        <strong>Confidence Level:</strong> {(modalDefect.confidence * 100).toFixed(1)}%
                       </p>
                     )}
                   </div>
 
                   {/* Image Link */}
                   {modalDefect.imageUrl && (
-                    <p style={{ fontSize: '12px', color: '#2196f3', marginBottom: '15px' }}>
+                    <p style={{ fontSize: '12px', color: '#2196f3', marginBottom: '20px' }}>
                       <a 
                         href={modalDefect.imageUrl} 
                         target="_blank" 
@@ -541,33 +532,37 @@ function Dashboard() {
                 </div>
 
                 {/* Modal Navigation and Actions */}
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', padding: '16px 0 0 0', flexWrap: 'wrap', borderTop: '1px solid #eee', paddingTop: '15px' }}>
-                  {currentImageIndex > 0 && (
-                    <button onClick={prevImage} className="modal-next" style={{ flex: 1, minWidth: '100px' }}>
-                      <svg className="icon" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}>
-                        <polyline points="15 18 9 12 15 6"></polyline>
-                      </svg>
-                      Prev  
-                    </button>
-                  )}
-                  {modalDefect?.id && modalDefect?.status !== 'resolved' && (
-                    <button 
-                      onClick={() => handleStatusUpdate(modalDefect.id, modalDefect.status === 'pending' ? 'reviewed' : 'resolved')}
-                      className="modal-next"
-                      disabled={updatingStatus}
-                      style={{ flex: 1, minWidth: '100px', backgroundColor: updatingStatus ? '#ccc' : '#2196f3', cursor: updatingStatus ? 'not-allowed' : 'pointer' }}
-                    >
-                      {updatingStatus ? 'Updating...' : modalDefect.status === 'pending' ? '✓ Mark Reviewed' : '✓ Mark Resolved'}
-                    </button>
-                  )}
-                  {currentImageIndex < currentDefects.length - 1 && (
-                    <button onClick={nextImage} className="modal-next">
-                      Next
-                      <svg className="icon" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}>
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                      </svg>
-                    </button>
-                  )}
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', padding: '20px 0 0 0', borderTop: '1px solid #eee', paddingTop: '20px' }}>
+                  <button 
+                    onClick={prevImage} 
+                    disabled={currentImageIndex === 0}
+                    className="modal-next"
+                    style={{ flex: 1, minWidth: '100px', opacity: currentImageIndex === 0 ? 0.5 : 1, cursor: currentImageIndex === 0 ? 'not-allowed' : 'pointer' }}
+                  >
+                    <svg className="icon" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}>
+                      <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                    Prev  
+                  </button>
+                  <button 
+                    onClick={() => handleStatusUpdate(modalDefect.id, 'reviewed')}
+                    className="modal-next"
+                    disabled={updatingStatus}
+                    style={{ flex: 1, minWidth: '100px', backgroundColor: updatingStatus ? '#ccc' : '#2196f3', cursor: updatingStatus ? 'not-allowed' : 'pointer' }}
+                  >
+                    {updatingStatus ? 'Updating...' : '✓ Mark Reviewed'}
+                  </button>
+                  <button 
+                    onClick={nextImage} 
+                    disabled={currentImageIndex === currentDefects.length - 1}
+                    className="modal-next"
+                    style={{ flex: 1, minWidth: '100px', opacity: currentImageIndex === currentDefects.length - 1 ? 0.5 : 1, cursor: currentImageIndex === currentDefects.length - 1 ? 'not-allowed' : 'pointer' }}
+                  >
+                    Next
+                    <svg className="icon" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}>
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </button>
                 </div>
               </div>
             </div>
