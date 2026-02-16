@@ -1,7 +1,1 @@
-# Railway Configuration for Backend
-# Auto-detected as Node.js project
-# startCommand specified in Procfile
-
-[deploy]
-startCommand = "npm start"
-restartPolicyMaxRetries = 3
+# Railway Configuration - uses Procfile for build and start commands

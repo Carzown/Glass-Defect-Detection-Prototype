@@ -2,8 +2,4 @@
 Defect/
 HTML/
 react-glass/
-.git/
-.venv/
-node_modules/
 *.md
-.gitignore

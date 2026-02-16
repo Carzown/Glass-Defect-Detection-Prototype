@@ -1,8 +1,3 @@
 #!/bin/bash
-set -e
+# This file is not used - Railway uses Procfile instead
 
-echo "Installing backend dependencies..."
-cd backend
-npm install
-echo "✅ Backend dependencies installed"
-cd ..
