@@ -1,6 +1,7 @@
 {
-  "buildCommand": "cd Frontend && npm install --force --legacy-peer-deps --no-audit --no-fund && npm run build",
-  "outputDirectory": "Frontend/build",
+  "root": "Frontend",
+  "buildCommand": "npm install --force --legacy-peer-deps --no-audit --no-fund && npm run build",
+  "outputDirectory": "build",
   "framework": "create-react-app",
   "routes": [
     {
