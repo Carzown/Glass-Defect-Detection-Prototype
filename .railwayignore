@@ -1,0 +1,9 @@
+# Exclude unnecessary directories from Railway build
+Defect/
+HTML/
+react-glass/
+.git/
+.venv/
+node_modules/
+*.md
+.gitignore
