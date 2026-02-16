@@ -59,6 +59,7 @@ function Dashboard() {
     }, 3000);
     
     return () => clearInterval(pollInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // WebSocket connection for real-time video frames from Railway backend
