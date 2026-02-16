@@ -22,7 +22,7 @@ public:
     void captureFrame();
 
 signals:
-    void defectDetected(const QString &type, const QDateTime &timestamp);
+    void defectDetected(const QString &type, const QDateTime &timestamp, double confidence, const QString &imagePath);
     void frameUpdated(const QPixmap &pixmap);
 
 private slots:

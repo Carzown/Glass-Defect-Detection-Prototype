@@ -114,7 +114,8 @@ void DetectionWidget::onCaptureClicked()
     if (QRandomGenerator::global()->bounded(100) < 60) {
         QStringList defectTypes = {"Scratch", "Crack", "Bubble", "Discoloration"};
         QString type = defectTypes[QRandomGenerator::global()->bounded(defectTypes.size())];
-        emit defectDetected(type, QDateTime::currentDateTime());
+        double confidence = 0.75 + (QRandomGenerator::global()->bounded(100) / 500.0); // 0.75-0.95
+        emit defectDetected(type, QDateTime::currentDateTime(), confidence, "");
     }
 }
 

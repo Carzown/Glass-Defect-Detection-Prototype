@@ -31,9 +31,9 @@ MainWindow::MainWindow(QWidget *parent)
     updateButtonStates();
 
     // Connect defect detection signal to list widget
-    connect(detectionWidget, &DetectionWidget::defectDetected, this, [this](const QString &type, const QDateTime &timestamp) {
+    connect(detectionWidget, &DetectionWidget::defectDetected, this, [this](const QString &type, const QDateTime &timestamp, double confidence, const QString &imagePath) {
         if (defectListWidget) {
-            defectListWidget->addDefect(type, timestamp, "Medium");
+            defectListWidget->addDefect(type, timestamp, "Medium", confidence, imagePath);
         }
         
         // Send to WebSocket if connected

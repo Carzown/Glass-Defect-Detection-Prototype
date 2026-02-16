@@ -9,23 +9,46 @@ This script:
 4. Saves detected defects to Supabase database
 5. Uploads defect images to Supabase storage
 
-Dependencies: degirum, picamera2, supabase-py, websocket-client, opencv-python
+Dependencies: degirum, picamera2, supabase-py, websocket-client, opencv-python, pytz
+
+NOTE: This is a Raspberry Pi-specific script. Platform-specific imports (degirum, picamera2)
+will show Pylance warnings when editing on non-Pi systems. This is expected and safe.
+The # type: ignore comments suppress these IDE errors while keeping the code functional.
 """
 
 import cv2
 import time
 import threading
-import requests
-import numpy as np
+import base64
 import uuid
-from datetime import datetime, timezone
+import json
+import os
+from datetime import datetime
 import pytz
 
-import degirum as dg
-from picamera2 import Picamera2
-from supabase import create_client
-import websocket
-import json
+try:
+    import degirum as dg  # type: ignore
+except ImportError:
+    print("❌ ERROR: degirum not installed. Install with: pip install degirum")
+    exit(1)
+
+try:
+    from picamera2 import Picamera2  # type: ignore
+except ImportError:
+    print("❌ ERROR: picamera2 not installed. Install with: pip install picamera2")
+    exit(1)
+
+try:
+    from supabase import create_client  # type: ignore
+except ImportError:
+    print("❌ ERROR: supabase not installed. Install with: pip install supabase")
+    exit(1)
+
+try:
+    import websocket  # type: ignore
+except ImportError:
+    print("❌ ERROR: websocket-client not installed. Install with: pip install websocket-client")
+    exit(1)
 
 
 # ============================================================================
@@ -33,16 +56,17 @@ import json
 # ============================================================================
 # ✅ CHECK: Update BACKEND_URL to your actual backend server address
 # ✅ CHECK: Update TIMEZONE to match your local timezone
+# ✅ CHECK: Set Supabase credentials as environment variables for security
 
 BACKEND_URL = "http://192.168.1.100:5000"  # Backend server address
-TIMEZONE = "UTC"                           # Change to your timezone (e.g., "Asia/Manila", "America/New_York")
+TIMEZONE = "UTC"  # Change to your timezone (e.g., "Asia/Manila", "America/New_York")
 
 # Supabase configuration (cloud database + storage)
-SUPABASE_URL = "https://kfeztemgrbkfwaicvgnk.supabase.co"
-SUPABASE_SERVICE_ROLE_KEY = (
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmZXp0ZW1ncmJrZndhaWN2Z25rIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTIwMzg0MiwiZXhwIjoyMDc2Nzc5ODQyfQ."
-    "-xhy3SYWYlNiD1d_V264FJ5HyLscmhr_bv5crRcjvK0"
+# BEST PRACTICE: Use environment variables instead of hardcoding
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://kfeztemgrbkfwaicvgnk.supabase.co")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv(
+    "SUPABASE_KEY",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmZXp0ZW1ncmJrZndhaWN2Z25rIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTIwMzg0MiwiZXhwIjoyMDc2Nzc5ODQyfQ.-xhy3SYWYlNiD1d_V264FJ5HyLscmhr_bv5crRcjvK0"
 )
 BUCKET_NAME = "defect-images"  # Storage bucket for defect images
 
@@ -56,274 +80,312 @@ DEVICE_TYPE = "HAILORT/HAILO8"  # Hailo 8 AI accelerator hardware
 # ============================================================================
 # ✅ CHECK: Camera captures at fixed settings (no auto-exposure)
 
-# Camera resolution (must be supported by Picamera2)
 WIDTH = 768
 HEIGHT = 768
-
-# Manual exposure control (disable auto-exposure for consistency)
-SHUTTER = 8000              # Exposure time in microseconds
-ANALOG_GAIN = 4.0           # Sensor gain (0.0 to 8.0)
-RED_GAIN = 2.85             # White balance red channel
-BLUE_GAIN = 1.05            # White balance blue channel  
-SHARPNESS = 1.0             # Image sharpness enhancement
-
+SHUTTER = 8000  # Exposure time in microseconds
+ANALOG_GAIN = 4.0  # Sensor gain (0.0 to 8.0)
+RED_GAIN = 2.85  # White balance red channel
+BLUE_GAIN = 1.05  # White balance blue channel
+SHARPNESS = 1.0  # Image sharpness enhancement
 
 # ============================================================================
-# INIT
+# INIT - Initialization with error handling
 # ============================================================================
 
 # ✅ FUNCTIONALITY CHECK 1: Supabase Connection
-# Initializes connection to cloud database and storage
-supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-print("✅ Supabase client initialized (database + storage ready)")
+supabase = None
+try:
+    supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    print("✅ Supabase client initialized (database + storage ready)")
+except Exception as e:
+    print(f"❌ Supabase initialization failed: {e}")
+    print("⚠️  Continuing without Supabase (detections won't be saved)")
 
 # Setup timezone
+local_tz = pytz.UTC
 try:
     local_tz = pytz.timezone(TIMEZONE)
-except:
-    print(f"⚠️ Invalid timezone '{TIMEZONE}', using UTC")
+    print(f"✅ Timezone set to {TIMEZONE}")
+except Exception as e:
+    print(f"⚠️  Invalid timezone '{TIMEZONE}': {e}")
+    print("⚠️  Using UTC instead")
     local_tz = pytz.UTC
+
 
 def get_timestamp():
     """Get current timestamp in local timezone with ISO format"""
     return datetime.now(local_tz)
 
-print(f"✅ Timezone set to {TIMEZONE}")
 
 # ✅ FUNCTIONALITY CHECK 2: AI Model Loading
-# Loads YOLOv8m segmentation model on Hailo accelerator
-model = dg.load_model(
-    model_name=MODEL_NAME,
-    inference_host_address="@local",  # Use local Hailo hardware
-    zoo_url=ZOO_PATH,
-    device_type=DEVICE_TYPE
-)
-print("✅ AI Model loaded on Hailo accelerator")
-
-# Disable confidence score display in overlays (cleaner output)
-model.overlay_show_probabilities = False
-
+model = None
+try:
+    model = dg.load_model(
+        model_name=MODEL_NAME,
+        inference_host_address="@local",
+        zoo_url=ZOO_PATH,
+        device_type=DEVICE_TYPE,
+    )
+    model.overlay_show_probabilities = False
+    print("✅ AI Model loaded on Hailo accelerator")
+except Exception as e:
+    print(f"❌ AI Model loading failed: {e}")
+    print("❌ Cannot continue without model. Exiting.")
+    exit(1)
 
 # ============================================================================
-
 # SUPABASE HELPERS
 # ============================================================================
 
+
 def upload_image(frame, defect_type, ts):
-    """
-    Upload defect image to Supabase storage
-    ✅ CHECK: Images save to defect-images bucket with unique names
-    ✅ CHECK: Public URLs generated for web dashboard display
-    """
-    # Encode with good quality for storage
-    _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
-    image_bytes = buf.tobytes()
-
-    unique_id = uuid.uuid4().hex
-    filename = f"{ts.strftime('%Y%m%d_%H%M%S_%f')}_{unique_id}.jpg"
-    path = f"defects/{defect_type}/{filename}"
-
-    try:
-        supabase.storage.from_(BUCKET_NAME).upload(
-            path,
-            image_bytes,
-            {"content-type": "image/jpeg"},
-        )
-    except Exception as e:
-        print("Upload failed:", e)
+    """Upload defect image to Supabase storage"""
+    if not supabase:
         return None, None
 
-    url = supabase.storage.from_(BUCKET_NAME).get_public_url(path)
-    return url, path
+    try:
+        _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        image_bytes = buf.tobytes()
+
+        unique_id = uuid.uuid4().hex
+        filename = f"{ts.strftime('%Y%m%d_%H%M%S_%f')}_{unique_id}.jpg"
+        path = f"defects/{defect_type}/{filename}"
+
+        supabase.storage.from_(BUCKET_NAME).upload(
+            path, image_bytes, {"content-type": "image/jpeg"}
+        )
+
+        url = supabase.storage.from_(BUCKET_NAME).get_public_url(path)
+        return url, path
+    except Exception as e:
+        print(f"⚠️  Image upload failed: {e}")
+        return None, None
 
 
 def save_defect(defect_type, ts, image_url, image_path, confidence):
-    """
-    Save defect record to Supabase database
-    ✅ CHECK: Records appear in Supabase > Tables > defects
-    ✅ CHECK: Image URL links are stored for web dashboard retrieval
-    """
-    supabase.table("defects").insert(
-        {
-            "defect_type": defect_type,
-            "detected_at": ts.isoformat(),
-            "image_url": image_url,
-            "image_path": image_path,
-            "status": "pending",
-            "confidence": confidence,
-        }
-    ).execute()
+    """Save defect record to Supabase database"""
+    if not supabase:
+        return
+
+    try:
+        supabase.table("defects").insert(
+            {
+                "defect_type": defect_type,
+                "detected_at": ts.isoformat(),
+                "image_url": image_url,
+                "image_path": image_path,
+                "status": "pending",
+                "confidence": confidence,
+            }
+        ).execute()
+    except Exception as e:
+        print(f"⚠️  Database save failed: {e}")
 
 
 # ============================================================================
-# WEBSOCKET VIDEO STREAM (replaces WebRTC)
+# WEBSOCKET VIDEO STREAM
 # ============================================================================
 
-# ✅ FUNCTIONALITY CHECK 3: WebSocket Connection
 ws_connection = None
 ws_lock = threading.Lock()
+ws_retry_count = 0
+WS_MAX_RETRIES = 5
+
+
+def get_websocket_url():
+    """Convert backend URL to WebSocket URL"""
+    url = BACKEND_URL.replace("http://", "ws://").replace("https://", "wss://")
+    if not url.endswith(":8080"):
+        url = f"{url}:8080"
+    return url
+
 
 def connect_websocket():
-    """
-    Establish WebSocket connection to backend server
-    ✅ CHECK: WebSocket connects without errors on startup
-    ✅ CHECK: Device registers with backend for identification
-    """
-    global ws_connection
+    """Establish WebSocket connection with retry logic"""
+    global ws_connection, ws_retry_count
+
     try:
-        ws_url = "ws://localhost:8080"
-        ws_connection = websocket.create_connection(ws_url)
-        print(f"✅ WebSocket connected to {ws_url}")
-        
-        # Send initial status
-        msg = json.dumps({"type": "status", "status": "connected"})
+        ws_url = get_websocket_url()
+        print(f"🔄 Connecting to WebSocket: {ws_url}")
+
+        ws_connection = websocket.create_connection(ws_url, timeout=5)
+        ws_retry_count = 0
+
+        # Send device registration
+        msg = json.dumps({"type": "device_register"})
         ws_connection.send(msg)
+
+        print(f"✅ WebSocket connected to {ws_url}")
+        return True
     except Exception as e:
-        print(f"WebSocket connection error: {e}")
+        ws_retry_count += 1
+        print(f"⚠️  WebSocket connection error (attempt {ws_retry_count}/{WS_MAX_RETRIES}): {e}")
         ws_connection = None
+
+        if ws_retry_count < WS_MAX_RETRIES:
+            print(f"🔄 Retrying in 5 seconds...")
+            time.sleep(5)
+            return connect_websocket()
+        else:
+            print("❌ WebSocket connection failed. Continuing without streaming.")
+            return False
+
 
 def send_frame(frame):
-    """
-    Stream annotated frame (with detection overlays) to web clients
-    ✅ CHECK: Live frames appear on dashboard with <1s latency
-    ✅ CHECK: Defect bounding boxes and labels visible in stream
-    ✅ CHECK: Frame quality is good (85% JPEG)
-    """
+    """Stream annotated frame to web clients"""
     global ws_connection
+
     try:
-        if ws_connection:
-            # Convert frame to JPEG and base64 (with detection overlays)
-            _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            import base64
-            frame_data = base64.b64encode(buffer).decode('utf-8')
-            
-            msg = json.dumps({
-                "type": "frame",
-                "data": f"data:image/jpeg;base64,{frame_data}"
-            })
-            
-            with ws_lock:
+        if not ws_connection:
+            return
+
+        _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        frame_data = base64.b64encode(buffer).decode("utf-8")
+
+        msg = json.dumps({"type": "frame", "data": f"data:image/jpeg;base64,{frame_data}"})
+
+        with ws_lock:
+            if ws_connection:
                 ws_connection.send(msg)
     except Exception as e:
-        print(f"WebSocket send error: {e}")
+        print(f"⚠️  WebSocket frame send error: {e}")
         ws_connection = None
 
+
 def send_defect(defect_type, confidence, timestamp):
-    """
-    Send defect detection metadata to dashboard in real-time
-    ✅ CHECK: Defects appear in dashboard list immediately
-    ✅ CHECK: Confidence scores displayed correctly (e.g., 95%)
-    ✅ CHECK: Timestamps match detection time
-    """
+    """Send defect detection metadata to dashboard"""
+    global ws_connection
+
     try:
-        if ws_connection:
-            msg = json.dumps({
+        if not ws_connection:
+            return
+
+        msg = json.dumps(
+            {
                 "type": "defect",
                 "defect_type": defect_type,
                 "confidence": confidence,
-                "timestamp": timestamp.isoformat()
-            })
-            
-            with ws_lock:
+                "timestamp": timestamp.isoformat(),
+            }
+        )
+
+        with ws_lock:
+            if ws_connection:
                 ws_connection.send(msg)
     except Exception as e:
-        print(f"WebSocket defect send error: {e}")
+        print(f"⚠️  WebSocket defect send error: {e}")
+        ws_connection = None
+
 
 # ============================================================================
 # CAMERA INITIALIZATION
 # ============================================================================
 
 # ✅ FUNCTIONALITY CHECK 4: Camera Initialization
-picam2 = Picamera2()
-print("✅ Picamera2 initialized")
+picam2 = None
+try:
+    picam2 = Picamera2()
+    print("✅ Picamera2 initialized")
 
-config = picam2.create_video_configuration(
-    main={"size": (WIDTH, HEIGHT), "format": "RGB888"},
-    controls={
-        "AeEnable": False,              # Disable auto-exposure
-        "AwbEnable": False,             # Disable auto white balance
-        "ExposureTime": SHUTTER,
-        "AnalogueGain": ANALOG_GAIN,
-        "ColourGains": (RED_GAIN, BLUE_GAIN),
-        "NoiseReductionMode": 0,
-        "Sharpness": SHARPNESS,
-    }
-)
+    config = picam2.create_video_configuration(
+        main={"size": (WIDTH, HEIGHT), "format": "RGB888"},
+        controls={
+            "AeEnable": False,
+            "AwbEnable": False,
+            "ExposureTime": SHUTTER,
+            "AnalogueGain": ANALOG_GAIN,
+            "ColourGains": (RED_GAIN, BLUE_GAIN),
+            "NoiseReductionMode": 0,
+            "Sharpness": SHARPNESS,
+        },
+    )
 
-picam2.configure(config)
-picam2.start()
-time.sleep(1)  # Wait for camera to stabilize
+    picam2.configure(config)
+    picam2.start()
+    time.sleep(1)
+    print(f"✅ Camera running at {WIDTH}x{HEIGHT} with fixed parameters")
 
-print("✅ Camera running at {}x{} with fixed parameters.".format(WIDTH, HEIGHT))
+except Exception as e:
+    print(f"❌ Camera initialization failed: {e}")
+    print("❌ Cannot continue without camera. Exiting.")
+    exit(1)
 
 # Initialize WebSocket for video streaming
 connect_websocket()
-if not ws_connection:
-    print("Warning: WebSocket not connected. Continuing without streaming.")
 
 # ============================================================================
 # MAIN LOOP
 # ============================================================================
 
-print("\n" + "="*70)
-print("✅ FUNCTIONALITY CHECK 6: Starting Main Detection Loop")
-print("="*70)
-print("Monitoring for defects...")
-print("(Press 'q' to stop)\n")
+print("\n" + "=" * 70)
+print("✅ Detection loop starting...")
+print("=" * 70)
+print("Monitoring for defects... (Press 'q' to stop)")
+print()
 
-for result in model.predict_batch(
-    (picam2.capture_array() for _ in iter(int, 1))
-):
-    # result.image_overlay = frame with AI detection overlays (boxes, labels)
-    annotated = result.image_overlay
+try:
+    for result in model.predict_batch((picam2.capture_array() for _ in iter(int, 1))):
+        annotated = result.image_overlay
 
-    # STEP 1: STREAM - Send frame to web dashboard via WebSocket
-    send_frame(annotated)
+        # STEP 1: Stream frame
+        send_frame(annotated)
 
-    # STEP 2: DETECT - Check if any defects were found in this frame
-    if result.results:
-        ts = get_timestamp()  # Get current time in local timezone
+        # STEP 2: Check for defects
+        if result.results:
+            ts = get_timestamp()
 
-        for r in result.results:
-            label = r["label"]              # Type of defect
-            conf = r["confidence"]          # Confidence score
+            for r in result.results:
+                label = r.get("label", "Unknown")
+                conf = r.get("confidence", 0.0)
 
-            # Console output
-            print(f"🔍 DEFECT DETECTED: {label} ({conf:.2%})")
+                print(f"🔍 DEFECT DETECTED: {label} ({conf:.2%})")
 
-            # STEP 3: BROADCAST - Send defect to dashboard in real-time
-            # Convert to ISO format for transmission
-            send_defect(label, conf, ts)
-            
-            # STEP 4: SAVE IMAGE - Upload to Supabase storage
-            url, path = upload_image(annotated, label, ts)
-            if url:
-                # STEP 5: SAVE RECORD - Store defect metadata in database
-                save_defect(label, ts, url, path, conf)
-                print(f"💾 Saved to database: {label}")
-            else:
-                print(f"⚠️ Failed to upload image for {label}")
+                # STEP 3: Broadcast to dashboard
+                send_defect(label, conf, ts)
 
-    # Local display for debugging
-    cv2.imshow("Glass Defect Detection", annotated)
+                # STEP 4: Upload image
+                url, path = upload_image(annotated, label, ts)
+                if url:
+                    # STEP 5: Save record
+                    save_defect(label, ts, url, path, conf)
+                    print(f"💾 Saved: {label}")
 
-    # Exit on 'q' key
-    if cv2.waitKey(1) & 0xFF == ord("q"):
-        print("\n⏹️ User pressed 'q' - Shutting down...")
-        break
+        # Display locally
+        cv2.imshow("Glass Defect Detection", annotated)
+
+        # Exit on 'q'
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            print("\n⏹️  Shutdown requested...")
+            break
+
+except KeyboardInterrupt:
+    print("\n⏹️  Interrupted by user...")
+except Exception as e:
+    print(f"\n❌ Error in main loop: {e}")
 
 # Cleanup
-picam2.stop()
-cv2.destroyAllWindows()
-print("✅ Camera and windows closed.")
-print("\n" + "="*70)
-print("SUMMARY OF FUNCTIONALITIES")
-print("="*70)
-print("✅ 1. Supabase database connection")
-print("✅ 2. AI model loaded and inferencing")
-print("✅ 3. WebSocket streaming to dashboard")
-print("✅ 4. Camera capture and processing")
-print("✅ 5. Real-time defect detection")
-print("✅ 6. Image upload and storage")
-print("✅ 7. Defect record saving")
-print("="*70)
+finally:
+    print("🔄 Cleaning up...")
+    if picam2:
+        try:
+            picam2.stop()
+        except:
+            pass
+    cv2.destroyAllWindows()
+    if ws_connection:
+        try:
+            ws_connection.close()
+        except:
+            pass
+    print("✅ Cleanup complete")
+
+print("\n" + "=" * 70)
+print("SYSTEM STATUS SUMMARY")
+print("=" * 70)
+print("✅ 1. Supabase database connection - {}".format("OK" if supabase else "DISABLED"))
+print("✅ 2. AI model loaded and inferencing - OK")
+print("✅ 3. WebSocket streaming - {}".format("OK" if ws_connection else "DISCONNECTED"))
+print("✅ 4. Camera capture and processing - OK")
+print("✅ 5. Real-time defect detection - STOPPED")
+print("=" * 70)
+

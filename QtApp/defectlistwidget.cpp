@@ -110,23 +110,30 @@ void DefectListWidget::setupUI()
     mainLayout->addLayout(buttonLayout);
 }
 
-void DefectListWidget::addDefect(const QString &type, const QDateTime &timestamp, const QString &severity)
+void DefectListWidget::addDefect(const QString &type, const QDateTime &timestamp, const QString &severity, double confidence, const QString &imagePath)
 {
     defectCount++;
 
     QString timeStr = timestamp.toString("HH:mm:ss");
-    QString dateStr = timestamp.toString("yyyy-MM-dd");
-    QString displayText = QString("[%1] %2 - %3 (Severity: %4)\n%5 %6")
-                              .arg(defectCount)
+    
+    // Format confidence as percentage
+    int confidencePercent = static_cast<int>(confidence * 100);
+    
+    // Create image badge indicator
+    QString imageBadge = imagePath.isEmpty() ? "○ Image" : "● Image";
+    
+    // Display format: [HH:MM:SS] Type | Image Badge | Confidence%
+    QString displayText = QString("[%1] %2 | %3 | %4%")
+                              .arg(timeStr)
                               .arg(type)
-                              .arg(severity)
-                              .arg(severity)
-                              .arg(dateStr)
-                              .arg(timeStr);
+                              .arg(imageBadge)
+                              .arg(confidencePercent);
 
     QListWidgetItem *item = new QListWidgetItem(displayText);
     item->setData(Qt::UserRole, type);
     item->setData(Qt::UserRole + 1, timestamp.toString(Qt::ISODate));
+    item->setData(Qt::UserRole + 2, imagePath);
+    item->setData(Qt::UserRole + 3, confidence);
     defectList->insertItem(0, item);
 }
 
@@ -178,7 +185,15 @@ void DefectListWidget::onDefectSelected(QListWidgetItem *item)
 {
     QString type = item->data(Qt::UserRole).toString();
     QString timestamp = item->data(Qt::UserRole + 1).toString();
-    QMessageBox::information(this, "Defect Details", QString("Type: %1\nTimestamp: %2").arg(type, timestamp));
+    QString imagePath = item->data(Qt::UserRole + 2).toString();
+    double confidence = item->data(Qt::UserRole + 3).toDouble();
+    int confidencePercent = static_cast<int>(confidence * 100);
+    
+    QString details = QString("Type: %1\nTimestamp: %2\nConfidence: %3%\nImage: %4")
+                          .arg(type, timestamp, QString::number(confidencePercent), 
+                               imagePath.isEmpty() ? "No image" : "Available");
+    
+    QMessageBox::information(this, "Defect Details", details);
 }
 
 void DefectListWidget::loadDefectsFromStorage()

@@ -14,7 +14,7 @@ public:
     explicit DefectListWidget(QWidget *parent = nullptr);
     ~DefectListWidget();
 
-    void addDefect(const QString &type, const QDateTime &timestamp, const QString &severity);
+    void addDefect(const QString &type, const QDateTime &timestamp, const QString &severity, double confidence, const QString &imagePath = "");
     void clearDefects();
     int getDefectCount() const;
 
