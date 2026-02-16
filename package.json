@@ -1,15 +1,21 @@
 {
   "name": "glass-defect-detection",
   "version": "1.0.0",
-  "description": "Glass Defect Detection System - Backend API",
+  "description": "Glass Defect Detection System - Frontend & Backend",
   "private": true,
   "engines": {
     "node": "20.x",
     "npm": "10.x"
   },
   "scripts": {
-    "build": "cd backend && npm install",
-    "start": "cd backend && npm start",
-    "dev": "cd backend && npm run dev"
+    "build": "cd Frontend && npm install && npm run build",
+    "start": "cd Frontend && npm start",
+    "dev": "npm run dev:frontend",
+    "dev:frontend": "cd Frontend && npm start",
+    "dev:backend": "cd Backend && npm run dev",
+    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   }
 }

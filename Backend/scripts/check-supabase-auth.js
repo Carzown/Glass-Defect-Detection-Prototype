@@ -11,7 +11,7 @@
  * 4. Can sign in with test credentials
  */
 
-require('dotenv').config({ path: './react-glass/.env.local' });
+require('dotenv').config({ path: './Frontend/.env.local' });
 
 const fs = require('fs');
 const path = require('path');

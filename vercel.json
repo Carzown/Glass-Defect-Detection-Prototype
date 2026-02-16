@@ -1,0 +1,17 @@
+{
+  "buildCommand": "cd Frontend && npm install && npm run build",
+  "installCommand": "npm install --legacy-peer-deps --no-audit --no-fund",
+  "outputDirectory": "Frontend/build",
+  "framework": "create-react-app",
+  "env": {
+    "REACT_APP_SUPABASE_URL": "@supabase_url",
+    "REACT_APP_SUPABASE_ANON_KEY": "@supabase_anon_key",
+    "REACT_APP_API_URL": "@api_url"
+  },
+  "routes": [
+    {
+      "src": "^/(?!.*\\.).*$",
+      "dest": "/index.html"
+    }
+  ]
+}

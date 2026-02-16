@@ -3,8 +3,8 @@
 .env.*
 *.env
 *.env.*
-react-glass/.env.local
-react-glass/.env.*
+Frontend/.env.local
+Frontend/.env.*
 native-glass/.env
 native-glass/.env.*
 
@@ -59,7 +59,7 @@ dist/
 *.egg-info/
 
 # ---- JavaScript / Node ----
-react-glass/node_modules/
+Frontend/node_modules/
 native-glass/node_modules/
 npm-debug.log*
 yarn-debug.log*
@@ -67,7 +67,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 # React build output
-react-glass/build/
+Frontend/build/
 
 # Expo / React Native
 native-glass/.expo/

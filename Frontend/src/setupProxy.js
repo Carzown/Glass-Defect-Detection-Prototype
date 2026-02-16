@@ -3,7 +3,7 @@ let backendProc = null;
 
 function startBackendOnce() {
   if (backendProc && !backendProc.killed) return;
-  const cwd = process.cwd().replace(/react-glass$/, 'backend');
+  const cwd = process.cwd().replace(/Frontend$/, 'backend');
   backendProc = spawn('node', ['server.js'], { cwd, env: { ...process.env }, stdio: 'inherit' });
   backendProc.on('exit', (code) => {
     backendProc = null;
