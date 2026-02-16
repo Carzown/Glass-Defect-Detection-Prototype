@@ -371,9 +371,6 @@ function Dashboard() {
       setCurrentDefects(prev => 
         prev.map(d => d.id === defectId ? { ...d, status: newStatus } : d)
       );
-      setSupabaseDefects(prev =>
-        prev.map(d => d.id === defectId ? { ...d, status: newStatus } : d)
-      );
       alert(`Defect marked as ${newStatus}`);
       closeModal();
     } catch (error) {
