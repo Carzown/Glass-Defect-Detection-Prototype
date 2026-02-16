@@ -42,15 +42,5 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  },
-  "overrides": {
-    "rimraf": "^4.4.1",
-    "glob": "^10.3.10",
-    "@humanwhocodes/config-array": "^2.13.0",
-    "@humanwhocodes/object-schema": "^2.1.1",
-    "workbox-cacheable-response": "^7.0.0",
-    "workbox-google-analytics": "^7.0.0",
-    "domexception": "^4.0.0",
-    "svgo": "^3.0.2"
   }
 }
