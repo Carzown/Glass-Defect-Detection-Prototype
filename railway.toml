@@ -1,9 +1,6 @@
-# Railway Configuration for Glass Defect Detection Backend
-
-[build]
-builder = "nixpacks"
-buildCommand = "cd backend && npm install && npm run build"
+# Railway Configuration for Glass Defect Detection
+# Railway will auto-detect Node.js and use package.json for build/start
 
 [deploy]
-startCommand = "cd backend && npm start"
+startCommand = "npm start"
 restartPolicyMaxRetries = 5
