@@ -7,7 +7,7 @@ import Help from './pages/Help';
 function App() {
   return (
     <div>
-      <Router basename="/Glass-Defect-Detection-Prototype/">
+      <Router basename={process.env.NODE_ENV === "production" ? "/Glass-Defect-Detection-Prototype/" : "/"}>
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/dashboard" element={<Dashboard />} />
