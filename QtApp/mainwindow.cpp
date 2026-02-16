@@ -42,26 +42,7 @@ MainWindow::MainWindow(QWidget *parent)
         }
     });
 
-    // Connect defect list buttons
-    connect(defectListWidget, &DefectListWidget::uploadRequested, this, [this]() {
-        logMessage("Upload requested - syncing to cloud server...");
-        if (websocketHandler && websocketHandler->isConnected()) {
-            websocketHandler->sendStatus("uploading_defects");
-        }
-        QMessageBox::information(this, "Upload", "Defect data uploaded successfully!");
-    });
 
-    connect(defectListWidget, &DefectListWidget::downloadRequested, this, [this]() {
-        logMessage("Download requested - fetching from server...");
-        if (websocketHandler && websocketHandler->isConnected()) {
-            websocketHandler->sendStatus("downloading_defects");
-        }
-        QMessageBox::information(this, "Download", "Defect data downloaded successfully!");
-    });
-
-    connect(defectListWidget, &DefectListWidget::clearRequested, this, [this]() {
-        logMessage("Defects cleared");
-    });
 }
 
 MainWindow::~MainWindow()

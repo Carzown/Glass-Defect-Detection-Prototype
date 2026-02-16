@@ -1,6 +1,5 @@
 #include "defectlistwidget.h"
 #include <QVBoxLayout>
-#include <QHBoxLayout>
 #include <QLabel>
 #include <QDateTime>
 #include <QMessageBox>
@@ -51,63 +50,6 @@ void DefectListWidget::setupUI()
     );
     connect(defectList, &QListWidget::itemClicked, this, &DefectListWidget::onDefectSelected);
     mainLayout->addWidget(defectList);
-
-    // Buttons layout
-    QHBoxLayout *buttonLayout = new QHBoxLayout();
-    buttonLayout->setSpacing(10);
-
-    uploadButton = new QPushButton("Upload", this);
-    uploadButton->setStyleSheet(
-        "QPushButton { "
-        "background-color: #D4A048; "
-        "color: white; "
-        "border: 2px solid #D4A048; "
-        "border-radius: 6px; "
-        "font-size: 11px; "
-        "font-weight: bold; "
-        "padding: 6px 12px; "
-        "} "
-        "QPushButton:hover { background-color: #E5B759; } "
-        "QPushButton:pressed { background-color: #C4941F; }"
-    );
-    connect(uploadButton, &QPushButton::clicked, this, &DefectListWidget::onUploadClicked);
-    buttonLayout->addWidget(uploadButton);
-
-    downloadButton = new QPushButton("Download", this);
-    downloadButton->setStyleSheet(
-        "QPushButton { "
-        "background-color: #D4A048; "
-        "color: white; "
-        "border: 2px solid #D4A048; "
-        "border-radius: 6px; "
-        "font-size: 11px; "
-        "font-weight: bold; "
-        "padding: 6px 12px; "
-        "} "
-        "QPushButton:hover { background-color: #E5B759; } "
-        "QPushButton:pressed { background-color: #C4941F; }"
-    );
-    connect(downloadButton, &QPushButton::clicked, this, &DefectListWidget::onDownloadClicked);
-    buttonLayout->addWidget(downloadButton);
-
-    clearButton = new QPushButton("Clear", this);
-    clearButton->setStyleSheet(
-        "QPushButton { "
-        "background-color: #E74C3C; "
-        "color: white; "
-        "border: 2px solid #E74C3C; "
-        "border-radius: 6px; "
-        "font-size: 11px; "
-        "font-weight: bold; "
-        "padding: 6px 12px; "
-        "} "
-        "QPushButton:hover { background-color: #EC7063; } "
-        "QPushButton:pressed { background-color: #C0392B; }"
-    );
-    connect(clearButton, &QPushButton::clicked, this, &DefectListWidget::onClearClicked);
-    buttonLayout->addWidget(clearButton);
-
-    mainLayout->addLayout(buttonLayout);
 }
 
 void DefectListWidget::addDefect(const QString &type, const QDateTime &timestamp, const QString &severity, double confidence, const QString &imagePath)
@@ -146,39 +88,6 @@ void DefectListWidget::clearDefects()
 int DefectListWidget::getDefectCount() const
 {
     return defectCount;
-}
-
-void DefectListWidget::onUploadClicked()
-{
-    if (defectCount == 0) {
-        QMessageBox::information(this, "Upload", "No defects to upload.");
-        return;
-    }
-    QMessageBox::information(this, "Upload", QString("Uploading %1 defect(s)...\nData will be synchronized with the cloud server.").arg(defectCount));
-    emit uploadRequested();
-}
-
-void DefectListWidget::onDownloadClicked()
-{
-    QMessageBox::information(this, "Download", "Downloading defect records from server...\nFetching latest data.");
-    emit downloadRequested();
-}
-
-void DefectListWidget::onClearClicked()
-{
-    if (defectCount == 0) {
-        QMessageBox::information(this, "Clear", "No defects to clear.");
-        return;
-    }
-
-    int ret = QMessageBox::question(this, "Clear Defects",
-                                     QString("Are you sure you want to clear all %1 defects?").arg(defectCount),
-                                     QMessageBox::Yes | QMessageBox::No);
-    if (ret == QMessageBox::Yes) {
-        clearDefects();
-        QMessageBox::information(this, "Clear", "All defects cleared.");
-        emit clearRequested();
-    }
 }
 
 void DefectListWidget::onDefectSelected(QListWidgetItem *item)

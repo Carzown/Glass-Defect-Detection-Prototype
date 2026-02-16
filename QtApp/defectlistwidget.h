@@ -4,7 +4,6 @@
 #include <QWidget>
 #include <QListWidget>
 #include <QDateTime>
-#include <QPushButton>
 
 class DefectListWidget : public QWidget
 {
@@ -19,14 +18,8 @@ public:
     int getDefectCount() const;
 
 signals:
-    void uploadRequested();
-    void downloadRequested();
-    void clearRequested();
 
 private slots:
-    void onUploadClicked();
-    void onDownloadClicked();
-    void onClearClicked();
     void onDefectSelected(QListWidgetItem *item);
 
 private:
@@ -34,9 +27,6 @@ private:
     void loadDefectsFromStorage();
 
     QListWidget *defectList;
-    QPushButton *uploadButton;
-    QPushButton *downloadButton;
-    QPushButton *clearButton;
     int defectCount;
 };
 
