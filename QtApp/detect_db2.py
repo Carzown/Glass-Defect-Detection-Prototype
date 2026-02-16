@@ -58,7 +58,7 @@ except ImportError:
 # ✅ CHECK: Update TIMEZONE to match your local timezone
 # ✅ CHECK: Set Supabase credentials as environment variables for security
 
-BACKEND_URL = "https://glass-defect-detection-prototype-production.up.railway.app"  # Production backend
+BACKEND_URL = "http://192.168.1.100:5000"  # Backend server address
 TIMEZONE = "UTC"  # Change to your timezone (e.g., "Asia/Manila", "America/New_York")
 
 # Supabase configuration (cloud database + storage)
