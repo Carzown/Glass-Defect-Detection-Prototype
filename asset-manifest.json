@@ -1,0 +1,14 @@
+{
+  "files": {
+    "main.css": "/Glass-Defect-Detection-Prototype/static/css/main.8b09e1ee.css",
+    "main.js": "/Glass-Defect-Detection-Prototype/static/js/main.180bba73.js",
+    "static/media/AlumpreneurLogo.png": "/Glass-Defect-Detection-Prototype/static/media/AlumpreneurLogo.e6b5aa49800e62283073.png",
+    "index.html": "/Glass-Defect-Detection-Prototype/index.html",
+    "main.8b09e1ee.css.map": "/Glass-Defect-Detection-Prototype/static/css/main.8b09e1ee.css.map",
+    "main.180bba73.js.map": "/Glass-Defect-Detection-Prototype/static/js/main.180bba73.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.8b09e1ee.css",
+    "static/js/main.180bba73.js"
+  ]
+}
