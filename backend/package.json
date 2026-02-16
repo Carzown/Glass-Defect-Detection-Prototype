@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "ws:server": "node websocket-server.js",
+    "ws:dev": "nodemon websocket-server.js",
     "test": "echo tests removed",
     "sync:profiles": "node scripts/sync-profiles.js",
     "dev:infer": "python scripts/inference_server.py --port 5055 --model ../native-glass/yolov11_small_model.pt"
@@ -18,7 +20,8 @@
     "@supabase/supabase-js": "^2.46.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"

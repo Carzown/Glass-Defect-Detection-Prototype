@@ -1,5 +1,5 @@
-// Socket.IO event constants - DEPRECATED
-// Socket.IO has been replaced with WebRTC streaming from Raspberry Pi
+// Socket.IO event constants - Legacy reference
+// Frame streaming now uses WebSocket relay instead
 // This file is kept for backward compatibility only
 
 module.exports = {

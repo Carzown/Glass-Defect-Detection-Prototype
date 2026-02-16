@@ -5,22 +5,120 @@ const cors = require("cors");
 
 const app = express();
 
-app.use(cors());
+// CORS configuration
+const corsOptions = {
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+    process.env.FRONTEND_URL || 'http://localhost:3000'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-// Basic routes
+// Health check and info routes
 app.get("/", (req, res) => {
-  res.send("Backend connected successfully!");
+  res.json({ 
+    message: "Backend connected successfully!",
+    timestamp: new Date().toISOString(),
+  });
 });
-app.get("/health", (_req, res) => res.json({ ok: true }));
 
-// Admin API (list users, change passwords) protected by x-admin-token
-try {
-  const adminRouter = require('./admin')
-  app.use('/admin', adminRouter)
-} catch (e) {
-  console.warn('Admin routes not loaded:', e?.message || e)
-}
+app.get("/health", (req, res) => {
+  res.json({ 
+    ok: true,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/health/detailed", (req, res) => {
+  const supabaseUrl = process.env.SUPABASE_URL ? '✅ SET' : '❌ MISSING';
+  const supabaseKey = process.env.SUPABASE_KEY ? '✅ SET' : '❌ MISSING';
+  
+  res.json({
+    ok: true,
+    port: process.env.PORT || 5000,
+    environment: process.env.NODE_ENV || 'development',
+    supabase: {
+      url: supabaseUrl,
+      key: supabaseKey,
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Test Supabase connection endpoint
+app.get("/test/supabase", async (req, res) => {
+  try {
+    console.log('[TEST] Testing Supabase connection...');
+    
+    const { createClient } = require('@supabase/supabase-js');
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_KEY;
+    
+    const results = {
+      timestamp: new Date().toISOString(),
+      configuration: {
+        url: supabaseUrl ? '✅ SET' : '❌ MISSING',
+        key: supabaseKey ? '✅ SET (length: ' + supabaseKey.length + ')' : '❌ MISSING',
+      },
+      tests: {},
+    };
+    
+    if (!supabaseUrl || !supabaseKey) {
+      results.success = false;
+      results.error = 'Missing Supabase credentials in .env';
+      return res.status(400).json(results);
+    }
+    
+    // Test 1: Create client
+    try {
+      const client = createClient(supabaseUrl, supabaseKey);
+      results.tests.clientCreation = { success: true };
+      console.log('✅ Supabase client created successfully');
+    } catch (e) {
+      results.tests.clientCreation = { success: false, error: e.message };
+      console.error('❌ Failed to create Supabase client:', e.message);
+    }
+    
+    // Test 2: Test auth session
+    try {
+      const client = createClient(supabaseUrl, supabaseKey);
+      const { data, error } = await client.auth.getSession();
+      if (error) {
+        results.tests.authSession = { success: false, error: error.message };
+        console.warn('⚠️ Auth session test:', error.message);
+      } else {
+        results.tests.authSession = { 
+          success: true, 
+          hasSession: !!data.session,
+          message: data.session ? 'Session active' : 'No active session'
+        };
+        console.log('✅ Auth session check passed');
+      }
+    } catch (e) {
+      results.tests.authSession = { success: false, error: e.message };
+      console.warn('⚠️ Auth session exception:', e.message);
+    }
+    
+    results.success = results.tests.clientCreation?.success || results.tests.authSession?.success;
+    res.json(results);
+  } catch (error) {
+    console.error('[TEST] Exception during test:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
 
 // Defects API for glass defect management
 try {
@@ -29,14 +127,6 @@ try {
   console.log('[SERVER] Defects API routes loaded')
 } catch (e) {
   console.warn('[SERVER] Defects routes not loaded:', e?.message || e)
-}
-
-// WebRTC signaling for Raspberry Pi streaming
-try {
-  const registerWebRTC = require('./webrtc-handler')
-  registerWebRTC(app)
-} catch (e) {
-  console.warn('[SERVER] WebRTC handler not loaded:', e?.message || e)
 }
 
 

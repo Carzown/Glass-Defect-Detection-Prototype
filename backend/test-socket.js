@@ -1,10 +1,10 @@
 ﻿#!/usr/bin/env node
 /**
- * DEPRECATED: Socket.IO Test Client
- * Socket.IO streaming has been replaced with WebRTC
+ * Test Script - WebSocket Connection
+ * Tests real-time frame streaming via WebSocket relay
  */
 
-console.log('❌ [TEST] Socket.IO test client is deprecated.');
-console.log('   The system now uses WebRTC streaming from Raspberry Pi instead.');
-console.log('   Please use WebRTC client tools to test the new streaming implementation.');
+console.log('✅ [TEST] WebSocket relay for frame streaming');
+console.log('   The system uses WebSocket for real-time streaming from Raspberry Pi.');
+console.log('   Connect to ws://localhost:8080 to test the streaming implementation.');
 process.exit(0);

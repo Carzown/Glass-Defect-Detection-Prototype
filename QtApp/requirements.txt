@@ -1,0 +1,23 @@
+# Glass Defect Detection - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core dependencies
+opencv-python==4.8.1.78
+numpy==1.24.3
+requests==2.31.0
+
+# Database
+supabase==2.0.0
+supabase-py>=2.0.0
+
+# WebSocket for video streaming
+websocket-client==1.6.2
+
+# Timezone support
+pytz==2024.1
+
+# AI Model - Hailo-specific
+degirum>=1.6.0
+
+# Raspberry Pi Camera (if on RPi)
+# picamera2>=0.3.0  # Only install on Raspberry Pi 5
