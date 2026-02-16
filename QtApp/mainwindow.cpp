@@ -24,8 +24,8 @@ MainWindow::MainWindow(QWidget *parent)
     defectListWidget = new DefectListWidget();
     ui.defectLayout->addWidget(defectListWidget);
 
-    // Initialize WebSocket handler
-    websocketHandler = std::make_unique<WebSocketHandler>("ws://localhost:8080", this);
+    // Initialize WebSocket handler - Production backend
+    websocketHandler = std::make_unique<WebSocketHandler>("wss://glass-defect-detection-prototype-production.up.railway.app:8080", this);
 
     setupConnections();
     updateButtonStates();

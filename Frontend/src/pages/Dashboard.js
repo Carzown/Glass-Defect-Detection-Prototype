@@ -182,6 +182,105 @@ function Dashboard() {
     };
   }, [useManualConnection]);
 
+  // WebSocket connection for real-time frame streaming
+  useEffect(() => {
+    let ws = null;
+    let reconnectTimeout = null;
+
+    const connectWebSocket = () => {
+      try {
+        const wsUrl = process.env.REACT_APP_WS_URL || 'wss://glass-defect-detection-prototype-production.up.railway.app:8080';
+        console.log('[Dashboard] Attempting WebSocket connection to:', wsUrl);
+
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          console.log('[Dashboard] WebSocket connected');
+          setStreamStatus('connected');
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+
+            // Handle frame data
+            if (data.type === 'frame' && data.frame) {
+              // Display frame in video element if available
+              if (videoRef.current && data.frame) {
+                const blob = new Blob([Buffer.from(data.frame, 'base64')], { type: 'image/jpeg' });
+                const url = URL.createObjectURL(blob);
+                videoRef.current.src = url;
+              }
+            }
+
+            // Handle defect detection
+            if (data.type === 'defect' && data.defect) {
+              const defect = data.defect;
+              // Add to current defects list
+              const newDefect = {
+                id: defect.id || `ws-${Date.now()}`,
+                time: formatTime(new Date()),
+                type: capitalizeDefectType(defect.type || defect.defect_type || 'Unknown'),
+                imageUrl: defect.image_url,
+                status: 'pending',
+                detected_at: new Date().toISOString(),
+                confidence: defect.confidence,
+              };
+
+              setCurrentDefects(prev => [newDefect, ...prev.slice(0, 19)]);
+            }
+
+            // Handle connection status
+            if (data.type === 'status') {
+              console.log('[Dashboard] Server status:', data.message);
+            }
+          } catch (e) {
+            console.error('[Dashboard] Error parsing WebSocket message:', e);
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.error('[Dashboard] WebSocket error:', error);
+          setStreamStatus('error');
+          setCameraError('WebSocket connection error');
+        };
+
+        ws.onclose = () => {
+          console.log('[Dashboard] WebSocket disconnected');
+          setStreamStatus('disconnected');
+          
+          // Attempt reconnection after 3 seconds
+          reconnectTimeout = setTimeout(() => {
+            console.log('[Dashboard] Attempting to reconnect WebSocket...');
+            connectWebSocket();
+          }, 3000);
+        };
+
+      } catch (error) {
+        console.error('[Dashboard] WebSocket setup error:', error);
+        setStreamStatus('error');
+        setCameraError(`WebSocket Error: ${error.message}`);
+        
+        // Retry connection after 3 seconds
+        reconnectTimeout = setTimeout(() => {
+          connectWebSocket();
+        }, 3000);
+      }
+    };
+
+    connectWebSocket();
+
+    return () => {
+      // Cleanup on unmount
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, []);
+
   const loadSupabaseDefects = async (filterAfterTime = null) => {
     try {
       // Save current scroll position before updating defects

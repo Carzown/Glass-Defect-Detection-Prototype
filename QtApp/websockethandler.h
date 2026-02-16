@@ -12,7 +12,7 @@ class WebSocketHandler : public QObject
     Q_OBJECT
 
 public:
-    explicit WebSocketHandler(const QString &serverUrl = "ws://localhost:8080", QObject *parent = nullptr);
+    explicit WebSocketHandler(const QString &serverUrl = "wss://glass-defect-detection-prototype-production.up.railway.app:8080", QObject *parent = nullptr);
     ~WebSocketHandler();
 
     void connectToServer();
