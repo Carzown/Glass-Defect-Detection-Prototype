@@ -2,15 +2,12 @@ FROM node:18.20.0-alpine
 
 WORKDIR /app
 
-# Copy root package files
-COPY package.json package-lock.json* ./
+# Copy all files
+COPY . .
 
-# Copy backend folder
-COPY backend ./backend
-
-# Install backend dependencies
+# Install backend dependencies with clean cache
 WORKDIR /app/backend
-RUN npm install --production --legacy-peer-deps
+RUN npm cache clean --force && npm ci --production --no-cache
 
 # Expose port
 EXPOSE 8080
