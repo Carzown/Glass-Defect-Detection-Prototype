@@ -8,7 +8,6 @@ function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
-  const [role, setRole] = useState('employee'); // UI hint only; actual role comes from DB
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -56,13 +55,7 @@ function Login() {
     try {
       // Authenticate with Supabase
       const res = await signInAndGetRole(email, password);
-      let actualRole = res.role || 'employee';
       
-      // Hard-code admin email mapping (override database role if needed)
-      if (res.email && res.email.toLowerCase() === 'qvcdclarito@tip.edu.ph') {
-        actualRole = 'admin';
-      }
-
       // Handle "Remember me" functionality
       if (remember) {
         localStorage.setItem('rememberMe', 'true');
@@ -72,25 +65,13 @@ function Login() {
         localStorage.removeItem('email');
       }
 
-      // Set session storage for app state
+      // Set session storage for app state (always as employee)
       sessionStorage.setItem('loggedIn', 'true');
-      sessionStorage.setItem('role', actualRole);
+      sessionStorage.setItem('role', 'employee');
       sessionStorage.setItem('userId', res.uid);
 
-      // Show role mismatch warnings if user selected wrong tab
-      if (role === 'admin' && actualRole !== 'admin') {
-        alert('You are not authorized as Admin. Redirecting to Employee Dashboard.');
-      }
-      if (role === 'employee' && actualRole === 'admin') {
-        alert('Admins cannot use the Employee Dashboard. Redirecting to Admin.');
-      }
-
-      // Navigate based on actual role
-      if (actualRole === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
+      // Navigate to dashboard
+      navigate('/dashboard');
     } catch (error) {
       console.error('Login error:', error);
       
@@ -126,34 +107,14 @@ function Login() {
         </div>
         <h1 className="login-title">Glass Defect Detector</h1>
 
-        <div className="login-role-tabs" role="tablist" aria-label="Sign in as">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={role === 'admin'}
-            className={`role-tab ${role === 'admin' ? 'active' : ''}`}
-            onClick={() => setRole('admin')}
-          >
-            Admin
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={role === 'employee'}
-            className={`role-tab ${role === 'employee' ? 'active' : ''}`}
-            onClick={() => setRole('employee')}
-          >
-            Employee
-          </button>
-        </div>
         <form className="login-form" id="loginForm" onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label" htmlFor="email">{role === 'admin' ? 'Email Address' : 'Email Address'}</label>
+            <label className="form-label" htmlFor="email">Email Address</label>
             <input
               className="form-input"
               type="email"
               id="email"
-              placeholder={role === 'admin' ? 'Email' : 'Email'}
+              placeholder="Email"
               required
               value={email}
               onChange={e => setEmail(e.target.value)}
