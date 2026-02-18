@@ -135,6 +135,18 @@ app.get("/devices/status", (req, res) => {
   });
 });
 
+// WebSocket debug endpoint - shows server status
+app.get("/ws/status", (req, res) => {
+  res.json({
+    websocket_enabled: true,
+    path: '/ws',
+    devices_connected: deviceConnections.size,
+    web_clients_connected: webClients.size,
+    timestamp: new Date().toISOString(),
+    note: 'To upgrade HTTP to WebSocket, send GET request to /ws with Upgrade and Connection headers'
+  });
+});
+
 // Defects API for glass defect management
 try {
   const defectsRouter = require('./defects')
@@ -166,43 +178,19 @@ function setupWebSocketServer(httpServer) {
     server: httpServer, 
     path: '/ws',  // Use specific path, not root
     perMessageDeflate: false,  // Disable compression for faster streaming
+    maxPayload: 100 * 1024 * 1024,  // 100MB max payload for large frames
     verifyClient: (info, callback) => {
-      const origin = info.origin || info.req.headers.origin || '';
-      
-      // Allow browser clients from known origins
-      const browserOrigins = [
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://127.0.0.1:3000',
-        'http://127.0.0.1:3001',
-        'https://Carzown.github.io'  // GitHub Pages
-      ];
-      
-      // Allow device connections (Raspberry Pi, scripts) with no origin
-      // or connections from local/same-host
-      const isAllowed = 
-        !origin ||  // No origin header (device connection)
-        origin === '' ||  // Empty origin
-        browserOrigins.some(o => o && origin.includes(o)) ||  // Browser client
-        origin.includes('localhost') ||  // Localhost connections
-        origin.includes('127.0.0.1') ||  // Loopback
-        origin.includes(process.env.FRONTEND_URL || '') ||  // Configured frontend
-        origin.includes(process.env.RAILWAY_PUBLIC_URL || '');  // Railway domain
-      
-      if (isAllowed) {
-        callback(true);
-      } else {
-        console.log('[WS] Connection attempt from origin:', origin);
-        callback(true);  // Allow all for development - can be restricted later
-      }
+      // For Railway/proxy compatibility, simply accept all connections
+      // Origin validation should be done at application level if needed
+      callback(true);
     }
   });
 
   console.log('[WebSocket] Server initialized on path /ws with origin validation');
 
+  // Add request logging for WebSocket upgrade attempts
   wss.on('connection', (ws, req) => {
-    const clientIp = req.socket.remoteAddress;
-    console.log(`[WS Connection] New client from ${clientIp}`);
+    console.log(`[WS Connection] New connection from ${req.socket.remoteAddress}`);
     
     let clientType = null; // 'device' or 'web'
     let deviceId = null;
@@ -346,7 +334,14 @@ function startServer(port, attempt = 1) {
   };
 
   const server = http.createServer(app);
-  setupWebSocketServer(server); // Initialize WebSocket on same HTTP server
+  
+  // Log all upgrade attempts (for debugging WebSocket issues)
+  server.on('upgrade', (req, socket, head) => {
+    console.log(`[HTTP Upgrade] Received upgrade request to ${req.url} from ${req.headers.origin || 'unknown origin'}`);
+  });
+  
+  // Setup WebSocket server (will handle /ws upgrade automatically)
+  setupWebSocketServer(server);
   
   server.once('error', onError);
   server.listen(port, onListening);
