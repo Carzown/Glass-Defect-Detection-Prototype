@@ -254,17 +254,31 @@ app.post("/api/device/detections", (req, res) => {
     return res.status(400).json({ error: 'Missing device_id or detections' });
   }
   
+  // Store detections in memory (for WebSocket broadcast)
+  const detections = req.body.detections || [];
+  detections.forEach(detection => {
+    defectsStore.addDefect({
+      device_id: deviceId,
+      defect_type: detection.defect_type || detection.type,
+      confidence: detection.confidence,
+      detected_at: req.body.timestamp || new Date().toISOString(),
+      status: 'pending'
+    });
+  });
+  
   // Broadcast detections to web clients
   broadcastToWeb({
     type: 'detection',
     device_id: deviceId,
     detections: req.body.detections,
-    timestamp: req.body.timestamp || Date.now()
+    timestamp: req.body.timestamp || Date.now(),
+    stored: true
   });
   
   res.json({
     success: true,
-    received: req.body.detections.length,
+    received: detections.length,
+    stored: detections.length,
     timestamp: new Date().toISOString()
   });
 });
@@ -292,6 +306,38 @@ const deviceConnections = new Map(); // device_id -> ws connection
 const webClients = new Set(); // web dashboard clients
 let currentFrame = null;
 let lastFrameTime = Date.now();
+
+// In-memory defects storage (fallback when Supabase not configured)
+const defectsStore = {
+  data: [], // Array of defect records
+  addDefect: function(defect) {
+    this.data.unshift({ ...defect, id: Date.now() + Math.random(), timestamp: new Date().toISOString() });
+    // Keep only last 1000 defects in memory
+    if (this.data.length > 1000) {
+      this.data = this.data.slice(0, 1000);
+    }
+    return this.data[0];
+  },
+  getDefects: function(options = {}) {
+    let results = [...this.data];
+    if (options.deviceId) {
+      results = results.filter(d => d.device_id === options.deviceId);
+    }
+    if (options.status) {
+      results = results.filter(d => d.status === options.status);
+    }
+    const limit = options.limit || 50;
+    const offset = options.offset || 0;
+    return {
+      data: results.slice(offset, offset + limit),
+      count: results.length,
+      total: this.data.length
+    };
+  },
+  clear: function() {
+    this.data = [];
+  }
+};
 
 function setupWebSocketServer(httpServer) {
   // WebSocket server with origin validation
@@ -473,4 +519,4 @@ if (require.main === module) {
   startServer(basePort);
 }
 
-module.exports = { app };
+module.exports = { app, defectsStore };

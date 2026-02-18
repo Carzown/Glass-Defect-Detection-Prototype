@@ -1,7 +1,16 @@
-// Defects API Routes - Handle glass defect records with Supabase integration
+// Defects API Routes - Handle glass defect records with Supabase integration or in-memory fallback
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
+
+// Try to import in-memory defects store from server.js
+let defectsStore = null;
+try {
+  const server = require('./server');
+  defectsStore = server.defectsStore;
+} catch (e) {
+  console.warn('[defects] Could not load in-memory defects store:', e.message);
+}
 
 // Initialize Supabase client from environment variables
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -13,7 +22,7 @@ if (supabaseUrl && supabaseKey) {
   supabase = createClient(supabaseUrl, supabaseKey);
   console.log('✅ Supabase client initialized for defects');
 } else {
-  console.warn('⚠️ Supabase not configured for defects API');
+  console.warn('⚠️ Supabase not configured - using in-memory storage for defects (not persistent)');
 }
 
 /**
@@ -27,8 +36,19 @@ if (supabaseUrl && supabaseKey) {
  */
 router.get('/', async (req, res) => {
   try {
+    // Supabase is REQUIRED for retrieving defects
     if (!supabase) {
-      return res.status(503).json({ error: 'Supabase not configured' });
+      return res.status(503).json({ 
+        error: 'Supabase not configured - cannot retrieve defects',
+        instructions: [
+          'Configure Supabase on Railway to save and retrieve defects:',
+          '1. Go to Railway Dashboard → glass-defect-detection-prototype-production',
+          '2. Click "Variables" tab',
+          '3. Add: SUPABASE_URL = https://kfeztemgrbkfwaicvgnk.supabase.co',
+          '4. Add: SUPABASE_SERVICE_ROLE_KEY = (from Supabase Settings → API)',
+          '5. Redeploy'
+        ]
+      });
     }
 
     const { deviceId, status, limit = 50, offset = 0 } = req.query;
@@ -53,13 +73,14 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
 
-    res.json({
+    return res.json({
       data,
       pagination: {
         total: count,
         limit: parseInt(limit),
         offset: parseInt(offset),
       },
+      source: 'supabase'
     });
   } catch (err) {
     console.error('Error fetching defects:', err);
@@ -73,22 +94,30 @@ router.get('/', async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
   try {
-    if (!supabase) {
-      return res.status(503).json({ error: 'Supabase not configured' });
-    }
-
     const { id } = req.params;
-    const { data, error } = await supabase
-      .from('defects')
-      .select('*')
-      .eq('id', id)
-      .single();
+    
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('defects')
+        .select('*')
+        .eq('id', id)
+        .single();
 
-    if (error) {
-      return res.status(404).json({ error: 'Defect not found' });
+      if (error) {
+        return res.status(404).json({ error: 'Defect not found' });
+      }
+
+      return res.json(data);
+    } else if (defectsStore) {
+      // Search in memory
+      const defect = defectsStore.data.find(d => d.id == id);
+      if (!defect) {
+        return res.status(404).json({ error: 'Defect not found' });
+      }
+      return res.json(defect);
+    } else {
+      return res.status(503).json({ error: 'No storage configured' });
     }
-
-    res.json(data);
   } catch (err) {
     console.error('Error fetching defect:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -97,52 +126,77 @@ router.get('/:id', async (req, res) => {
 
 /**
  * POST /defects
- * Create a new defect record
+ * Create a new defect record - REQUIRES Supabase
+ * This is called automatically by the device detection endpoint
  * Body:
- *   - device_id: device identifier
- *   - defect_type: type of defect
+ *   - device_id: device identifier (REQUIRED)
+ *   - defect_type: type of defect (REQUIRED)
  *   - detected_at: ISO timestamp of detection
+ *   - confidence: confidence score (0-1)
  *   - image_url: URL to the image in storage
  *   - image_path: path to the image in storage bucket
- *   - status: (optional) pending, reviewed, or resolved
+ *   - status: pending, reviewed, or resolved
  */
 router.post('/', async (req, res) => {
   try {
+    // Supabase is REQUIRED for saving defects
     if (!supabase) {
-      return res.status(503).json({ error: 'Supabase not configured' });
-    }
-
-    const { device_id, defect_type, detected_at, image_url, image_path, status = 'pending' } = req.body;
-
-    // Validate required fields
-    if (!device_id || !defect_type || !detected_at || !image_url) {
-      return res.status(400).json({
-        error: 'Missing required fields: device_id, defect_type, detected_at, image_url',
+      return res.status(503).json({ 
+        error: 'Supabase not configured',
+        message: 'To save defects, configure Supabase on Railway:',
+        instructions: [
+          '1. Go to Railway Dashboard → glass-defect-detection-prototype-production',
+          '2. Click "Variables" tab',
+          '3. Add: SUPABASE_URL = https://kfeztemgrbkfwaicvgnk.supabase.co',
+          '4. Add: SUPABASE_SERVICE_ROLE_KEY = (get from Supabase Dashboard → Settings → API)',
+          '5. Redeploy'
+        ]
       });
     }
 
+    const { device_id, defect_type, detected_at, image_url, image_path, confidence, status = 'pending' } = req.body;
+
+    // Validate required fields
+    if (!device_id || !defect_type) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['device_id', 'defect_type']
+      });
+    }
+
+    // Insert into Supabase
     const { data, error } = await supabase
       .from('defects')
       .insert([
         {
           device_id,
           defect_type,
-          detected_at,
-          image_url,
-          image_path,
+          detected_at: detected_at || new Date().toISOString(),
+          image_url: image_url || null,
+          image_path: image_path || null,
+          confidence: confidence || null,
           status,
         },
       ])
       .select();
 
     if (error) {
-      return res.status(400).json({ error: error.message });
+      console.error('Supabase insert error:', error);
+      return res.status(400).json({ 
+        error: 'Failed to save defect to Supabase',
+        details: error.message 
+      });
     }
 
-    res.status(201).json(data[0]);
+    return res.status(201).json({
+      success: true,
+      data: data[0],
+      source: 'supabase',
+      message: 'Defect saved to Supabase'
+    });
   } catch (err) {
     console.error('Error creating defect:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
 
