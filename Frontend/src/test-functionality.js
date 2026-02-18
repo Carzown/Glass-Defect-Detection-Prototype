@@ -42,7 +42,7 @@ async function testBackendConnectivity() {
 async function testWebSocketConnection() {
   return new Promise((resolve) => {
     try {
-      const wsUrl = process.env.REACT_APP_WS_URL || 'wss://glass-defect-detection-prototype-production.up.railway.app:8080';
+      const wsUrl = process.env.REACT_APP_WS_URL || 'wss://glass-defect-detection-prototype-production.up.railway.app/ws';
       const ws = new WebSocket(wsUrl);
 
       const timeout = setTimeout(() => {
