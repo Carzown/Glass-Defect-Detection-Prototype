@@ -197,10 +197,6 @@ function setupWebSocketServer(httpServer) {
       }
     }
   });
-        callback(false, 403, 'Forbidden');
-      }
-    }
-  });
 
   console.log('[WebSocket] Server initialized on path /ws with origin validation');
 
