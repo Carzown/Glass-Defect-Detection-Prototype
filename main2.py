@@ -217,6 +217,8 @@ http_session.mount("https://", adapter)
 
 # Track connection mode
 connection_mode = "unknown"  # 'websocket' or 'http'
+ws_error_count = 0  # Track consecutive WebSocket errors
+WS_ERROR_THRESHOLD = 3  # Switch to HTTP after 3 consecutive errors
 
 
 def get_websocket_url():
@@ -247,6 +249,14 @@ def connect_websocket():
     """Establish WebSocket connection with fallback to HTTP"""
     global ws_connection, ws_retry_count, connection_mode
 
+    # Allow disabling WebSocket via environment variable
+    disable_websocket = os.getenv('DISABLE_WEBSOCKET', '').lower() in ('true', '1', 'yes')
+    
+    if disable_websocket:
+        print(f"⚠️  WebSocket disabled via DISABLE_WEBSOCKET environment variable")
+        print(f"🔄 Using HTTP fallback directly...")
+        return connect_http_fallback()
+
     try:
         ws_url = get_websocket_url()
         print(f"🔄 Connecting to WebSocket: {ws_url}")
@@ -268,31 +278,36 @@ def connect_websocket():
         ws_connection = None
         
         # Try HTTP fallback instead
+        return connect_http_fallback()
+
+
+def connect_http_fallback():
+    """Establish HTTP fallback connection"""
+    global ws_retry_count, connection_mode
+    
+    try:
         print(f"🔄 Attempting HTTP fallback connection...")
-        try:
-            http_url = BACKEND_URL.rstrip('/') + "/api/device/register"
-            headers = {'x-device-id': DEVICE_ID}
-            response = http_session.post(http_url, headers=headers, json={'device_id': DEVICE_ID}, timeout=5)
-            response.raise_for_status()
-            
-            connection_mode = "http"
-            print(f"✅ HTTP fallback connected to {BACKEND_URL}")
-            print(f"📡 Device '{DEVICE_ID}' registered via HTTP")
-            ws_retry_count = 0
-            return True
-            
-        except Exception as http_error:
-            print(f"❌ HTTP fallback also failed: {http_error}")
-            connection_mode = "unknown"
-            
-            if ws_retry_count < WS_MAX_RETRIES:
-                print(f"🔄 Retrying in 5 seconds...")
-                time.sleep(5)
-                return connect_websocket()
-            else:
-                print("❌ All connection attempts failed.")
-                return False
-            print("⚠️  Continuing in offline mode - frames won't be streamed")
+        http_url = BACKEND_URL.rstrip('/') + "/api/device/register"
+        headers = {'x-device-id': DEVICE_ID}
+        response = http_session.post(http_url, headers=headers, json={'device_id': DEVICE_ID}, timeout=5)
+        response.raise_for_status()
+        
+        connection_mode = "http"
+        print(f"✅ HTTP fallback connected to {BACKEND_URL}")
+        print(f"📡 Device '{DEVICE_ID}' registered via HTTP")
+        ws_retry_count = 0
+        return True
+        
+    except Exception as http_error:
+        print(f"❌ HTTP fallback also failed: {http_error}")
+        connection_mode = "unknown"
+        
+        if ws_retry_count < WS_MAX_RETRIES:
+            print(f"🔄 Retrying in 5 seconds...")
+            time.sleep(5)
+            return connect_websocket()
+        else:
+            print("❌ All connection attempts failed. Continuing in offline mode...")
             return False
 
 
@@ -307,7 +322,7 @@ def send_frame(frame):
 
 def websocket_send_worker():
     """Background thread: sends frames from queue to WebSocket or HTTP"""
-    global ws_connection, connection_mode
+    global ws_connection, connection_mode, ws_error_count
     
     while ws_send_active:
         try:
@@ -327,8 +342,19 @@ def websocket_send_worker():
                     with ws_lock:
                         if ws_connection:
                             ws_connection.send(msg)
+                    ws_error_count = 0  # Reset error counter on success
                 except Exception as e:
-                    print(f"⚠️  WebSocket send error: {e}")
+                    ws_error_count += 1
+                    if "timeout" in str(e).lower() or "write" in str(e).lower():
+                        print(f"⚠️  WebSocket write timeout ({ws_error_count}/{WS_ERROR_THRESHOLD}): {e}")
+                    else:
+                        print(f"⚠️  WebSocket send error: {e}")
+                    
+                    # Switch to HTTP fallback if too many errors
+                    if ws_error_count >= WS_ERROR_THRESHOLD:
+                        print(f"🔄 Too many WebSocket errors ({ws_error_count}), switching to HTTP...")
+                        connection_mode = "http"
+                        ws_error_count = 0
                     
             elif connection_mode == "http":
                 # Send via HTTP POST
@@ -359,7 +385,7 @@ def send_defect(defect_type, confidence, timestamp):
 
 def websocket_defect_worker():
     """Background thread: sends defect metadata from queue via WebSocket or HTTP"""
-    global ws_connection, connection_mode
+    global ws_connection, connection_mode, ws_error_count
     
     while ws_send_active:
         try:
@@ -375,8 +401,16 @@ def websocket_defect_worker():
                     with ws_lock:
                         if ws_connection:
                             ws_connection.send(msg)
+                    ws_error_count = 0  # Reset on success
                 except Exception as e:
+                    ws_error_count += 1
                     print(f"⚠️  WebSocket detection send error: {e}")
+                    
+                    # Switch to HTTP fallback if too many errors
+                    if ws_error_count >= WS_ERROR_THRESHOLD:
+                        print(f"🔄 Switching detection to HTTP (WebSocket issues)...")
+                        connection_mode = "http"
+                        ws_error_count = 0
                     
             elif connection_mode == "http":
                 # Send via HTTP POST
