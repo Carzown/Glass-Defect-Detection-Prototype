@@ -1,14 +1,10 @@
 FROM node:20-alpine
 
-WORKDIR /app
+# Copy entire repo to /app
+COPY . /app
 
-# Copy Backend source directly to /app (flatten structure)
-COPY Backend/ ./
-
-# Verify files are present
-RUN test -f package.json || (echo "ERROR: package.json not found!" && exit 1)
-
-# Install dependencies
+# Install dependencies from Backend directory
+WORKDIR /app/Backend
 RUN npm install --legacy-peer-deps
 
 # Set production environment
