@@ -5,9 +5,9 @@ WORKDIR /app
 # Copy entire repository
 COPY . .
 
-# Install backend dependencies
+# Install backend dependencies (use npm install if lock file issue)
 WORKDIR /app/Backend
-RUN npm ci --legacy-peer-deps
+RUN npm install --legacy-peer-deps --no-optional || npm install --legacy-peer-deps
 
 # Set production environment
 ENV NODE_ENV=production
