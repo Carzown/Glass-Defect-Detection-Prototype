@@ -1,18 +1,35 @@
+# Build artifacts and cache
 node_modules
 npm-debug.log
+.npm
+
+# Version control
 .git
 .gitignore
-README.md
-*.md
-.env
-.env.local
+
+# IDE
 .vscode
 .idea
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
-.github
-*.py
-QtApp/
+.env
+.env.local
+
+# Unnecessary directories (not needed for Backend)
 Frontend/
-.dockerignore
+QtApp/
+.github/
+
+# Documentation (not needed in runtime)
+*.md
+README.md
+
+# Misc
 railway.json
 DATABASE_SETUP.sql
+Dockerfile
+.dockerignore
