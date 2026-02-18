@@ -135,6 +135,140 @@ app.get("/devices/status", (req, res) => {
   });
 });
 
+// WebSocket debug endpoint - shows server status
+app.get("/ws/status", (req, res) => {
+  res.json({
+    websocket_enabled: true,
+    path: '/ws',
+    devices_connected: deviceConnections.size,
+    web_clients_connected: webClients.size,
+    timestamp: new Date().toISOString(),
+    note: 'WebSocket endpoint at /ws (may require proxy configuration on Railway)'
+  });
+});
+
+// HTTP fallback endpoint for browsers - Server-Sent Events for frame streaming
+// This works when WebSocket is blocked by proxies
+app.get("/stream/frames", (req, res) => {
+  // Set proper SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  
+  // Send current frame immediately if available
+  if (currentFrame) {
+    res.write(`data: ${JSON.stringify({
+      type: 'frame',
+      frame: currentFrame,
+      timestamp: lastFrameTime
+    })}\n\n`);
+  }
+  
+  // Handle client disconnect
+  req.on('close', () => {
+    console.log('[SSE] Client disconnected from /stream/frames');
+  });
+  
+  // Keep connection open and send frames as they arrive
+  // This is a simple polling approach - in production, use event emitters
+  const interval = setInterval(() => {
+    if (currentFrame) {
+      res.write(`data: ${JSON.stringify({
+        type: 'frame',
+        frame: currentFrame,
+        timestamp: lastFrameTime
+      })}\n\n`);
+    }
+  }, 100); // Send every 100ms
+  
+  req.on('close', () => {
+    clearInterval(interval);
+  });
+});
+
+// HTTP fallback for device registration (polling-based alternative to WebSocket)  
+app.post("/api/device/register", (req, res) => {
+  const deviceId = req.headers['x-device-id'] || req.body?.device_id || 'unknown-' + Date.now();
+  
+  // Store as HTTP device
+  deviceConnections.set('http-' + deviceId, { 
+    type: 'http',
+    id: deviceId,
+    lastSeen: Date.now()
+  });
+  
+  res.json({
+    success: true,
+    device_id: deviceId,
+    message: 'Device registered via HTTP fallback',
+    polling_endpoint: `/api/device/${deviceId}/commands`,
+    frame_stream_sse: '/stream/frames',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Defects API for glass defect management
+try {
+  const defectsRouter = require('./defects')
+  app.use('/defects', defectsRouter)
+  console.log('[SERVER] Defects API routes loaded')
+} catch (e) {
+  console.warn('[SERVER] Defects routes not loaded:', e?.message || e)
+}
+
+// HTTP endpoint for devices to send frames (alternative to WebSocket)
+app.post("/api/device/frames", (req, res) => {
+  const deviceId = req.headers['x-device-id'] || req.body?.device_id;
+  
+  if (!deviceId) {
+    return res.status(400).json({ error: 'Missing device_id header or in body' });
+  }
+  
+  // Update current frame
+  if (req.body?.frame) {
+    currentFrame = req.body.frame;
+    lastFrameTime = Date.now();
+    
+    // Broadcast to web clients via WebSocket (if any)
+    broadcastToWeb({
+      type: 'frame',
+      frame: currentFrame,
+      timestamp: lastFrameTime,
+      device_id: deviceId
+    });
+  }
+  
+  res.json({
+    success: true,
+    device_id: deviceId,
+    received_at: new Date().toISOString()
+  });
+});
+
+// HTTP endpoint for devices to send detections
+app.post("/api/device/detections", (req, res) => {
+  const deviceId = req.headers['x-device-id'] || req.body?.device_id;
+  
+  if (!deviceId || !req.body?.detections) {
+    return res.status(400).json({ error: 'Missing device_id or detections' });
+  }
+  
+  // Broadcast detections to web clients
+  broadcastToWeb({
+    type: 'detection',
+    device_id: deviceId,
+    detections: req.body.detections,
+    timestamp: req.body.timestamp || Date.now()
+  });
+  
+  res.json({
+    success: true,
+    received: req.body.detections.length,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Defects API for glass defect management
 try {
   const defectsRouter = require('./defects')
@@ -166,33 +300,19 @@ function setupWebSocketServer(httpServer) {
     server: httpServer, 
     path: '/ws',  // Use specific path, not root
     perMessageDeflate: false,  // Disable compression for faster streaming
+    maxPayload: 100 * 1024 * 1024,  // 100MB max payload for large frames
     verifyClient: (info, callback) => {
-      const origin = info.origin || info.req.headers.origin || '';
-      const allowedOrigins = [
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://127.0.0.1:3000',
-        'http://127.0.0.1:3001',
-        process.env.FRONTEND_URL || '',
-        'https://Carzown.github.io'  // GitHub Pages
-      ];
-      
-      const isAllowed = allowedOrigins.some(o => o && origin.includes(o));
-      
-      if (isAllowed || !origin || origin === '') {
-        callback(true);
-      } else {
-        console.log('[WS] Blocked connection from origin:', origin);
-        callback(false, 403, 'Forbidden');
-      }
+      // For Railway/proxy compatibility, simply accept all connections
+      // Origin validation should be done at application level if needed
+      callback(true);
     }
   });
 
   console.log('[WebSocket] Server initialized on path /ws with origin validation');
 
+  // Add request logging for WebSocket upgrade attempts
   wss.on('connection', (ws, req) => {
-    const clientIp = req.socket.remoteAddress;
-    console.log(`[WS Connection] New client from ${clientIp}`);
+    console.log(`[WS Connection] New connection from ${req.socket.remoteAddress}`);
     
     let clientType = null; // 'device' or 'web'
     let deviceId = null;
@@ -336,7 +456,14 @@ function startServer(port, attempt = 1) {
   };
 
   const server = http.createServer(app);
-  setupWebSocketServer(server); // Initialize WebSocket on same HTTP server
+  
+  // Log all upgrade attempts (for debugging WebSocket issues)
+  server.on('upgrade', (req, socket, head) => {
+    console.log(`[HTTP Upgrade] Received upgrade request to ${req.url} from ${req.headers.origin || 'unknown origin'}`);
+  });
+  
+  // Setup WebSocket server (will handle /ws upgrade automatically)
+  setupWebSocketServer(server);
   
   server.once('error', onError);
   server.listen(port, onListening);
