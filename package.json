@@ -8,8 +8,8 @@
     "npm": "10.x"
   },
   "scripts": {
+    "start": "cd Backend && npm start",
     "build": "cd Frontend && npm install && npm run build",
-    "start": "cd Frontend && npm start",
     "dev": "npm run dev:frontend",
     "dev:frontend": "cd Frontend && npm start",
     "dev:backend": "cd Backend && npm run dev",
