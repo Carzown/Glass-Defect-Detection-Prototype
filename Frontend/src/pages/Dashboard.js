@@ -211,6 +211,14 @@ function Dashboard() {
       
       // Fetch latest defects (unlimited to get all)
       const result = await fetchDefects({ limit: 100, offset: 0 });
+      
+      // Check if result contains error
+      if (result.error) {
+        console.warn('[Dashboard] ⚠️ Supabase fetch returned error:', result.error);
+        console.warn('[Dashboard] Continuing with empty defects list');
+        return;
+      }
+      
       const supabaseData = result.data || [];
       
       console.log(`[Dashboard] ✅ Fetched ${supabaseData.length} defects from Supabase`);
@@ -277,6 +285,7 @@ function Dashboard() {
         status: error.status,
         details: error.details
       });
+      console.warn('[Dashboard] ⚠️ Will retry fetching defects on next poll interval');
     }
   };
 
