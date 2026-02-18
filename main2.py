@@ -28,6 +28,8 @@ import pytz
 from collections import deque
 import sys
 import threading
+from queue import Queue, Full
+from concurrent.futures import ThreadPoolExecutor
 
 # Add modules to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'modules'))
@@ -136,13 +138,14 @@ except Exception as e:
 # ============================================================================
 
 
-def upload_image(frame, defect_type, ts):
-    """Upload defect image to Supabase storage"""
+def upload_image_async(frame, defect_type, ts):
+    """Async upload defect image to Supabase storage (runs in thread pool)"""
     if not supabase:
         return None, None
 
     try:
-        _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        # Lower quality (60 vs 90) for faster upload
+        _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 60])
         image_bytes = buf.tobytes()
 
         unique_id = uuid.uuid4().hex
@@ -156,7 +159,7 @@ def upload_image(frame, defect_type, ts):
         url = supabase.storage.from_(BUCKET_NAME).get_public_url(path)
         return url, path
     except Exception as e:
-        print(f"⚠️  Image upload failed: {e}")
+        # Silently fail (don't block detection)
         return None, None
 
 
@@ -190,6 +193,12 @@ ws_retry_count = 0
 WS_MAX_RETRIES = 5
 ws_last_heartbeat = time.time()
 WS_HEARTBEAT_INTERVAL = 30  # Send heartbeat every 30 seconds
+
+# Async queues for non-blocking I/O
+frame_queue = Queue(maxsize=3)  # Keep only 3 frames in queue (drop old frames)
+defect_queue = Queue(maxsize=10)  # Defect metadata queue
+upload_executor = ThreadPoolExecutor(max_workers=2)  # Thread pool for uploads
+ws_send_active = True
 
 
 def get_websocket_url():
@@ -254,48 +263,76 @@ def connect_websocket():
 
 
 def send_frame(frame):
-    """Stream annotated frame to web clients"""
-    global ws_connection
-
+    """Queue frame for async WebSocket streaming (non-blocking)"""
     try:
-        with ws_lock:
+        frame_queue.put_nowait(frame)
+        return True
+    except Full:
+        return False
+
+
+def websocket_send_worker():
+    """Background thread: sends frames from queue to WebSocket"""
+    global ws_connection
+    
+    while ws_send_active:
+        try:
             if not ws_connection:
-                return False
+                time.sleep(0.1)
+                continue
             
-            _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            try:
+                frame = frame_queue.get(timeout=1)
+            except:
+                continue
+            
+            # Lower quality for speed (50 vs 85)
+            _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
             frame_data = base64.b64encode(buffer).decode("utf-8")
             msg = json.dumps({"type": "frame", "frame": frame_data})
-            ws_connection.send(msg)
-            return True
-    except Exception as e:
-        print(f"⚠️  WebSocket frame send error: {e}")
-        ws_connection = None
-        return False
+            
+            with ws_lock:
+                if ws_connection:
+                    ws_connection.send(msg)
+        except Exception as e:
+            pass
 
 
 def send_defect(defect_type, confidence, timestamp):
-    """Send defect detection metadata to dashboard"""
-    global ws_connection
-
+    """Queue defect metadata for async WebSocket send"""
     try:
-        with ws_lock:
-            if not ws_connection:
-                return False
-
-            msg = json.dumps(
-                {
-                    "type": "detection",
-                    "defect_type": defect_type,
-                    "confidence": float(confidence),
-                    "timestamp": timestamp.isoformat(),
-                }
-            )
-            ws_connection.send(msg)
-            return True
-    except Exception as e:
-        print(f"⚠️  WebSocket defect send error: {e}")
-        ws_connection = None
+        defect_queue.put_nowait({
+            "type": "detection",
+            "defect_type": defect_type,
+            "confidence": float(confidence),
+            "timestamp": timestamp.isoformat(),
+        })
+        return True
+    except Full:
         return False
+
+
+def websocket_defect_worker():
+    """Background thread: sends defect metadata from queue"""
+    global ws_connection
+    
+    while ws_send_active:
+        try:
+            if not ws_connection:
+                time.sleep(0.1)
+                continue
+            
+            try:
+                defect_data = defect_queue.get(timeout=1)
+            except:
+                continue
+            
+            msg = json.dumps(defect_data)
+            with ws_lock:
+                if ws_connection:
+                    ws_connection.send(msg)
+        except Exception as e:
+            pass
 
 
 def check_websocket_health():
@@ -372,6 +409,13 @@ if not connect_websocket():
 else:
     print("✅ WebSocket streaming enabled")
 
+# Start background worker threads for async sends
+ws_frame_thread = threading.Thread(target=websocket_send_worker, daemon=True)
+ws_defect_thread = threading.Thread(target=websocket_defect_worker, daemon=True)
+ws_frame_thread.start()
+ws_defect_thread.start()
+print("✅ Async WebSocket workers started")
+
 # Small delay to ensure all threads are ready
 time.sleep(1)
 
@@ -440,42 +484,42 @@ try:
                     conf = hit.get("confidence", 0.0)
                     bbox = hit.get("bbox", [0, 0, 0, 0])
                     
-                    # Calculate center point for spatial uniqueness check
-                    center = np.array([
-                        (bbox[0] + bbox[2]) / 2,
-                        (bbox[1] + bbox[3]) / 2
-                    ])
+                    # Optimized spatial check: use squared distance, no numpy
+                    center_x = (bbox[0] + bbox[2]) / 2
+                    center_y = (bbox[1] + bbox[3]) / 2
+                    dist_sq = SPATIAL_DIST ** 2
                     
-                    # Check if this is a new defect (not near any recently sent one)
+                    # Fast check: does NOT match any recent detection
                     is_new_defect = not any(
-                        np.linalg.norm(center - past) < SPATIAL_DIST 
+                        (center_x - past[0])**2 + (center_y - past[1])**2 < dist_sq
                         for past in sent_history
                     )
                     
                     if is_new_defect:
                         print(f"🔍 DEFECT DETECTED: {label} ({conf:.2%})")
                         
-                        # Track this defect location
-                        sent_history.append(center)
+                        # Track this defect location (tuple instead of array)
+                        sent_history.append((center_x, center_y))
                         last_upload_time = now
                         
-                        # STEP 4: Broadcast to dashboard
+                        # STEP 4: Broadcast to dashboard (async)
                         send_defect(label, conf, ts)
                         
-                        # STEP 5: Upload image
-                        url, path = upload_image(annotated, label, ts)
-                        if url:
-                            # STEP 6: Save record
-                            save_defect(label, ts, url, path, conf)
-                            print(f"💾 Saved: {label}")
+                        # STEP 5: Upload image async (non-blocking)
+                        def async_upload():
+                            url, path = upload_image_async(annotated, label, ts)
+                            if url:
+                                save_defect(label, ts, url, path, conf)
+                                print(f"💾 Saved: {label}")
+                        
+                        upload_executor.submit(async_upload)
 
-            # Display locally
-            cv2.imshow("Glass Defect Detection", annotated)
-
-            # Exit on 'q'
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                print("\n⏹️  Shutdown requested...")
-                break
+            # Skip local display - causes lag on headless systems
+            # Uncomment only for debugging on desktop:
+            # cv2.imshow("Glass Defect Detection", annotated)
+            # if cv2.waitKey(1) & 0xFF == ord("q"):
+            #     print("\n⏹️  Shutdown requested...")
+            #     break
         
         except Exception as e:
             print(f"⚠️  Error processing frame: {e}")
@@ -489,6 +533,13 @@ except Exception as e:
 # Cleanup
 finally:
     print("\n🔄 Cleaning up...")
+    
+    # Stop async workers
+    ws_send_active = False
+    ws_frame_thread.join(timeout=2)
+    ws_defect_thread.join(timeout=2)
+    upload_executor.shutdown(wait=False)
+    print("✅ Async workers stopped")
     
     # Stop camera
     if picam2:
