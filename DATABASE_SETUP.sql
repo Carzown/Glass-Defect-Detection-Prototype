@@ -9,6 +9,7 @@ DROP TABLE IF EXISTS public.defects CASCADE;
 CREATE TABLE public.defects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
+  device_id TEXT DEFAULT 'CAM-001',
   defect_type TEXT NOT NULL,
 
   detected_at TIMESTAMPTZ NOT NULL,
@@ -39,6 +40,9 @@ CREATE INDEX idx_defects_defect_type
 
 CREATE INDEX idx_defects_confidence
   ON public.defects (confidence DESC);
+
+CREATE INDEX idx_defects_device_id
+  ON public.defects (device_id);
 
 -- =========================
 -- 4. ENABLE REALTIME

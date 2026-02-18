@@ -174,6 +174,7 @@ def save_defect(defect_type, ts, image_url, image_path, confidence):
     try:
         supabase.table("defects").insert(
             {
+                "device_id": DEVICE_ID,
                 "defect_type": defect_type,
                 "detected_at": ts.isoformat(),
                 "image_url": image_url,
