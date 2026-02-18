@@ -1,8 +1,11 @@
 # Environment files (keep secrets out of git)
 .env
+.env.local
+.env.development
+.env.staging
 .env.*
+!.env.production
 *.env
-*.env.*
 Frontend/.env.local
 Frontend/.env.*
 native-glass/.env
