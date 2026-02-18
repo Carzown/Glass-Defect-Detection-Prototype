@@ -8,8 +8,6 @@ README.md
 .env.local
 .vscode
 .idea
-Defect/
-HTML/
 .DS_Store
 .github
 *.py
