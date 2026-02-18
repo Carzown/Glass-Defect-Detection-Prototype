@@ -204,12 +204,16 @@ function Dashboard() {
 
   const loadSupabaseDefects = async (filterAfterTime = null) => {
     try {
+      console.log('[Dashboard] Fetching defects from Supabase...');
+      
       // Save current scroll position before updating defects
       const scrollPos = defectsListRef.current?.scrollTop || 0;
       
       // Fetch latest defects (unlimited to get all)
       const result = await fetchDefects({ limit: 100, offset: 0 });
       const supabaseData = result.data || [];
+      
+      console.log(`[Dashboard] ✅ Fetched ${supabaseData.length} defects from Supabase`);
       
       // Filter defects to only show ones detected after session start
       const timeToFilter = filterAfterTime || sessionStartTime;
@@ -252,6 +256,7 @@ function Dashboard() {
           .sort((a, b) => new Date(b.detected_at || 0) - new Date(a.detected_at || 0))
           .slice(0, 20);
         
+        console.log(`[Dashboard] Updated defects list: ${merged.length} items`);
         return merged;
       });
       
@@ -265,7 +270,13 @@ function Dashboard() {
       
       setSupabaseDefects(supabaseData);
     } catch (error) {
-      console.error('Error loading Supabase defects:', error);
+      console.error('[Dashboard] ❌ Error loading Supabase defects:', error);
+      console.error('[Dashboard] Error details:', {
+        message: error.message,
+        code: error.code,
+        status: error.status,
+        details: error.details
+      });
     }
   };
 

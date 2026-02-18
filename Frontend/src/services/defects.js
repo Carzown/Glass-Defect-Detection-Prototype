@@ -22,7 +22,18 @@ export async function fetchDefects(filters = {}) {
 
     const { data, count, error } = await query;
 
-    if (error) throw error;
+    if (error) {
+      console.error('[fetchDefects] Supabase error:', {
+        message: error.message,
+        code: error.code,
+        status: error.status,
+        hint: error.hint,
+        details: error.details
+      });
+      throw error;
+    }
+
+    console.log(`[fetchDefects] ✅ Successfully fetched ${(data || []).length} defects from Supabase`);
 
     return {
       data: data || [],
@@ -33,7 +44,14 @@ export async function fetchDefects(filters = {}) {
       },
     };
   } catch (error) {
-    console.error('Error fetching defects:', error);
+    console.error('[fetchDefects] ❌ Error fetching defects:', error.message);
+    
+    // Check if it's a table not found error
+    if (error.message?.includes('does not exist') || error.message?.includes('relation') || error.code === 'PGRST116') {
+      console.error('[fetchDefects] ⚠️ The "defects" table does not exist in Supabase. Please create it.');
+      throw new Error('Defects table not found in Supabase. Please create the table with schema: id, device_id, defect_type, detected_at, confidence, image_url, image_path, status, notes, created_at');
+    }
+    
     throw error;
   }
 }
