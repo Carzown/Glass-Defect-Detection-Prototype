@@ -168,21 +168,35 @@ function setupWebSocketServer(httpServer) {
     perMessageDeflate: false,  // Disable compression for faster streaming
     verifyClient: (info, callback) => {
       const origin = info.origin || info.req.headers.origin || '';
-      const allowedOrigins = [
+      
+      // Allow browser clients from known origins
+      const browserOrigins = [
         'http://localhost:3000',
         'http://localhost:3001',
         'http://127.0.0.1:3000',
         'http://127.0.0.1:3001',
-        process.env.FRONTEND_URL || '',
         'https://Carzown.github.io'  // GitHub Pages
       ];
       
-      const isAllowed = allowedOrigins.some(o => o && origin.includes(o));
+      // Allow device connections (Raspberry Pi, scripts) with no origin
+      // or connections from local/same-host
+      const isAllowed = 
+        !origin ||  // No origin header (device connection)
+        origin === '' ||  // Empty origin
+        browserOrigins.some(o => o && origin.includes(o)) ||  // Browser client
+        origin.includes('localhost') ||  // Localhost connections
+        origin.includes('127.0.0.1') ||  // Loopback
+        origin.includes(process.env.FRONTEND_URL || '') ||  // Configured frontend
+        origin.includes(process.env.RAILWAY_PUBLIC_URL || '');  // Railway domain
       
-      if (isAllowed || !origin || origin === '') {
+      if (isAllowed) {
         callback(true);
       } else {
-        console.log('[WS] Blocked connection from origin:', origin);
+        console.log('[WS] Connection attempt from origin:', origin);
+        callback(true);  // Allow all for development - can be restricted later
+      }
+    }
+  });
         callback(false, 403, 'Forbidden');
       }
     }
