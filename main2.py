@@ -30,6 +30,9 @@ import sys
 import threading
 from queue import Queue, Full
 from concurrent.futures import ThreadPoolExecutor
+import requests
+from urllib3.util.retry import Retry
+from requests.adapters import HTTPAdapter
 
 # Add modules to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'modules'))
@@ -200,6 +203,21 @@ defect_queue = Queue(maxsize=10)  # Defect metadata queue
 upload_executor = ThreadPoolExecutor(max_workers=2)  # Thread pool for uploads
 ws_send_active = True
 
+# HTTP fallback configuration
+http_session = requests.Session()
+retry_strategy = Retry(
+    total=2,
+    backoff_factor=0.1,
+    status_forcelist=[500, 502, 503, 504],
+    allowed_methods=["POST", "GET"]
+)
+adapter = HTTPAdapter(max_retries=retry_strategy)
+http_session.mount("http://", adapter)
+http_session.mount("https://", adapter)
+
+# Track connection mode
+connection_mode = "unknown"  # 'websocket' or 'http'
+
 
 def get_websocket_url():
     """Convert backend URL to WebSocket URL"""
@@ -226,8 +244,8 @@ def get_websocket_url():
 
 
 def connect_websocket():
-    """Establish WebSocket connection with retry logic"""
-    global ws_connection, ws_retry_count
+    """Establish WebSocket connection with fallback to HTTP"""
+    global ws_connection, ws_retry_count, connection_mode
 
     try:
         ws_url = get_websocket_url()
@@ -235,29 +253,45 @@ def connect_websocket():
 
         ws_connection = websocket.create_connection(ws_url, timeout=5)
         ws_retry_count = 0
+        connection_mode = "websocket"
 
         # Send device registration with device ID
         msg = json.dumps({"type": "device_register", "device_id": DEVICE_ID})
         ws_connection.send(msg)
         print(f"📡 Device '{DEVICE_ID}' registered with backend")
-
         print(f"✅ WebSocket connected to {ws_url}")
         return True
-    except ValueError as e:
-        print(f"❌ Configuration error: {e}")
-        print("❌ Check config.py for missing BACKEND_URL")
-        return False
-    except Exception as e:
+        
+    except Exception as ws_error:
         ws_retry_count += 1
-        print(f"⚠️  WebSocket connection error (attempt {ws_retry_count}/{WS_MAX_RETRIES}): {e}")
+        print(f"⚠️  WebSocket connection error: {ws_error}")
         ws_connection = None
-
-        if ws_retry_count < WS_MAX_RETRIES:
-            print(f"🔄 Retrying in 5 seconds...")
-            time.sleep(5)
-            return connect_websocket()
-        else:
-            print("❌ WebSocket connection failed after max retries.")
+        
+        # Try HTTP fallback instead
+        print(f"🔄 Attempting HTTP fallback connection...")
+        try:
+            http_url = BACKEND_URL.rstrip('/') + "/api/device/register"
+            headers = {'x-device-id': DEVICE_ID}
+            response = http_session.post(http_url, headers=headers, json={'device_id': DEVICE_ID}, timeout=5)
+            response.raise_for_status()
+            
+            connection_mode = "http"
+            print(f"✅ HTTP fallback connected to {BACKEND_URL}")
+            print(f"📡 Device '{DEVICE_ID}' registered via HTTP")
+            ws_retry_count = 0
+            return True
+            
+        except Exception as http_error:
+            print(f"❌ HTTP fallback also failed: {http_error}")
+            connection_mode = "unknown"
+            
+            if ws_retry_count < WS_MAX_RETRIES:
+                print(f"🔄 Retrying in 5 seconds...")
+                time.sleep(5)
+                return connect_websocket()
+            else:
+                print("❌ All connection attempts failed.")
+                return False
             print("⚠️  Continuing in offline mode - frames won't be streamed")
             return False
 
@@ -272,15 +306,11 @@ def send_frame(frame):
 
 
 def websocket_send_worker():
-    """Background thread: sends frames from queue to WebSocket"""
-    global ws_connection
+    """Background thread: sends frames from queue to WebSocket or HTTP"""
+    global ws_connection, connection_mode
     
     while ws_send_active:
         try:
-            if not ws_connection:
-                time.sleep(0.1)
-                continue
-            
             try:
                 frame = frame_queue.get(timeout=1)
             except:
@@ -289,11 +319,26 @@ def websocket_send_worker():
             # Lower quality for speed (50 vs 85)
             _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
             frame_data = base64.b64encode(buffer).decode("utf-8")
-            msg = json.dumps({"type": "frame", "frame": frame_data})
             
-            with ws_lock:
-                if ws_connection:
-                    ws_connection.send(msg)
+            if connection_mode == "websocket" and ws_connection:
+                # Send via WebSocket
+                try:
+                    msg = json.dumps({"type": "frame", "frame": frame_data})
+                    with ws_lock:
+                        if ws_connection:
+                            ws_connection.send(msg)
+                except Exception as e:
+                    print(f"⚠️  WebSocket send error: {e}")
+                    
+            elif connection_mode == "http":
+                # Send via HTTP POST
+                try:
+                    http_url = BACKEND_URL.rstrip('/') + "/api/device/frames"
+                    headers = {'x-device-id': DEVICE_ID}
+                    http_session.post(http_url, headers=headers, json={'frame': frame_data}, timeout=5)
+                except Exception as e:
+                    print(f"⚠️  HTTP frame send error: {e}")
+                    
         except Exception as e:
             pass
 
@@ -313,24 +358,35 @@ def send_defect(defect_type, confidence, timestamp):
 
 
 def websocket_defect_worker():
-    """Background thread: sends defect metadata from queue"""
-    global ws_connection
+    """Background thread: sends defect metadata from queue via WebSocket or HTTP"""
+    global ws_connection, connection_mode
     
     while ws_send_active:
         try:
-            if not ws_connection:
-                time.sleep(0.1)
-                continue
-            
             try:
                 defect_data = defect_queue.get(timeout=1)
             except:
                 continue
             
-            msg = json.dumps(defect_data)
-            with ws_lock:
-                if ws_connection:
-                    ws_connection.send(msg)
+            if connection_mode == "websocket" and ws_connection:
+                # Send via WebSocket
+                try:
+                    msg = json.dumps(defect_data)
+                    with ws_lock:
+                        if ws_connection:
+                            ws_connection.send(msg)
+                except Exception as e:
+                    print(f"⚠️  WebSocket detection send error: {e}")
+                    
+            elif connection_mode == "http":
+                # Send via HTTP POST
+                try:
+                    http_url = BACKEND_URL.rstrip('/') + "/api/device/detections"
+                    headers = {'x-device-id': DEVICE_ID}
+                    http_session.post(http_url, headers=headers, json=defect_data, timeout=5)
+                except Exception as e:
+                    print(f"⚠️  HTTP detection send error: {e}")
+                    
         except Exception as e:
             pass
 
@@ -431,6 +487,7 @@ print(f"Device: {DEVICE_ID}")
 print(f"Backend: {BACKEND_URL}")
 print(f"Camera: {WIDTH}x{HEIGHT} @ Hailo Accelerator")
 print(f"Min Confidence: {MIN_CONFIDENCE}")
+print(f"Connection Mode: {connection_mode.upper()}")
 print("Status: CONTINUOUS DETECTION ACTIVE")
 print("=" * 70)
 print()
