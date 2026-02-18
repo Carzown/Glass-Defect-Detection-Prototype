@@ -1,0 +1,31 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "start:all": "node start-all.js",
+    "dev:all": "nodemon start-all.js",
+    "check:backend": "python scripts/check_backend.py --url http://localhost:5000",
+    "check:supabase": "node scripts/check-supabase-auth.js",
+    "check:all": "npm run check:backend && npm run check:supabase",
+    "test": "echo tests removed"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.46.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.1.0",
+    "path-to-regexp": "^8.3.0",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
