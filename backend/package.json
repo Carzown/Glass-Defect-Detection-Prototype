@@ -6,11 +6,12 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "ws:server": "node websocket-server.js",
-    "ws:dev": "nodemon websocket-server.js",
-    "test": "echo tests removed",
-    "sync:profiles": "node scripts/sync-profiles.js",
-    "dev:infer": "python scripts/inference_server.py --port 5055 --model ../native-glass/yolov11_small_model.pt"
+    "start:all": "node start-all.js",
+    "dev:all": "nodemon start-all.js",
+    "check:backend": "python scripts/check_backend.py --url http://localhost:5000",
+    "check:supabase": "node scripts/check-supabase-auth.js",
+    "check:all": "npm run check:backend && npm run check:supabase",
+    "test": "echo tests removed"
   },
   "keywords": [],
   "author": "",

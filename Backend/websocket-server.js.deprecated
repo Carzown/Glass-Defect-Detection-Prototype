@@ -1,0 +1,17 @@
+/**
+ * DEPRECATED: WebSocket server is now integrated into server.js
+ * 
+ * This file has been replaced by the WebSocket server integrated into server.js
+ * The WebSocket server functionality now runs on the same port as the Express API (port 5000).
+ * 
+ * Do NOT use this file - it is no longer started by the application.
+ * 
+ * To start the backend with integrated WebSocket:
+ *   npm start
+ *   or
+ *   node server.js
+ * 
+ * Both the HTTP API and WebSocket server will listen on the same port 5000.
+ * 
+ * See server.js for the integrated WebSocket implementation (setupWebSocketServer function).
+ */

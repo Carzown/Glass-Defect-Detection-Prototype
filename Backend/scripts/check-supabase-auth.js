@@ -11,7 +11,11 @@
  * 4. Can sign in with test credentials
  */
 
-require('dotenv').config({ path: './Frontend/.env.local' });
+// Try to load from both .env and .env.local
+require('dotenv').config({ path: './Frontend/.env' });
+if (!process.env.REACT_APP_SUPABASE_URL) {
+  require('dotenv').config({ path: './Frontend/.env.local' });
+}
 
 const fs = require('fs');
 const path = require('path');

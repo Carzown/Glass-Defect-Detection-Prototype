@@ -63,35 +63,37 @@ def http_check(base_url: str, path: str = "/", timeout: float = 4.0) -> bool:
         return False
 
 
-def webrtc_signaling_check(base_url: str, timeout: float = 6.0) -> bool:
-    """Check if WebRTC signaling endpoints are available"""
+def device_status_check(base_url: str, timeout: float = 6.0) -> bool:
+    """Check if WebSocket device connections are working"""
     if requests is None:
-        print("[WebRTC] requests not installed; skipping WebRTC check")
+        print("[Device] requests not installed; skipping device check")
         return True
 
     try:
-        # Check for WebRTC status endpoint
+        # Check for device status endpoint
         resp = requests.get(
-            f"{base_url}/webrtc/status/test",
+            f"{base_url}/devices/status",
             timeout=timeout
         )
-        if resp.status_code in [200, 400]:  # 400 is ok (means endpoint exists but device not connected)
-            print(f"[WebRTC] OK: Signaling endpoints available at {base_url}")
+        if resp.status_code == 200:
+            data = resp.json()
+            count = data.get('count', 0)
+            print(f"[Device] OK: {count} device(s) connected via WebSocket")
             return True
         else:
-            print(f"[WebRTC] Fail: Signaling endpoint returned {resp.status_code}")
+            print(f"[Device] Fail: Device status endpoint returned {resp.status_code}")
             return False
     except Exception as e:
-        print(f"[WebRTC] Fail: Signaling check failed: {e}")
+        print(f"[Device] Fail: Device check failed: {e}")
         return False
 
 
 def main():
     parser = argparse.ArgumentParser(description="Check backend server connectivity")
-    parser.add_argument("--url", default=os.getenv("BACKEND_URL", "http://localhost:3000"), help="Base backend URL")
+    parser.add_argument("--url", default=os.getenv("BACKEND_URL", "http://localhost:5000"), help="Base backend URL")
     parser.add_argument("--path", default=os.getenv("CHECK_PATH", "/"), help="HTTP path to probe (default /)")
     parser.add_argument("--skip-http", action="store_true", help="Skip HTTP check")
-    parser.add_argument("--skip-webrtc", action="store_true", help="Skip WebRTC signaling check")
+    parser.add_argument("--skip-device", action="store_true", help="Skip device status check")
     args = parser.parse_args()
 
     parsed = urlparse(args.url)
@@ -113,11 +115,11 @@ def main():
             print("Result: HTTP FAILED")
             sys.exit(2)
 
-    sio_ok = True
-    if not args.skip_webrtc:
-        webrtc_ok = webrtc_signaling_check(args.url)
-        if not webrtc_ok:
-            print("Result: WEBRTC SIGNALING CHECK FAILED")
+    device_ok = True
+    if not args.skip_device:
+        device_ok = device_status_check(args.url)
+        if not device_ok:
+            print("Result: DEVICE STATUS CHECK FAILED")
             sys.exit(3)
 
     print("Result: ALL CHECKS PASSED")

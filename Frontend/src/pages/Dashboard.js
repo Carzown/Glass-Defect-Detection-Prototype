@@ -4,6 +4,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
+import LiveDetectionPreview from '../components/LiveDetectionPreview';
 import { signOutUser } from '../supabase';
 import { fetchDefects, updateDefectStatus } from '../services/defects';
 import './Dashboard.css';
@@ -67,7 +68,16 @@ function Dashboard() {
   useEffect(() => {
     const connectWebSocket = () => {
       try {
-        const wsUrl = process.env.REACT_APP_WS_URL || 'wss://glass-defect-detection-prototype-production.up.railway.app:8080';
+        // Convert backend URL to WebSocket URL
+        let wsUrl = process.env.REACT_APP_WS_URL || process.env.REACT_APP_BACKEND_URL || 'wss://glass-defect-detection-prototype-production.up.railway.app';
+        
+        // Clean up the URL
+        wsUrl = wsUrl.replace('http://', '').replace('https://', '').replace('wss://', '').replace('ws://', '').replace(/\/+$/, '');
+        
+        // Add protocol
+        const protocol = wsUrl.includes('railway') || wsUrl.includes('localhost') === false ? 'wss' : 'ws';
+        wsUrl = `${protocol}://${wsUrl}/ws`;  // Connect to /ws endpoint
+        
         console.log('[Dashboard] Attempting WebSocket connection to:', wsUrl);
 
         wsRef.current = new WebSocket(wsUrl);
@@ -80,8 +90,7 @@ function Dashboard() {
           // Register as web_client
           if (wsRef.current) {
             wsRef.current.send(JSON.stringify({
-              type: 'register',
-              client_type: 'web_client'
+              type: 'web_client'
             }));
           }
         };
@@ -93,11 +102,11 @@ function Dashboard() {
             // Handle frame data (for live video display)
             if (data.type === 'frame' && data.frame) {
               try {
-                const blob = new Blob([Uint8Array.from(atob(data.frame), c => c.charCodeAt(0))], { type: 'image/jpeg' });
-                const url = URL.createObjectURL(blob);
-                setVideoFrame(url);
+                // Create image data URL from base64
+                const imageUrl = `data:image/jpeg;base64,${data.frame}`;
+                setVideoFrame(imageUrl);
               } catch (e) {
-                console.error('[Dashboard] Error creating blob from frame:', e);
+                console.error('[Dashboard] Error handling frame:', e);
               }
             }
 
@@ -388,39 +397,13 @@ function Dashboard() {
             <div className="machine-video-section">
               <h2 className="machine-section-title">Live Detection Stream</h2>
 
-              {/* Video Container */}
+              {/* Live Detection Preview Component */}
               <div className="machine-video-container">
-                {streamStatus === 'error' ? (
-                  <div style={videoContainerStyle}>
-                    <p style={{ marginBottom: 16, fontSize: 16 }}>❌ Connection Error</p>
-                    <p style={{ fontSize: 12, color: '#999' }}>{streamMessage}</p>
-                    <p style={{ fontSize: 12, color: '#999', marginTop: 8 }}>Make sure backend is running on Railway</p>
-                  </div>
-                ) : streamStatus === 'connecting' ? (
-                  <div style={videoContainerStyle}>
-                    <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>⏳ Connecting...</div>
-                    <div style={{ fontSize: 12, color: '#999' }}>{streamMessage}</div>
-                  </div>
-                ) : (
-                  <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                    {videoFrame ? (
-                      <img 
-                        ref={videoRef}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'contain',
-                          backgroundColor: '#000'
-                        }}
-                        alt="Live detection stream"
-                      />
-                    ) : (
-                      <div style={videoContainerStyle}>
-                        <p style={{ fontSize: 14 }}>Waiting for video stream...</p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <LiveDetectionPreview 
+                  ws={wsRef.current}
+                  streamStatus={streamStatus}
+                  streamMessage={streamMessage}
+                />
               </div>
             </div>
 
