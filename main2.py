@@ -605,12 +605,12 @@ try:
                         
                         upload_executor.submit(async_upload)
 
-            # Skip local display - causes lag on headless systems
-            # Uncomment only for debugging on desktop:
-            # cv2.imshow("Glass Defect Detection", annotated)
-            # if cv2.waitKey(1) & 0xFF == ord("q"):
-            #     print("\n⏹️  Shutdown requested...")
-            #     break
+            # Display local window with detection overlays (shown on Raspberry Pi display)
+            # Frame is also being streamed to backend (async, non-blocking)
+            cv2.imshow("Glass Defect Detection - Live Stream", annotated)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                print("\n⏹️  Shutdown requested...")
+                break
         
         except Exception as e:
             print(f"⚠️  Error processing frame: {e}")
