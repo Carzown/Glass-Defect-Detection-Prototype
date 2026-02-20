@@ -8,7 +8,23 @@ import { supabase } from '../supabase';
  */
 export async function fetchDefects(filters = {}) {
   try {
+    // Check if Supabase is initialized
+    if (!supabase) {
+      console.error('[fetchDefects] ❌ Supabase is not initialized. Check REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY in .env.local');
+      return {
+        data: [],
+        pagination: {
+          total: 0,
+          limit: 50,
+          offset: 0,
+        },
+        error: 'Supabase not initialized'
+      };
+    }
+
     const { status, limit = 50, offset = 0 } = filters;
+
+    console.log('[fetchDefects] Fetching defects from Supabase with filters:', { status, limit, offset });
 
     let query = supabase
       .from('defects')
@@ -45,6 +61,7 @@ export async function fetchDefects(filters = {}) {
     };
   } catch (error) {
     console.error('[fetchDefects] ❌ Error fetching defects:', error.message);
+    console.error('[fetchDefects] Full error:', error);
     
     // Check if it's a table not found error
     if (error.message?.includes('does not exist') || error.message?.includes('relation') || error.code === 'PGRST116') {
