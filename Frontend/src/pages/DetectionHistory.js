@@ -5,53 +5,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { signOutUser } from '../supabase';
-import { fetchDefects } from '../services/defects';
+import { fetchDefectsByRange } from '../services/defects';
 import './Dashboard.css';
 import './DetectionHistory.css';
-
-// ── Mock sessions (shown when Supabase has no data) ─────────────
-const MOCK_SESSIONS = [
-  {
-    detected_at: '2026-02-21T14:32:10Z', defect_type: 'scratch',
-    confidence: 0.92, status: 'unresolved', device_id: 'CAM-001', id: 'm1',
-  },
-  {
-    detected_at: '2026-02-21T14:45:03Z', defect_type: 'bubble',
-    confidence: 0.87, status: 'resolved', device_id: 'CAM-001', id: 'm2',
-  },
-  {
-    detected_at: '2026-02-21T15:01:55Z', defect_type: 'crack',
-    confidence: 0.95, status: 'unresolved', device_id: 'CAM-001', id: 'm3',
-  },
-  {
-    detected_at: '2026-02-20T09:12:40Z', defect_type: 'scratch',
-    confidence: 0.78, status: 'resolved', device_id: 'CAM-001', id: 'm4',
-  },
-  {
-    detected_at: '2026-02-20T09:58:22Z', defect_type: 'bubble',
-    confidence: 0.81, status: 'unresolved', device_id: 'CAM-002', id: 'm5',
-  },
-  {
-    detected_at: '2026-02-20T11:30:05Z', defect_type: 'crack',
-    confidence: 0.90, status: 'resolved', device_id: 'CAM-002', id: 'm6',
-  },
-  {
-    detected_at: '2026-02-20T13:44:19Z', defect_type: 'scratch',
-    confidence: 0.85, status: 'unresolved', device_id: 'CAM-001', id: 'm7',
-  },
-  {
-    detected_at: '2026-02-19T08:05:33Z', defect_type: 'crack',
-    confidence: 0.93, status: 'resolved', device_id: 'CAM-001', id: 'm8',
-  },
-  {
-    detected_at: '2026-02-19T10:22:47Z', defect_type: 'bubble',
-    confidence: 0.76, status: 'unresolved', device_id: 'CAM-002', id: 'm9',
-  },
-  {
-    detected_at: '2026-02-19T14:55:11Z', defect_type: 'scratch',
-    confidence: 0.88, status: 'resolved', device_id: 'CAM-001', id: 'm10',
-  },
-];
 
 function capitalizeDefectType(type) {
   if (!type) return type;
@@ -90,6 +46,7 @@ function DetectionHistory() {
   const [selectedSession, setSelectedSession] = useState(null);
   const [selectedDefect, setSelectedDefect] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [timeFilter, setTimeFilter] = useState('30days');
 
   async function handleLogout() {
     try {
@@ -106,21 +63,24 @@ function DetectionHistory() {
   }
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       try {
         setLoading(true);
-        const result = await fetchDefects({ limit: 500, offset: 0 });
-        const data = result.data || [];
-        setSessions(groupByDate(data.length > 0 ? data : MOCK_SESSIONS));
+        setSelectedSession(null);
+        setSelectedDefect(null);
+        const data = await fetchDefectsByRange(timeFilter);
+        if (!cancelled) setSessions(groupByDate(data));
       } catch (e) {
-        console.error('[DetectionHistory] Error loading defects, using mock data:', e);
-        setSessions(groupByDate(MOCK_SESSIONS));
+        console.error('[DetectionHistory] Error loading defects:', e);
+        if (!cancelled) setSessions([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     load();
-  }, []);
+    return () => { cancelled = true; };
+  }, [timeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSessionClick(session) {
     setSelectedSession(session);
@@ -148,11 +108,23 @@ function DetectionHistory() {
         <header className="machine-header">
           <div className="machine-header-left">
             <h1 className="machine-header-title">Detection History</h1>
-            <p className="machine-header-subtitle">Browse past detections</p>
+            <p className="machine-header-subtitle">View past inspection results</p>
           </div>
         </header>
 
         <div className="dh-page-content-area">
+          <div className="dashboard-title-row" style={{ padding: '0 0 8px 0' }}>
+            <h2 className="dashboard-box-title">Sessions</h2>
+            <select
+              className="dashboard-time-filter"
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value)}
+            >
+              <option value="today">Today</option>
+              <option value="7days">Last 7 days</option>
+              <option value="30days">Last 30 days</option>
+            </select>
+          </div>
           {loading && <div className="dh-loading">Loading history…</div>}
 
           {!loading && (
@@ -209,6 +181,9 @@ function DetectionHistory() {
                             </span>
                             <span className="dh-row-time">{formatTime(d.detected_at)}</span>
                           </div>
+                          {d.tag_number != null && (
+                            <span style={{ background: '#0f2942', color: 'white', borderRadius: 4, fontSize: 10, fontWeight: 700, padding: '2px 6px', fontFamily: 'Inter', flexShrink: 0, marginRight: 4 }}>#{d.tag_number}</span>
+                          )}
                           <svg className="dh-row-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <polyline points="9 18 15 12 9 6" />
                           </svg>
@@ -227,7 +202,22 @@ function DetectionHistory() {
                       <span className="dh-panel-title">Details</span>
                     </div>
                     <div className="dh-detail-card-wrapper">
+                      {(selectedDefect.tagged_image_url || selectedDefect.image_url) && (
+                        <div style={{ marginBottom: 12, borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+                          <img
+                            src={selectedDefect.tagged_image_url || selectedDefect.image_url}
+                            alt="Defect"
+                            style={{ width: '100%', display: 'block', objectFit: 'contain', background: '#000' }}
+                          />
+                        </div>
+                      )}
                       <div className="dh-detail-card">
+                        {selectedDefect.tag_number != null && (
+                          <div className="dh-detail-row">
+                            <span className="dh-detail-label">Tag #</span>
+                            <span className="dh-detail-value" style={{ fontWeight: 800, color: '#0f2942' }}>#{selectedDefect.tag_number}</span>
+                          </div>
+                        )}
                         <div className="dh-detail-row">
                           <span className="dh-detail-label">Type</span>
                           <span className={`dh-defect-type dh-defect-${(selectedDefect.defect_type || '').toLowerCase()}`}>
@@ -251,12 +241,18 @@ function DetectionHistory() {
                           </div>
                         )}
                         <div className="dh-detail-row">
-                          <span className="dh-detail-label">Image URL</span>
-                          {selectedDefect.image_url
-                            ? <a href={selectedDefect.image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb', wordBreak: 'break-all' }}>View image</a>
-                            : <span className="dh-detail-value">—</span>
+                          <span className="dh-detail-label">Tagged Image</span>
+                          {selectedDefect.tagged_image_url
+                            ? <a href={selectedDefect.tagged_image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb' }}>View tagged ↗</a>
+                            : <span className="dh-detail-value" style={{ color: '#d1d5db' }}>Pending…</span>
                           }
                         </div>
+                        {selectedDefect.image_url && (
+                          <div className="dh-detail-row">
+                            <span className="dh-detail-label">Original</span>
+                            <a href={selectedDefect.image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb' }}>View original ↗</a>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </>

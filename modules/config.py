@@ -3,9 +3,8 @@
 # ============================================================================
 # Update these values for your Raspberry Pi setup
 
-# Backend Connection
-DEVICE_ID = "raspi-pi-1"  # Your Raspberry Pi identifier
-BACKEND_URL = "https://glass-defect-detection-prototype-production.up.railway.app"  # Your Railway backend domain
+# Backend Connection (used if posting detections to Railway backend instead of directly to Supabase)
+BACKEND_URL = "https://glass-defect-detection-prototype-production.up.railway.app"
 
 # Camera Configuration
 WIDTH = 768   # Frame width (Picamera2)

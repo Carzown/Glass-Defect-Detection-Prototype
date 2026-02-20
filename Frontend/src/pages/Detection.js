@@ -7,15 +7,7 @@ import { signOutUser } from '../supabase';
 import { fetchDefects } from '../services/defects';
 import './Detection.css';
 
-// ── Mock defects (shown when Supabase returns no data) ──────────
-const MOCK_DEFECTS = [
-  { id: 'md1', defect_type: 'scratch', detected_at: '2026-02-21T14:32:10Z', confidence: 0.92, image_url: null, device_id: 'CAM-001', status: null, notes: null },
-  { id: 'md2', defect_type: 'bubble',  detected_at: '2026-02-21T14:45:03Z', confidence: 0.87, image_url: null, device_id: 'CAM-001', status: null, notes: null },
-  { id: 'md3', defect_type: 'crack',   detected_at: '2026-02-21T15:01:55Z', confidence: 0.95, image_url: null, device_id: 'CAM-001', status: null, notes: null },
-  { id: 'md4', defect_type: 'scratch', detected_at: '2026-02-21T15:22:40Z', confidence: 0.78, image_url: null, device_id: 'CAM-001', status: null, notes: null },
-  { id: 'md5', defect_type: 'bubble',  detected_at: '2026-02-21T15:38:22Z', confidence: 0.81, image_url: null, device_id: 'CAM-002', status: null, notes: null },
-  { id: 'md6', defect_type: 'crack',   detected_at: '2026-02-21T15:50:05Z', confidence: 0.90, image_url: null, device_id: 'CAM-002', status: null, notes: null },
-];
+
 
 // Helper: format Date -> [HH:MM:SS]
 function formatTime(date) {
@@ -41,8 +33,6 @@ function capitalizeDefectType(type) {
 function Detection() {
   // State
   const [currentDefects, setCurrentDefects] = useState([]);
-  // eslint-disable-next-line no-unused-vars
-  const [supabaseDefects, setSupabaseDefects] = useState([]);
   const [sessionStartTime, setSessionStartTime] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -100,88 +90,37 @@ function Detection() {
 
   const loadSupabaseDefects = async (filterAfterTime = null) => {
     try {
-      console.log('[Detection] Fetching defects from Supabase...');
-      
-      // Save current scroll position before updating defects
-      const scrollPos = defectsListRef.current?.scrollTop || 0;
-      
-      // Fetch latest defects (unlimited to get all)
       const result = await fetchDefects({ limit: 100, offset: 0 });
       const supabaseData = result.data || [];
-      
-      console.log(`[Detection] ✅ Fetched ${supabaseData.length} defects from Supabase`);
 
-      // Use mock data if Supabase returns nothing
-      const sourceData = supabaseData.length > 0 ? supabaseData : MOCK_DEFECTS;
-      
-      // Filter defects to only show ones detected after session start
+      // Only show defects detected after the session started
       const timeToFilter = filterAfterTime || sessionStartTime;
-      const filteredData = (supabaseData.length > 0 && timeToFilter)
-        ? sourceData.filter(d => new Date(d.detected_at) >= timeToFilter)
-        : sourceData;
-      
-      // Convert Supabase defects to display format
+      const filteredData = (timeToFilter && supabaseData.length > 0)
+        ? supabaseData.filter(d => new Date(d.detected_at) >= timeToFilter)
+        : supabaseData;
+
       const displayDefects = filteredData.map(d => ({
         id: d.id,
         time: formatTime(new Date(d.detected_at)),
         type: capitalizeDefectType(d.defect_type),
-        imageUrl: d.image_url,
-        status: d.status,
-        // Add full Supabase object for modal
+        // Prefer the tagged version (numbered badge drawn on image) if available
+        imageUrl: d.tagged_image_url || d.image_url,
+        originalImageUrl: d.image_url,
+        tagNumber: d.tag_number,
         detected_at: d.detected_at,
-        device_id: d.device_id,
         image_path: d.image_path,
         notes: d.notes,
         supabaseData: d,
       }));
 
-      // Update the list (keep latest 20)
-      setCurrentDefects(prev => {
-        // Merge with existing, removing duplicates by id
-        const mergedMap = new Map();
-        
-        // Add existing defects
-        prev.forEach(d => {
-          if (d.id) mergedMap.set(d.id, d);
-        });
-        
-        // Add/update with Supabase defects
-        displayDefects.forEach(d => {
-          mergedMap.set(d.id, d);
-        });
-        
-        // Convert back to array, keep latest 20
-        const merged = Array.from(mergedMap.values())
-          .sort((a, b) => new Date(b.detected_at || 0) - new Date(a.detected_at || 0))
-          .slice(0, 20);
-        
-        console.log(`[Detection] Updated defects list: ${merged.length} items`);
-        return merged;
-      });
-      
-      // Restore scroll position after state update
-      // Use requestAnimationFrame to ensure DOM has updated
-      requestAnimationFrame(() => {
-        if (defectsListRef.current) {
-          defectsListRef.current.scrollTop = scrollPos;
-        }
-      });
-      
-      setSupabaseDefects(supabaseData);
+      // Sort newest-first, cap at 20
+      const sorted = displayDefects
+        .sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at))
+        .slice(0, 20);
+
+      setCurrentDefects(sorted);
     } catch (error) {
-      console.error('[Detection] ❌ Error loading Supabase defects, using mock data:', error);
-      const displayMock = MOCK_DEFECTS.map(d => ({
-        id: d.id,
-        time: formatTime(new Date(d.detected_at)),
-        type: capitalizeDefectType(d.defect_type),
-        imageUrl: d.image_url,
-        detected_at: d.detected_at,
-        device_id: d.device_id,
-        confidence: d.confidence,
-        supabaseData: d,
-      }));
-      setCurrentDefects(displayMock);
-      setSupabaseDefects(MOCK_DEFECTS);
+      console.error('[Detection] ❌ Error loading defects:', error);
     }
   };
 
@@ -239,10 +178,10 @@ function Detection() {
     }
   }, [currentDefects, modalOpen, selectedDefectId, currentImageIndex]);
 
-  // Auto-scroll defects list so newest entries are visible
+  // Auto-scroll defects list so newest entry (top) is always visible
   useEffect(() => {
     if (defectsListRef.current) {
-      defectsListRef.current.scrollTop = defectsListRef.current.scrollHeight;
+      defectsListRef.current.scrollTop = 0;
     }
   }, [currentDefects]);
 
@@ -263,7 +202,7 @@ function Detection() {
         <header className="machine-header">
           <div className="machine-header-left">
             <h1 className="machine-header-title">Glass Defect Detector</h1>
-            <p className="machine-header-subtitle">CAM-001</p>
+            <p className="machine-header-subtitle">Live Detection Feed</p>
           </div>
         </header>
 
@@ -311,7 +250,7 @@ function Detection() {
                         key={defect.id || index}
                         onClick={() => openModal(index)}
                       >
-                        <div className="det-defect-index">{currentDefects.length - index}</div>
+                        <div className="det-defect-index">{defect.tagNumber ?? (currentDefects.length - index)}</div>
                         <div className="det-defect-body">
                           <span className="det-defect-type-label">{defect.type}</span>
                           <span className="det-defect-time-label">{defect.time}</span>
@@ -387,6 +326,12 @@ function Detection() {
                     <span className="det-modal-detail-label">Date</span>
                     <span className="det-modal-detail-value">{formatDisplayDate(modalDefect.detected_at)}</span>
                   </div>
+                  {modalDefect.tagNumber != null && (
+                    <div className="det-modal-detail-row">
+                      <span className="det-modal-detail-label">Tag #</span>
+                      <span className="det-modal-detail-value" style={{ fontWeight: 800, color: '#0f2942' }}>#{modalDefect.tagNumber}</span>
+                    </div>
+                  )}
                   {confidence != null && (
                     <div className="det-modal-detail-row">
                       <span className="det-modal-detail-label">Confidence</span>
@@ -394,12 +339,18 @@ function Detection() {
                     </div>
                   )}
                   <div className="det-modal-detail-row">
-                    <span className="det-modal-detail-label">Image URL</span>
+                    <span className="det-modal-detail-label">Tagged Image</span>
                     {modalDefect.imageUrl
-                      ? <a href={modalDefect.imageUrl} target="_blank" rel="noreferrer" className="det-modal-detail-link">View image ↗</a>
+                      ? <a href={modalDefect.imageUrl} target="_blank" rel="noreferrer" className="det-modal-detail-link">View tagged ↗</a>
                       : <span className="det-modal-detail-empty">—</span>
                     }
                   </div>
+                  {modalDefect.originalImageUrl && modalDefect.originalImageUrl !== modalDefect.imageUrl && (
+                    <div className="det-modal-detail-row">
+                      <span className="det-modal-detail-label">Original</span>
+                      <a href={modalDefect.originalImageUrl} target="_blank" rel="noreferrer" className="det-modal-detail-link">View original ↗</a>
+                    </div>
+                  )}
                 </div>
 
                 {/* Footer nav */}

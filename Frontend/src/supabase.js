@@ -124,15 +124,14 @@ export async function signInAndGetRole(email, password) {
       .select('role')
       .eq('id', authData.user.id)
       .single();
-    
+
     if (error) {
-      console.warn('⚠️ Could not fetch profile:', error);
-      // PGRST116 = no rows found, which is OK - user just doesn't have a profile yet
-      if (error.code !== 'PGRST116') {
-        console.error('❌ Database error:', error);
+      // PGRST116 = no row found (user has no profile yet) — silent default
+      // 42P01 / PGRST204 = table doesn't exist yet — silent default
+      const silent = ['PGRST116', 'PGRST204', '42P01'];
+      if (!silent.includes(error.code)) {
+        console.warn('⚠️ Could not fetch profile:', error.message);
       }
-    } else {
-      console.log('✅ User role fetched from database:', data?.role);
     }
 
     return {
@@ -178,7 +177,7 @@ export async function getRole(uid) {
  * @param {string} path - Path within bucket (e.g., 'defects/2024-01-15_damage.jpg')
  * @returns {Promise<{url: string, path: string}>} Public URL and file path
  */
-export async function uploadImageToStorage(imageFile, bucketName = 'defect-images', path) {
+export async function uploadImageToStorage(imageFile, bucketName = 'defects', path) {
   try {
     if (!supabase) throw new Error('Supabase not initialized');
     
@@ -238,22 +237,19 @@ export async function saveDefectRecord(defectData) {
 export async function fetchDefectsFromDB(filters = {}) {
   try {
     if (!supabase) throw new Error('Supabase not initialized');
-    
-    const { deviceId, status, limit = 50, offset = 0 } = filters;
-    
+
+    const { limit = 50, offset = 0 } = filters;
+
     let query = supabase
       .from('defects')
       .select('*', { count: 'exact' })
       .order('detected_at', { ascending: false })
       .range(offset, offset + limit - 1);
-    
-    if (deviceId) query = query.eq('device_id', deviceId);
-    if (status) query = query.eq('status', status);
-    
+
     const { data, count, error } = await query;
-    
+
     if (error) throw error;
-    
+
     return { data: data || [], count: count || 0 };
   } catch (error) {
     console.error('Error fetching defects:', error);
@@ -268,26 +264,7 @@ export async function fetchDefectsFromDB(filters = {}) {
  * @param {string} notes - Optional notes
  * @returns {Promise<Object>} Updated defect
  */
-export async function updateDefectStatus(defectId, status, notes = '') {
-  try {
-    if (!supabase) throw new Error('Supabase not initialized');
-    
-    const { data, error } = await supabase
-      .from('defects')
-      .update({ status, notes, updated_at: new Date() })
-      .eq('id', defectId)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    console.log('✅ Defect status updated:', status);
-    return data;
-  } catch (error) {
-    console.error('Error updating defect:', error);
-    throw error;
-  }
-}
+// updateDefectStatus removed — status column no longer in schema
 
 export async function signOutUser() {
   await signOut();

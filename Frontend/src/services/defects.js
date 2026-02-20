@@ -1,74 +1,32 @@
-// Supabase defects utility functions for React
+// Defects service — routes through the Railway backend API
 import { supabase } from '../supabase';
 
+const BACKEND_URL =
+  process.env.REACT_APP_BACKEND_URL ||
+  'https://glass-defect-detection-prototype-production.up.railway.app';
+
 /**
- * Fetch all defects with optional filters
- * @param {Object} filters - Optional filters (status, limit, offset)
+ * Fetch all defects with optional filters via Railway backend
+ * @param {Object} filters - Optional filters (limit, offset, dateFrom, dateTo)
  * @returns {Promise<{data: Array, pagination: Object}>}
  */
 export async function fetchDefects(filters = {}) {
   try {
-    // Check if Supabase is initialized
-    if (!supabase) {
-      console.error('[fetchDefects] ❌ Supabase is not initialized. Check REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY in .env.local');
-      return {
-        data: [],
-        pagination: {
-          total: 0,
-          limit: 50,
-          offset: 0,
-        },
-        error: 'Supabase not initialized'
-      };
-    }
+    const { limit = 50, offset = 0, dateFrom, dateTo } = filters;
+    const params = new URLSearchParams({ limit, offset });
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
 
-    const { status, limit = 50, offset = 0 } = filters;
+    console.log('[fetchDefects] Fetching via Railway backend:', `${BACKEND_URL}/defects?${params}`);
 
-    console.log('[fetchDefects] Fetching defects from Supabase with filters:', { status, limit, offset });
+    const res = await fetch(`${BACKEND_URL}/defects?${params}`);
+    if (!res.ok) throw new Error(`Backend responded ${res.status}`);
+    const json = await res.json();
 
-    let query = supabase
-      .from('defects')
-      .select('*', { count: 'exact' })
-      .order('detected_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (status) {
-      query = query.eq('status', status);
-    }
-
-    const { data, count, error } = await query;
-
-    if (error) {
-      console.error('[fetchDefects] Supabase error:', {
-        message: error.message,
-        code: error.code,
-        status: error.status,
-        hint: error.hint,
-        details: error.details
-      });
-      throw error;
-    }
-
-    console.log(`[fetchDefects] ✅ Successfully fetched ${(data || []).length} defects from Supabase`);
-
-    return {
-      data: data || [],
-      pagination: {
-        total: count || 0,
-        limit,
-        offset,
-      },
-    };
+    console.log(`[fetchDefects] ✅ Fetched ${(json.data || []).length} defects from Railway`);
+    return json;
   } catch (error) {
-    console.error('[fetchDefects] ❌ Error fetching defects:', error.message);
-    console.error('[fetchDefects] Full error:', error);
-    
-    // Check if it's a table not found error
-    if (error.message?.includes('does not exist') || error.message?.includes('relation') || error.code === 'PGRST116') {
-      console.error('[fetchDefects] ⚠️ The "defects" table does not exist in Supabase. Please create it.');
-      throw new Error('Defects table not found in Supabase. Please create the table with schema: id, device_id, defect_type, detected_at, confidence, image_url, image_path, status, notes, created_at');
-    }
-    
+    console.error('[fetchDefects] ❌ Error:', error.message);
     throw error;
   }
 }
@@ -178,24 +136,9 @@ export async function deleteAllDefects() {
 }
 
 /**
- * Change defect status (pending -> reviewed -> resolved)
- * @param {string} id - Defect ID
- * @param {string} status - New status (pending, reviewed, resolved)
- * @param {string} notes - Optional notes
- * @returns {Promise<Object>}
+ * Change defect status removed — status column no longer in schema.
  */
-export async function updateDefectStatus(id, status, notes = '') {
-  try {
-    const updates = { status };
-    if (notes) {
-      updates.notes = notes;
-    }
-    return await updateDefect(id, updates);
-  } catch (error) {
-    console.error('Error updating defect status:', error);
-    throw error;
-  }
-}
+// updateDefectStatus removed
 
 /**
  * Subscribe to real-time defect changes
@@ -230,22 +173,18 @@ export async function getDefectStats() {
   try {
     const { data: allDefects, error } = await supabase
       .from('defects')
-      .select('defect_type, status');
+      .select('defect_type');
 
     if (error) throw error;
 
     const stats = {
       total: allDefects?.length || 0,
       byType: {},
-      byStatus: {},
     };
 
     if (allDefects) {
       for (const defect of allDefects) {
-        // Count by type
         stats.byType[defect.defect_type] = (stats.byType[defect.defect_type] || 0) + 1;
-        // Count by status
-        stats.byStatus[defect.status] = (stats.byStatus[defect.status] || 0) + 1;
       }
     }
 
@@ -257,22 +196,63 @@ export async function getDefectStats() {
 }
 
 /**
- * Fetch defects for a specific time range
+ * Get ISO start/end timestamps for a named range.
+ * @param {'today'|'7days'|'30days'} range
+ * @returns {{ start: string, end: string }}
+ */
+export function getDateRangeBounds(range) {
+  const now = new Date();
+  const end = now.toISOString();
+  let start;
+  if (range === 'today') {
+    const s = new Date(now);
+    s.setHours(0, 0, 0, 0);
+    start = s.toISOString();
+  } else if (range === '7days') {
+    const s = new Date(now);
+    s.setDate(s.getDate() - 6);
+    s.setHours(0, 0, 0, 0);
+    start = s.toISOString();
+  } else if (range === '30days') {
+    const s = new Date(now);
+    s.setDate(s.getDate() - 29);
+    s.setHours(0, 0, 0, 0);
+    start = s.toISOString();
+  } else {
+    start = new Date(0).toISOString(); // all time
+  }
+  return { start, end };
+}
+
+/**
+ * Fetch all defects within a named time range.
+ * @param {'today'|'7days'|'30days'} range
+ * @returns {Promise<Array>}
+ */
+export async function fetchDefectsByRange(range) {
+  const { start, end } = getDateRangeBounds(range);
+  return fetchDefectsByDateRange(new Date(start), new Date(end));
+}
+
+/**
+ * Fetch defects for a specific time range via Railway backend
  * @param {Date} startDate - Start date
  * @param {Date} endDate - End date
  * @returns {Promise<Array>}
  */
 export async function fetchDefectsByDateRange(startDate, endDate) {
   try {
-    const { data, error } = await supabase
-      .from('defects')
-      .select('*')
-      .gte('detected_at', startDate.toISOString())
-      .lte('detected_at', endDate.toISOString())
-      .order('detected_at', { ascending: false });
-
-    if (error) throw error;
-    return data || [];
+    const params = new URLSearchParams({
+      dateFrom: startDate.toISOString(),
+      dateTo: endDate.toISOString(),
+      limit: 1000,
+      offset: 0,
+    });
+    console.log('[fetchDefectsByDateRange] Fetching via Railway:', `${BACKEND_URL}/defects?${params}`);
+    const res = await fetch(`${BACKEND_URL}/defects?${params}`);
+    if (!res.ok) throw new Error(`Backend responded ${res.status}`);
+    const json = await res.json();
+    return json.data || [];
   } catch (error) {
     console.error('Error fetching defects by date range:', error);
     throw error;

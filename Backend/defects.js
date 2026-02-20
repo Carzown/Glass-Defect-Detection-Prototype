@@ -29,8 +29,6 @@ if (supabaseUrl && supabaseKey) {
  * GET /defects
  * Retrieve all defects with optional filtering
  * Query params: 
- *   - deviceId: filter by device
- *   - status: filter by status (pending, reviewed, resolved)
  *   - limit: number of records to return (default: 50)
  *   - offset: pagination offset (default: 0)
  */
@@ -51,7 +49,7 @@ router.get('/', async (req, res) => {
       });
     }
 
-    const { deviceId, status, limit = 50, offset = 0 } = req.query;
+    const { limit = 50, offset = 0, dateFrom, dateTo } = req.query;
 
     let query = supabase
       .from('defects')
@@ -59,12 +57,11 @@ router.get('/', async (req, res) => {
       .order('detected_at', { ascending: false })
       .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
 
-    // Apply filters if provided
-    if (deviceId) {
-      query = query.eq('device_id', deviceId);
+    if (dateFrom) {
+      query = query.gte('detected_at', dateFrom);
     }
-    if (status) {
-      query = query.eq('status', status);
+    if (dateTo) {
+      query = query.lte('detected_at', dateTo);
     }
 
     const { data, count, error } = await query;
@@ -129,13 +126,11 @@ router.get('/:id', async (req, res) => {
  * Create a new defect record - REQUIRES Supabase
  * This is called automatically by the device detection endpoint
  * Body:
- *   - device_id: device identifier (REQUIRED)
  *   - defect_type: type of defect (REQUIRED)
  *   - detected_at: ISO timestamp of detection
  *   - confidence: confidence score (0-1)
  *   - image_url: URL to the image in storage
  *   - image_path: path to the image in storage bucket
- *   - status: pending, reviewed, or resolved
  */
 router.post('/', async (req, res) => {
   try {
@@ -154,13 +149,13 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const { device_id, defect_type, detected_at, image_url, image_path, confidence, status = 'pending' } = req.body;
+    const { defect_type, detected_at, image_url, image_path, confidence } = req.body;
 
     // Validate required fields
-    if (!device_id || !defect_type) {
+    if (!defect_type) {
       return res.status(400).json({
         error: 'Missing required fields',
-        required: ['device_id', 'defect_type']
+        required: ['defect_type']
       });
     }
 
@@ -169,13 +164,11 @@ router.post('/', async (req, res) => {
       .from('defects')
       .insert([
         {
-          device_id,
           defect_type,
           detected_at: detected_at || new Date().toISOString(),
           image_url: image_url || null,
           image_path: image_path || null,
           confidence: confidence || null,
-          status,
         },
       ])
       .select();
@@ -268,34 +261,71 @@ router.delete('/:id', async (req, res) => {
 
 /**
  * GET /defects/stats/summary
- * Get defect statistics
+ * Get defect statistics (legacy)
  */
 router.get('/stats/summary', async (req, res) => {
   try {
     if (!supabase) {
       return res.status(503).json({ error: 'Supabase not configured' });
     }
-
-    // Get total count by device and type
-    const { data: byDevice } = await supabase
+    const { data, error } = await supabase
       .from('defects')
-      .select('device_id', { count: 'exact' });
-
-    const { data: byType } = await supabase
-      .from('defects')
-      .select('defect_type', { count: 'exact' });
-
-    const { data: byStatus } = await supabase
-      .from('defects')
-      .select('status', { count: 'exact' });
-
+      .select('defect_type, confidence, detected_at');
+    if (error) return res.status(400).json({ error: error.message });
+    const records = data || [];
     res.json({
-      totalDefects: byDevice?.length || 0,
-      byType: groupBy(byType || [], 'defect_type'),
-      byStatus: groupBy(byStatus || [], 'status'),
+      totalDefects: records.length,
+      avgConfidence: records.length
+        ? records.reduce((s, d) => s + (d.confidence || 0), 0) / records.length
+        : 0,
+      byType: groupBy(records, 'defect_type'),
     });
   } catch (err) {
     console.error('Error fetching statistics:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /defects/stats/range
+ * Get defect statistics filtered by date range
+ * Query params:
+ *   - dateFrom: ISO start timestamp (inclusive)
+ *   - dateTo:   ISO end timestamp   (inclusive)
+ */
+router.get('/stats/range', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ error: 'Supabase not configured' });
+    }
+    const { dateFrom, dateTo } = req.query;
+    let query = supabase
+      .from('defects')
+      .select('id, defect_type, confidence, detected_at')
+      .order('detected_at', { ascending: false });
+    if (dateFrom) query = query.gte('detected_at', dateFrom);
+    if (dateTo)   query = query.lte('detected_at', dateTo);
+    const { data, error } = await query;
+    if (error) return res.status(400).json({ error: error.message });
+    const records = data || [];
+    const total = records.length;
+    const avgConfidence = total
+      ? records.reduce((s, d) => s + (d.confidence || 0), 0) / total
+      : 0;
+    const lastDetected = records.length ? records[0].detected_at : null;
+    const byType = groupBy(records, 'defect_type');
+    // Raspberry Pi: online if a record was detected in the last 10 minutes
+    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const piOnline = records.some(d => d.detected_at >= tenMinAgo);
+    res.json({
+      total,
+      avgConfidence,
+      lastDetected,
+      byType,
+      piOnline,
+    });
+  } catch (err) {
+    console.error('Error fetching range stats:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

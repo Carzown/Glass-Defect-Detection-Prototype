@@ -13,6 +13,9 @@
 
 /* Full-page miller container overrides */
 .dh-miller-page {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   border-radius: 12px;
   border: 2px solid #e5e7eb;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);

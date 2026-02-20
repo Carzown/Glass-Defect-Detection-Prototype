@@ -12,6 +12,7 @@ const corsOptions = {
     'http://localhost:3001',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001',
+    'https://carzown.github.io',
     process.env.FRONTEND_URL || 'http://localhost:3000'
   ],
   credentials: true,
@@ -174,6 +175,14 @@ try {
   console.log('[SERVER] Defects API routes loaded')
 } catch (e) {
   console.warn('[SERVER] Defects routes not loaded:', e?.message || e)
+}
+
+// Defect tagger — assigns sequential tag numbers + overlays numbered badges on images
+try {
+  const tagger = require('./defect-tagger')
+  tagger.start()
+} catch (e) {
+  console.warn('[SERVER] Defect tagger not started:', e?.message || e)
 }
 
 // ============================================================================

@@ -3,52 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { signOutUser } from '../supabase';
-import { fetchDefects } from '../services/defects';
+import { fetchDefectsByRange } from '../services/defects';
 import './Dashboard.css';
-
-// ── Mock sessions (shown when Supabase has no data) ─────────────
-const MOCK_SESSIONS = [
-  {
-    detected_at: '2026-02-21T14:32:10Z', defect_type: 'scratch',
-    confidence: 0.92, status: 'unresolved', device_id: 'CAM-001', id: 'm1',
-  },
-  {
-    detected_at: '2026-02-21T14:45:03Z', defect_type: 'bubble',
-    confidence: 0.87, status: 'resolved', device_id: 'CAM-001', id: 'm2',
-  },
-  {
-    detected_at: '2026-02-21T15:01:55Z', defect_type: 'crack',
-    confidence: 0.95, status: 'unresolved', device_id: 'CAM-001', id: 'm3',
-  },
-  {
-    detected_at: '2026-02-20T09:12:40Z', defect_type: 'scratch',
-    confidence: 0.78, status: 'resolved', device_id: 'CAM-001', id: 'm4',
-  },
-  {
-    detected_at: '2026-02-20T09:58:22Z', defect_type: 'bubble',
-    confidence: 0.81, status: 'unresolved', device_id: 'CAM-002', id: 'm5',
-  },
-  {
-    detected_at: '2026-02-20T11:30:05Z', defect_type: 'crack',
-    confidence: 0.90, status: 'resolved', device_id: 'CAM-002', id: 'm6',
-  },
-  {
-    detected_at: '2026-02-20T13:44:19Z', defect_type: 'scratch',
-    confidence: 0.85, status: 'unresolved', device_id: 'CAM-001', id: 'm7',
-  },
-  {
-    detected_at: '2026-02-19T08:05:33Z', defect_type: 'crack',
-    confidence: 0.93, status: 'resolved', device_id: 'CAM-001', id: 'm8',
-  },
-  {
-    detected_at: '2026-02-19T10:22:47Z', defect_type: 'bubble',
-    confidence: 0.76, status: 'unresolved', device_id: 'CAM-002', id: 'm9',
-  },
-  {
-    detected_at: '2026-02-19T14:55:11Z', defect_type: 'scratch',
-    confidence: 0.88, status: 'resolved', device_id: 'CAM-001', id: 'm10',
-  },
-];
 
 // ── Helpers for sessions widget ──────────────────────────────────
 function capitalizeDefectType(type) {
@@ -83,23 +39,34 @@ function Dashboard() {
   const [timeFilter, setTimeFilter] = useState('today');
 
   // Sessions widget state
-  const [dashSessions, setDashSessions] = useState([]);
   const [dashSelectedSession, setDashSelectedSession] = useState(null);
   const [dashSelectedDefect, setDashSelectedDefect] = useState(null);
+  const [filteredDefects, setFilteredDefects] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  // Re-fetch from Supabase every time the date filter changes
   useEffect(() => {
+    let cancelled = false;
     async function load() {
+      setLoading(true);
+      // Reset drill-down selections whenever the range changes
+      setDashSelectedSession(null);
+      setDashSelectedDefect(null);
       try {
-        const result = await fetchDefects({ limit: 500, offset: 0 });
-        const data = result.data || [];
-        setDashSessions(groupByDate(data.length > 0 ? data : MOCK_SESSIONS));
+        const data = await fetchDefectsByRange(timeFilter);
+        if (!cancelled) setFilteredDefects(data);
       } catch (e) {
-        console.error('[Dashboard] Failed to load sessions, using mock data:', e);
-        setDashSessions(groupByDate(MOCK_SESSIONS));
+        console.error('[Dashboard] Failed to load defects:', e);
+        if (!cancelled) setFilteredDefects([]);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
     load();
-  }, []);
+    return () => { cancelled = true; };
+  }, [timeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const dashSessions = groupByDate(filteredDefects);
 
   async function handleLogout() {
     try {
@@ -152,28 +119,48 @@ function Dashboard() {
                 onChange={(e) => setTimeFilter(e.target.value)}
               >
                 <option value="today">Today</option>
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
+                <option value="7days">Last 7 days</option>
+                <option value="30days">Last 30 days</option>
               </select>
             </div>
             <div className="dashboard-stats-row">
               <div className="dashboard-box dashboard-stats-box">
                 <div className="dashboard-stat-card">
                   <span className="dashboard-stat-label">Total Defects Detected</span>
-                  <span className="dashboard-stat-value">0</span>
+                  <span className="dashboard-stat-value">{loading ? '…' : filteredDefects.length}</span>
                 </div>
                 <div className="dashboard-stat-card">
                   <span className="dashboard-stat-label">Average Confidence Score</span>
-                  <span className="dashboard-stat-value">0%</span>
+                  <span className="dashboard-stat-value">
+                    {loading ? '…' : filteredDefects.length > 0
+                      ? `${(filteredDefects.reduce((sum, d) => sum + (d.confidence || 0), 0) / filteredDefects.length * 100).toFixed(1)}%`
+                      : '0%'}
+                  </span>
                 </div>
                 <div className="dashboard-stat-card">
                   <span className="dashboard-stat-label">Last Detection</span>
-                  <span className="dashboard-stat-value">--</span>
+                  <span className="dashboard-stat-value">
+                    {loading ? '…' : filteredDefects.length > 0 ? (() => {
+                      const last = filteredDefects.slice().sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at))[0];
+                      const mins = Math.floor((Date.now() - new Date(last.detected_at)) / 60000);
+                      return mins === 0 ? 'Just now' : `${mins} min${mins > 1 ? 's' : ''} ago`;
+                    })() : '--'}
+                  </span>
                 </div>
               </div>
               <div className="dashboard-box dashboard-status-box">
                 <span className="dashboard-stat-label">Raspberry Pi Status</span>
-                <span className="dashboard-stat-value dashboard-stat-status">Online</span>
+                {loading ? (
+                  <span className="dashboard-stat-value dashboard-stat-status" style={{ color: '#94a3b8' }}>…</span>
+                ) : (() => {
+                  const online = filteredDefects.some(d => (Date.now() - new Date(d.detected_at)) < 10 * 60000);
+                  return (
+                    <span className="dashboard-stat-value dashboard-stat-status" style={{ color: online ? '#22c55e' : '#ef4444', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: online ? '#22c55e' : '#ef4444', flexShrink: 0 }} />
+                      {online ? 'Online' : 'Offline'}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -192,6 +179,9 @@ function Dashboard() {
                 </button>
               </div>
               <div className="dashboard-box dashboard-sessions-box">
+                {loading ? (
+                  <div className="dh-loading">Loading…</div>
+                ) : (
                 <div className="dh-miller-container">
                   {/* Column 1: Sessions */}
                   <div className="dh-panel dh-panel-always">
@@ -262,6 +252,12 @@ function Dashboard() {
                         </div>
                         <div className="dh-detail-card-wrapper">
                           <div className="dh-detail-card">
+                            {dashSelectedDefect.tag_number != null && (
+                              <div className="dh-detail-row">
+                                <span className="dh-detail-label">Tag #</span>
+                                <span className="dh-detail-value" style={{ fontWeight: 800, color: '#0f2942' }}>#{dashSelectedDefect.tag_number}</span>
+                              </div>
+                            )}
                             <div className="dh-detail-row">
                               <span className="dh-detail-label">Type</span>
                               <span className={`dh-defect-type dh-defect-${(dashSelectedDefect.defect_type || '').toLowerCase()}`}>
@@ -285,18 +281,25 @@ function Dashboard() {
                               </div>
                             )}
                             <div className="dh-detail-row">
-                              <span className="dh-detail-label">Image URL</span>
-                              {dashSelectedDefect.image_url
-                                ? <a href={dashSelectedDefect.image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb', wordBreak: 'break-all' }}>View image</a>
-                                : <span className="dh-detail-value">—</span>
+                              <span className="dh-detail-label">Tagged Image</span>
+                              {dashSelectedDefect.tagged_image_url
+                                ? <a href={dashSelectedDefect.tagged_image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb' }}>View tagged ↗</a>
+                                : <span className="dh-detail-value" style={{ color: '#d1d5db' }}>Pending…</span>
                               }
                             </div>
+                            {dashSelectedDefect.image_url && (
+                              <div className="dh-detail-row">
+                                <span className="dh-detail-label">Original</span>
+                                <a href={dashSelectedDefect.image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb' }}>View original ↗</a>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </>
                     )}
                   </div>
                 </div>
+                )}
               </div>
             </div>
             <div className="dashboard-box-wrapper">
@@ -319,25 +322,37 @@ function Dashboard() {
                         <div className="chart-gridline"></div>
                       </div>
                       <div className="chart-bars">
-                        <div className="chart-bar-wrapper">
-                          <div className="dashboard-bar-fill" style={{ width: '90%' }}></div>
-                          <span className="chart-bar-value">18</span>
-                        </div>
-                        <div className="chart-bar-wrapper">
-                          <div className="dashboard-bar-fill" style={{ width: '55%' }}></div>
-                          <span className="chart-bar-value">11</span>
-                        </div>
-                        <div className="chart-bar-wrapper">
-                          <div className="dashboard-bar-fill" style={{ width: '65%' }}></div>
-                          <span className="chart-bar-value">13</span>
-                        </div>
-                      </div>
-                      <div className="chart-x-axis">
-                        <span>0</span>
-                        <span>5</span>
-                        <span>10</span>
-                        <span>15</span>
-                        <span>20</span>
+                        {(() => {
+                          const typeCounts = { scratch: 0, bubble: 0, crack: 0 };
+                          filteredDefects.forEach(d => {
+                            const t = (d.defect_type || '').toLowerCase();
+                            if (typeCounts[t] !== undefined) typeCounts[t]++;
+                          });
+                          const dataMax = Math.max(...Object.values(typeCounts), 0);
+                          // Nice ceiling: smallest of these steps >= dataMax
+                          const steps = [5, 10, 20, 50, 100, 200, 500, 1000];
+                          const chartMax = steps.find(s => s >= dataMax) || Math.ceil(dataMax / 100) * 100;
+                          const ticks = [0, chartMax / 4, chartMax / 2, (chartMax * 3) / 4, chartMax];
+                          return (
+                            <>
+                              {[
+                                { label: 'Scratch', key: 'scratch' },
+                                { label: 'Bubble', key: 'bubble' },
+                                { label: 'Cracks', key: 'crack' },
+                              ].map(({ label, key }) => (
+                                <div className="chart-bar-wrapper" key={key}>
+                                  <div className="dashboard-bar-fill" style={{ width: `${(typeCounts[key] / chartMax) * 100}%` }}></div>
+                                  <span className="chart-bar-value">{typeCounts[key]}</span>
+                                </div>
+                              ))}
+                              <div className="chart-x-axis">
+                                {ticks.map((t, i) => (
+                                  <span key={i}>{Number.isInteger(t) ? t : Math.round(t)}</span>
+                                ))}
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/AlumpreneurLogo.png';
 import './Login.css';
-import { signInAndGetRole, getCurrentUser } from '../supabase';
+import { signInWithEmail, getCurrentUser } from '../supabase';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -34,9 +34,7 @@ function Login() {
         // Only auto-redirect if user is authenticated AND we have a valid session marker
         // This prevents auto-login after intentional logout
         if (user && hasLoggedIn) {
-          const roleStored = sessionStorage.getItem('role') || 'employee';
-          if (roleStored === 'admin') navigate('/admin');
-          else navigate('/dashboard');
+          navigate('/dashboard');
         }
       } catch (error) {
         // User not authenticated, stay on login page
@@ -54,8 +52,8 @@ function Login() {
     
     try {
       // Authenticate with Supabase
-      const res = await signInAndGetRole(email, password);
-      
+      const user = await signInWithEmail(email, password);
+
       // Handle "Remember me" functionality
       if (remember) {
         localStorage.setItem('rememberMe', 'true');
@@ -65,12 +63,10 @@ function Login() {
         localStorage.removeItem('email');
       }
 
-      // Set session storage for app state (always as employee)
+      // Set session storage
       sessionStorage.setItem('loggedIn', 'true');
-      sessionStorage.setItem('role', 'employee');
-      sessionStorage.setItem('userId', res.uid);
+      sessionStorage.setItem('userId', user.id);
 
-      // Navigate to dashboard
       navigate('/dashboard');
     } catch (error) {
       console.error('Login error:', error);
