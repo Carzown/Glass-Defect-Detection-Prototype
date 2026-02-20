@@ -44,16 +44,47 @@ function Detection() {
   const navigate = useNavigate();
   const defectsListRef = useRef(null);
 
+  // Load defects from Railway backend
+  const loadSupabaseDefects = async (filterAfterTime = null) => {
+    try {
+      const result = await fetchDefects({ limit: 100, offset: 0 });
+      const supabaseData = result.data || [];
+
+      const timeToFilter = filterAfterTime || sessionStartTime;
+      const filteredData = (timeToFilter && supabaseData.length > 0)
+        ? supabaseData.filter(d => new Date(d.detected_at) >= timeToFilter)
+        : supabaseData;
+
+      const displayDefects = filteredData.map(d => ({
+        id: d.id,
+        time: formatTime(new Date(d.detected_at)),
+        type: capitalizeDefectType(d.defect_type),
+        imageUrl: d.tagged_image_url || d.image_url,
+        originalImageUrl: d.image_url,
+        tagNumber: d.tag_number,
+        detected_at: d.detected_at,
+        image_path: d.image_path,
+        notes: d.notes,
+        supabaseData: d,
+      }));
+
+      const sorted = displayDefects
+        .sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at))
+        .slice(0, 20);
+
+      setCurrentDefects(sorted);
+    } catch (error) {
+      console.error('[Detection] Error loading defects:', error);
+    }
+  };
+
   // Load initial Supabase defects and set up polling
   useEffect(() => {
-    // Set session start time when component mounts
     const now = new Date();
     setSessionStartTime(now);
     
-    // Load initial defects
     loadSupabaseDefects(now);
     
-    // Poll for new defects every 3 seconds
     const pollInterval = setInterval(() => {
       loadSupabaseDefects(now);
     }, 3000);
@@ -61,20 +92,13 @@ function Detection() {
     return () => clearInterval(pollInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-
-
-
-
   async function handleLogout() {
     try {
-      // Sign out from Supabase
       await signOutUser();
     } catch (error) {
       console.error('Logout error:', error);
     }
     
-    // Clear session storage
     sessionStorage.removeItem('loggedIn');
     sessionStorage.removeItem('role');
     sessionStorage.removeItem('userId');
@@ -88,42 +112,6 @@ function Detection() {
     
     navigate('/');
   }
-
-  const loadSupabaseDefects = async (filterAfterTime = null) => {
-    try {
-      const result = await fetchDefects({ limit: 100, offset: 0 });
-      const supabaseData = result.data || [];
-
-      // Only show defects detected after the session started
-      const timeToFilter = filterAfterTime || sessionStartTime;
-      const filteredData = (timeToFilter && supabaseData.length > 0)
-        ? supabaseData.filter(d => new Date(d.detected_at) >= timeToFilter)
-        : supabaseData;
-
-      const displayDefects = filteredData.map(d => ({
-        id: d.id,
-        time: formatTime(new Date(d.detected_at)),
-        type: capitalizeDefectType(d.defect_type),
-        // Prefer the tagged version (numbered badge drawn on image) if available
-        imageUrl: d.tagged_image_url || d.image_url,
-        originalImageUrl: d.image_url,
-        tagNumber: d.tag_number,
-        detected_at: d.detected_at,
-        image_path: d.image_path,
-        notes: d.notes,
-        supabaseData: d,
-      }));
-
-      // Sort newest-first, cap at 20
-      const sorted = displayDefects
-        .sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at))
-        .slice(0, 20);
-
-      setCurrentDefects(sorted);
-    } catch (error) {
-      console.error('[Detection] ❌ Error loading defects:', error);
-    }
-  };
 
   function openModal(index) {
     const defect = currentDefects[index];

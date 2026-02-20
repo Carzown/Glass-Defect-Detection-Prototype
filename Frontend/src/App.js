@@ -6,7 +6,7 @@ import DetectionHistory from './pages/DetectionHistory';
 import Help from './pages/Help';
 
 function App() {
-  // Dynamic basename for local dev vs GitHub Pages production
+  // GitHub Pages requires basename in production
   const basename = process.env.NODE_ENV === 'production' 
     ? '/Glass-Defect-Detection-Prototype/' 
     : '/';

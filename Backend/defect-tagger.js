@@ -1,22 +1,4 @@
-// defect-tagger.js
-// Watches Supabase for untagged defects.
-// For each untagged defect:
-//   1. Assigns the next sequential tag_number (ordered by detected_at — chronological, permanent)
-//   2. If the defect has an image_url, downloads it, composites a numbered badge
-//      (dark box, upper-left corner) using sharp, and uploads the result back to
-//      Supabase Storage under tagged/<defect-id>-tag<n>.jpg
-//   3. Writes tag_number + tagged_image_url back to the 'defects' table
-//
-// History is entirely in Supabase — persists across server restarts, page refreshes,
-// and user logouts.
-//
-// Prerequisites (run once in Supabase SQL Editor):
-//   ALTER TABLE defects ADD COLUMN IF NOT EXISTS tag_number INTEGER;
-//   ALTER TABLE defects ADD COLUMN IF NOT EXISTS tagged_image_url TEXT;
-//
-// Storage: create a bucket named 'defects' in Supabase Storage (public read).
-// Override bucket name with env DEFECT_IMAGES_BUCKET.
-
+// Defect Tagger - Auto-tags defects with sequential numbers and overlays badges on images
 try { require('dotenv').config(); } catch (_) {}
 
 const { createClient } = require('@supabase/supabase-js');
@@ -26,7 +8,7 @@ try {
   sharp = require('sharp');
   console.log('[Tagger] sharp loaded — images will be visually tagged');
 } catch (_) {
-  console.warn('[Tagger] ⚠️  sharp not installed — run "npm install sharp" in Backend/ to enable image tagging');
+  console.warn('[Tagger] ⚠️  sharp not installed');
 }
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -35,20 +17,14 @@ const BUCKET       = process.env.DEFECT_IMAGES_BUCKET || 'defects';
 const POLL_MS      = 6000; // poll Supabase every 6 seconds
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.warn('[Tagger] ⚠️  Supabase not configured — defect tagger disabled');
+  console.warn('[Tagger] ⚠️  Supabase not configured');
   module.exports = { start: () => {}, stop: () => {} };
-  // Early return pattern for CommonJS module-level guard
   return;
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ─── Image helpers ────────────────────────────────────────────────────────────
-
-/**
- * Build an SVG badge: dark navy rounded rectangle containing the tag number in white.
- * Sized dynamically so 3-digit numbers still fit.
- */
+// Build SVG badge with tag number
 function makeBadgeSvg(number) {
   const label   = String(number);
   const fontSize = 14;
@@ -68,9 +44,7 @@ function makeBadgeSvg(number) {
   );
 }
 
-/**
- * Download image from a URL; returns a Buffer.
- */
+// Download image from URL
 async function downloadImage(url) {
   const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
   if (!res.ok) throw new Error(`HTTP ${res.status} downloading image from ${url}`);
@@ -78,10 +52,7 @@ async function downloadImage(url) {
   return Buffer.from(ab);
 }
 
-/**
- * Composite the numbered badge onto the upper-left corner of the image via sharp.
- * Returns a JPEG Buffer, or null if sharp is unavailable.
- */
+// Composite badge onto image and return JPEG
 async function buildTaggedImage(originalBuffer, tagNumber) {
   if (!sharp) return null;
   const badge = makeBadgeSvg(tagNumber);
@@ -91,9 +62,7 @@ async function buildTaggedImage(originalBuffer, tagNumber) {
     .toBuffer();
 }
 
-/**
- * Upload a tagged image buffer to Supabase Storage and return its public URL.
- */
+// Upload tagged image to Supabase Storage
 async function uploadToStorage(defectId, tagNumber, imageBuffer) {
   const filePath = `tagged/defect-${defectId}-tag${tagNumber}.jpg`;
   const { error } = await supabase.storage
@@ -104,12 +73,7 @@ async function uploadToStorage(defectId, tagNumber, imageBuffer) {
   return data.publicUrl;
 }
 
-// ─── Supabase helpers ─────────────────────────────────────────────────────────
-
-/**
- * Return the next available sequential tag number (max existing + 1, starts at 1).
- * Reads from Supabase so the sequence is globally consistent across restarts.
- */
+// Get next sequential tag number from database
 async function getNextTagNumber() {
   const { data } = await supabase
     .from('defects')
@@ -121,15 +85,9 @@ async function getNextTagNumber() {
   return (data?.tag_number ?? 0) + 1;
 }
 
-// ─── Core processing loop ─────────────────────────────────────────────────────
-
-/**
- * Find all defects without a tag_number, assign sequential numbers (oldest first),
- * tag their images, and persist everything back to Supabase.
- */
+// Process untagged defects - assign numbers and tag images
 async function processUntagged() {
-  // Fetch defects that haven't been tagged yet, ordered oldest-first so numbering
-  // follows chronological detection order.
+  // Fetch untagged defects ordered oldest-first
   const { data: defects, error } = await supabase
     .from('defects')
     .select('id, image_url, detected_at')
@@ -182,16 +140,12 @@ async function processUntagged() {
 let _timer = null;
 
 function start() {
-  // Process any existing untagged defects immediately on startup
-  processUntagged().catch(err => console.error('[Tagger] startup run:', err.message));
-
-  // Then poll on interval for new arrivals
+  processUntagged().catch(err => console.error('[Tagger] startup:', err.message));
   _timer = setInterval(
-    () => processUntagged().catch(err => console.error('[Tagger] poll run:', err.message)),
+    () => processUntagged().catch(err => console.error('[Tagger] poll:', err.message)),
     POLL_MS
   );
-
-  console.log(`[Tagger] 🏷️  Defect tagger running — polling every ${POLL_MS / 1000}s (bucket: "${BUCKET}")`);
+  console.log(`[Tagger] running - polling every ${POLL_MS / 1000}s (bucket: "${BUCKET}")`);
 }
 
 function stop() {

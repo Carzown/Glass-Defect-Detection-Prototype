@@ -1,6 +1,4 @@
-// DetectionHistory: Browse past detection sessions
-// Loads all defects from Supabase, groups by date into "sessions"
-// Miller-column navigation: Session → Defects in session → Defect details
+// Detection History - Browse past detection sessions grouped by date
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';

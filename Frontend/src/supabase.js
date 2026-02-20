@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Supabase configuration from environment variables
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://kfeztemgrbkfwaicvgnk.supabase.co';
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmZXp0ZW1ncmJrZndhaWN2Z25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEyMDM4NDIsImV4cCI6MjA3Njc3OTg0Mn0.n4F6v_kywu55Nj2Yx_dcZri4WsdUMaftzPl1FXT-to8';
 
@@ -8,29 +7,16 @@ let supabase;
 let auth;
 
 if (supabaseUrl && supabaseKey) {
-  // Initialize Supabase
   supabase = createClient(supabaseUrl, supabaseKey);
   auth = supabase.auth;
-  console.log('✅ Supabase initialized successfully');
-  console.log('URL:', supabaseUrl);
+  console.log('✅ Supabase initialized');
 } else {
-  console.error(
-    '❌ Supabase is NOT configured. Missing environment variables:',
-    {
-      REACT_APP_SUPABASE_URL: supabaseUrl ? '✅ Set' : '❌ Missing',
-      REACT_APP_SUPABASE_ANON_KEY: supabaseKey ? '✅ Set' : '❌ Missing',
-    }
-  );
-  // Provide stub objects so app can run without Supabase
-  auth = {
-    currentUser: null,
-  };
+  console.error('❌ Supabase not configured');
+  auth = { currentUser: null };
   supabase = null;
 }
 
 export { auth, supabase };
-
-// Authentication functions for Supabase
 export async function signInWithEmail(email, password) {
   const { data, error } = await auth.signInWithPassword({
     email,
@@ -95,23 +81,15 @@ export async function createUserWithRole(email, password, role) {
 }
 
 export async function signInAndGetRole(email, password) {
-  // Sign in user
   const { data: authData, error: authError } = await auth.signInWithPassword({
     email,
     password,
   });
   
-  if (authError) {
-    console.error('❌ Supabase Auth Error:', authError);
-    throw new Error(authError.message || 'Authentication failed');
-  }
+  if (authError) throw new Error(authError.message);
 
-  console.log('✅ User authenticated:', authData.user.email);
-
-  // Get user role from profiles table
   try {
     if (!supabase) {
-      console.warn('⚠️ Supabase client not initialized, returning default employee role');
       return {
         uid: authData.user.id,
         email: authData.user.email,
@@ -125,22 +103,12 @@ export async function signInAndGetRole(email, password) {
       .eq('id', authData.user.id)
       .single();
 
-    if (error) {
-      // PGRST116 = no row found (user has no profile yet) — silent default
-      // 42P01 / PGRST204 = table doesn't exist yet — silent default
-      const silent = ['PGRST116', 'PGRST204', '42P01'];
-      if (!silent.includes(error.code)) {
-        console.warn('⚠️ Could not fetch profile:', error.message);
-      }
-    }
-
     return {
       uid: authData.user.id,
       email: authData.user.email,
-      role: data?.role || 'employee', // Default to employee if no profile exists
+      role: data?.role || 'employee',
     };
   } catch (error) {
-    console.error('❌ Error fetching user role:', error);
     return {
       uid: authData.user.id,
       email: authData.user.email,
@@ -166,17 +134,7 @@ export async function getRole(uid) {
   }
 }
 
-// ============================================================================
-// IMAGE & DEFECT STORAGE FUNCTIONS
-// ============================================================================
-
-/**
- * Upload image to Supabase Storage bucket
- * @param {Blob|File} imageFile - Image file to upload
- * @param {string} bucketName - Bucket name (default: 'defect-images')
- * @param {string} path - Path within bucket (e.g., 'defects/2024-01-15_damage.jpg')
- * @returns {Promise<{url: string, path: string}>} Public URL and file path
- */
+// Upload image to Supabase Storage
 export async function uploadImageToStorage(imageFile, bucketName = 'defects', path) {
   try {
     if (!supabase) throw new Error('Supabase not initialized');
@@ -204,11 +162,7 @@ export async function uploadImageToStorage(imageFile, bucketName = 'defects', pa
   }
 }
 
-/**
- * Save defect record to Supabase database
- * @param {Object} defectData - Defect record (device_id, defect_type, detected_at, image_url, etc.)
- * @returns {Promise<Object>} Inserted defect record
- */
+// Save defect record to database
 export async function saveDefectRecord(defectData) {
   try {
     if (!supabase) throw new Error('Supabase not initialized');
@@ -229,11 +183,7 @@ export async function saveDefectRecord(defectData) {
   }
 }
 
-/**
- * Fetch defects with optional filtering
- * @param {Object} filters - Filters (deviceId, status, limit, offset)
- * @returns {Promise<{data: Array, count: number}>}
- */
+// Fetch defects from database with pagination
 export async function fetchDefectsFromDB(filters = {}) {
   try {
     if (!supabase) throw new Error('Supabase not initialized');
@@ -257,14 +207,7 @@ export async function fetchDefectsFromDB(filters = {}) {
   }
 }
 
-/**
- * Update defect status
- * @param {string} defectId - Defect record ID
- * @param {string} status - New status (pending, reviewed, resolved)
- * @param {string} notes - Optional notes
- * @returns {Promise<Object>} Updated defect
- */
-// updateDefectStatus removed — status column no longer in schema
+
 
 export async function signOutUser() {
   await signOut();

@@ -1,15 +1,11 @@
-// Defects service — routes through the Railway backend API
+// Defects service - API interface for glass defect records
 import { supabase } from '../supabase';
 
 const BACKEND_URL =
   process.env.REACT_APP_BACKEND_URL ||
   'https://glass-defect-detection-prototype-production.up.railway.app';
 
-/**
- * Fetch all defects with optional filters via Railway backend
- * @param {Object} filters - Optional filters (limit, offset, dateFrom, dateTo)
- * @returns {Promise<{data: Array, pagination: Object}>}
- */
+// Fetch all defects via Railway backend
 export async function fetchDefects(filters = {}) {
   try {
     const { limit = 50, offset = 0, dateFrom, dateTo } = filters;
@@ -17,13 +13,13 @@ export async function fetchDefects(filters = {}) {
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
 
-    console.log('[fetchDefects] Fetching via Railway backend:', `${BACKEND_URL}/defects?${params}`);
+    console.log('[fetchDefects] Fetching from Railway');
 
     const res = await fetch(`${BACKEND_URL}/defects?${params}`);
     if (!res.ok) throw new Error(`Backend responded ${res.status}`);
     const json = await res.json();
 
-    console.log(`[fetchDefects] ✅ Fetched ${(json.data || []).length} defects from Railway`);
+    console.log(`[fetchDefects] ✅ Fetched ${(json.data || []).length} defects`);
     return json;
   } catch (error) {
     console.error('[fetchDefects] ❌ Error:', error.message);
@@ -31,11 +27,7 @@ export async function fetchDefects(filters = {}) {
   }
 }
 
-/**
- * Fetch a single defect by ID
- * @param {string} id - Defect ID
- * @returns {Promise<Object>}
- */
+// Fetch single defect by ID
 export async function fetchDefectById(id) {
   try {
     const { data, error } = await supabase
@@ -52,11 +44,7 @@ export async function fetchDefectById(id) {
   }
 }
 
-/**
- * Create a new defect record
- * @param {Object} defectData - Defect data (defect_type, detected_at, image_url, confidence, etc.)
- * @returns {Promise<Object>}
- */
+// Create new defect record
 export async function createDefect(defectData) {
   try {
     const { data, error } = await supabase
@@ -73,12 +61,7 @@ export async function createDefect(defectData) {
   }
 }
 
-/**
- * Update a defect record
- * @param {string} id - Defect ID
- * @param {Object} updates - Fields to update (status, notes, etc.)
- * @returns {Promise<Object>}
- */
+// Update defect record
 export async function updateDefect(id, updates) {
   try {
     const { data, error } = await supabase
@@ -96,11 +79,7 @@ export async function updateDefect(id, updates) {
   }
 }
 
-/**
- * Delete a defect record
- * @param {string} id - Defect ID
- * @returns {Promise<boolean>}
- */
+// Delete defect record
 export async function deleteDefect(id) {
   try {
     const { error } = await supabase
@@ -116,10 +95,7 @@ export async function deleteDefect(id) {
   }
 }
 
-/**
- * Delete all defects
- * @returns {Promise<boolean>}
- */
+// Delete all defects
 export async function deleteAllDefects() {
   try {
     const { error } = await supabase
@@ -135,16 +111,7 @@ export async function deleteAllDefects() {
   }
 }
 
-/**
- * Change defect status removed — status column no longer in schema.
- */
-// updateDefectStatus removed
-
-/**
- * Subscribe to real-time defect changes
- * @param {Function} callback - Callback function to handle changes
- * @returns {Function} Unsubscribe function
- */
+// Subscribe to real-time defect changes
 export function subscribeToDefects(callback) {
   try {
     const subscription = supabase
@@ -165,10 +132,7 @@ export function subscribeToDefects(callback) {
   }
 }
 
-/**
- * Get defect statistics
- * @returns {Promise<Object>}
- */
+// Get defect statistics
 export async function getDefectStats() {
   try {
     const { data: allDefects, error } = await supabase
@@ -195,11 +159,7 @@ export async function getDefectStats() {
   }
 }
 
-/**
- * Get ISO start/end timestamps for a named range.
- * @param {'today'|'7days'|'30days'} range
- * @returns {{ start: string, end: string }}
- */
+// Get date range bounds (today, 7days, 30days, or all time)
 export function getDateRangeBounds(range) {
   const now = new Date();
   const end = now.toISOString();
@@ -224,22 +184,13 @@ export function getDateRangeBounds(range) {
   return { start, end };
 }
 
-/**
- * Fetch all defects within a named time range.
- * @param {'today'|'7days'|'30days'} range
- * @returns {Promise<Array>}
- */
+// Fetch defects within named time range
 export async function fetchDefectsByRange(range) {
   const { start, end } = getDateRangeBounds(range);
   return fetchDefectsByDateRange(new Date(start), new Date(end));
 }
 
-/**
- * Fetch defects for a specific time range via Railway backend
- * @param {Date} startDate - Start date
- * @param {Date} endDate - End date
- * @returns {Promise<Array>}
- */
+// Fetch defects for specific date range
 export async function fetchDefectsByDateRange(startDate, endDate) {
   try {
     const params = new URLSearchParams({
@@ -248,7 +199,7 @@ export async function fetchDefectsByDateRange(startDate, endDate) {
       limit: 1000,
       offset: 0,
     });
-    console.log('[fetchDefectsByDateRange] Fetching via Railway:', `${BACKEND_URL}/defects?${params}`);
+    console.log('[fetchDefectsByDateRange] Fetching');
     const res = await fetch(`${BACKEND_URL}/defects?${params}`);
     if (!res.ok) throw new Error(`Backend responded ${res.status}`);
     const json = await res.json();
@@ -258,10 +209,3 @@ export async function fetchDefectsByDateRange(startDate, endDate) {
     throw error;
   }
 }
-
-/**
- * Export defects as CSV
- * @param {Array} defects - Array of defect records
- * @returns {string} CSV content
- */
-// CSV export removed; keep defects API utilities only

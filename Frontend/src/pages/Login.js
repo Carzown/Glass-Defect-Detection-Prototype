@@ -13,7 +13,7 @@ function Login() {
   
   const navigate = useNavigate();
 
-  // Prefill from localStorage when user previously selected "Remember me"
+  // Restore saved email if "Remember me" was previously selected
   useEffect(() => {
     const remembered = localStorage.getItem('rememberMe') === 'true';
     const savedEmail = localStorage.getItem('email') || '';
@@ -23,21 +23,17 @@ function Login() {
     }
   }, []);
 
-  // If already logged in (check Supabase session), auto-redirect based on stored role
-  // But only if the user hasn't intentionally logged out
+  // Auto-redirect if already logged in
   useEffect(() => {
     const checkAuthState = async () => {
       try {
         const user = await getCurrentUser();
         const hasLoggedIn = sessionStorage.getItem('loggedIn') === 'true';
         
-        // Only auto-redirect if user is authenticated AND we have a valid session marker
-        // This prevents auto-login after intentional logout
         if (user && hasLoggedIn) {
           navigate('/dashboard');
         }
       } catch (error) {
-        // User not authenticated, stay on login page
         console.log('User not authenticated');
       }
     };
@@ -51,10 +47,9 @@ function Login() {
     setLoading(true);
     
     try {
-      // Authenticate with Supabase
       const user = await signInWithEmail(email, password);
 
-      // Handle "Remember me" functionality
+      // Save email if "Remember me" checked
       if (remember) {
         localStorage.setItem('rememberMe', 'true');
         localStorage.setItem('email', email);
@@ -63,7 +58,6 @@ function Login() {
         localStorage.removeItem('email');
       }
 
-      // Set session storage
       sessionStorage.setItem('loggedIn', 'true');
       sessionStorage.setItem('userId', user.id);
 
@@ -71,7 +65,6 @@ function Login() {
     } catch (error) {
       console.error('Login error:', error);
       
-      // Handle specific Supabase auth errors
       let errorMessage = 'Login failed';
       if (error.message) {
         if (error.message.includes('auth/invalid-email') || error.message.includes('auth/user-not-found')) {
@@ -93,9 +86,7 @@ function Login() {
     }
   };
 
-  
 
-  return (
     <div className="login-container">
       <div className="login-card">
         <div className="login-logo">

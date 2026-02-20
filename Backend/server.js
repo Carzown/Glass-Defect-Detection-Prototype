@@ -5,7 +5,6 @@ const cors = require("cors");
 
 const app = express();
 
-// CORS configuration
 const corsOptions = {
   origin: [
     'http://localhost:3000',
@@ -23,8 +22,6 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
-
-// Health check and info routes
 app.get("/", (req, res) => {
   res.json({ 
     message: "Backend connected successfully!",
@@ -55,10 +52,8 @@ app.get("/health/detailed", (req, res) => {
   });
 });
 
-// Test Supabase connection endpoint
 app.get("/test/supabase", async (req, res) => {
   try {
-    console.log('[TEST] Testing Supabase connection...');
     
     const { createClient } = require('@supabase/supabase-js');
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -79,34 +74,19 @@ app.get("/test/supabase", async (req, res) => {
       return res.status(400).json(results);
     }
     
-    // Test 1: Create client
     try {
       const client = createClient(supabaseUrl, supabaseKey);
       results.tests.clientCreation = { success: true };
-      console.log('✅ Supabase client created successfully');
     } catch (e) {
       results.tests.clientCreation = { success: false, error: e.message };
-      console.error('❌ Failed to create Supabase client:', e.message);
     }
     
-    // Test 2: Test auth session
     try {
       const client = createClient(supabaseUrl, supabaseKey);
       const { data, error } = await client.auth.getSession();
-      if (error) {
-        results.tests.authSession = { success: false, error: error.message };
-        console.warn('⚠️ Auth session test:', error.message);
-      } else {
-        results.tests.authSession = { 
-          success: true, 
-          hasSession: !!data.session,
-          message: data.session ? 'Session active' : 'No active session'
-        };
-        console.log('✅ Auth session check passed');
-      }
+      results.tests.authSession = error ? { success: false, error: error.message } : { success: true, hasSession: !!data.session };
     } catch (e) {
       results.tests.authSession = { success: false, error: e.message };
-      console.warn('⚠️ Auth session exception:', e.message);
     }
     
     results.success = results.tests.clientCreation?.success || results.tests.authSession?.success;
@@ -121,7 +101,6 @@ app.get("/test/supabase", async (req, res) => {
   }
 });
 
-// HTTP endpoint for devices to send frames
 app.post("/api/device/frames", (req, res) => {
   const deviceId = req.headers['x-device-id'] || req.body?.device_id;
   
@@ -137,7 +116,6 @@ app.post("/api/device/frames", (req, res) => {
   });
 });
 
-// HTTP endpoint for devices to send detections
 app.post("/api/device/detections", (req, res) => {
   const deviceId = req.headers['x-device-id'] || req.body?.device_id;
   
@@ -156,7 +134,6 @@ app.post("/api/device/detections", (req, res) => {
   });
 });
 
-// HTTP fallback for device registration
 app.post("/api/device/register", (req, res) => {
   const deviceId = req.headers['x-device-id'] || req.body?.device_id || 'unknown-' + Date.now();
   
@@ -168,7 +145,7 @@ app.post("/api/device/register", (req, res) => {
   });
 });
 
-// Defects API for glass defect management
+// Defects API routes
 try {
   const defectsRouter = require('./defects')
   app.use('/defects', defectsRouter)
@@ -177,17 +154,13 @@ try {
   console.warn('[SERVER] Defects routes not loaded:', e?.message || e)
 }
 
-// Defect tagger — assigns sequential tag numbers + overlays numbered badges on images
+// Defect tagger - auto-tags and overlays numbered badges on images
 try {
   const tagger = require('./defect-tagger')
   tagger.start()
 } catch (e) {
   console.warn('[SERVER] Defect tagger not started:', e?.message || e)
 }
-
-// ============================================================================
-// Run server
-// ============================================================================
 
 let basePort = parseInt(process.env.PORT, 10) || 5000;
 const maxAttempts = 10;

@@ -1,9 +1,8 @@
-// Defects API Routes - Handle glass defect records with Supabase integration or in-memory fallback
+// Defects API Routes - CRUD operations for glass defect records
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 
-// Try to import in-memory defects store from server.js
 let defectsStore = null;
 try {
   const server = require('./server');
@@ -12,7 +11,6 @@ try {
   console.warn('[defects] Could not load in-memory defects store:', e.message);
 }
 
-// Initialize Supabase client from environment variables
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 
@@ -22,19 +20,12 @@ if (supabaseUrl && supabaseKey) {
   supabase = createClient(supabaseUrl, supabaseKey);
   console.log('✅ Supabase client initialized for defects');
 } else {
-  console.warn('⚠️ Supabase not configured - using in-memory storage for defects (not persistent)');
+  console.warn('⚠️ Supabase not configured - using in-memory storage');
 }
 
-/**
- * GET /defects
- * Retrieve all defects with optional filtering
- * Query params: 
- *   - limit: number of records to return (default: 50)
- *   - offset: pagination offset (default: 0)
- */
+// GET /defects - Retrieve all defects with pagination
 router.get('/', async (req, res) => {
   try {
-    // Supabase is REQUIRED for retrieving defects
     if (!supabase) {
       return res.status(503).json({ 
         error: 'Supabase not configured - cannot retrieve defects',
@@ -85,10 +76,68 @@ router.get('/', async (req, res) => {
   }
 });
 
-/**
- * GET /defects/:id
- * Retrieve a specific defect by ID
- */
+// GET /stats/summary - Overall defect statistics
+router.get('/stats/summary', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ error: 'Supabase not configured' });
+    }
+    const { data, error } = await supabase
+      .from('defects')
+      .select('defect_type, confidence, detected_at');
+    if (error) return res.status(400).json({ error: error.message });
+    const records = data || [];
+    res.json({
+      totalDefects: records.length,
+      avgConfidence: records.length
+        ? records.reduce((s, d) => s + (d.confidence || 0), 0) / records.length
+        : 0,
+      byType: groupBy(records, 'defect_type'),
+    });
+  } catch (err) {
+    console.error('Error fetching statistics:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /stats/range - Statistics filtered by date range
+router.get('/stats/range', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ error: 'Supabase not configured' });
+    }
+    const { dateFrom, dateTo } = req.query;
+    let query = supabase
+      .from('defects')
+      .select('id, defect_type, confidence, detected_at')
+      .order('detected_at', { ascending: false });
+    if (dateFrom) query = query.gte('detected_at', dateFrom);
+    if (dateTo)   query = query.lte('detected_at', dateTo);
+    const { data, error } = await query;
+    if (error) return res.status(400).json({ error: error.message });
+    const records = data || [];
+    const total = records.length;
+    const avgConfidence = total
+      ? records.reduce((s, d) => s + (d.confidence || 0), 0) / total
+      : 0;
+    const lastDetected = records.length ? records[0].detected_at : null;
+    const byType = groupBy(records, 'defect_type');
+    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const piOnline = records.some(d => d.detected_at >= tenMinAgo);
+    res.json({
+      total,
+      avgConfidence,
+      lastDetected,
+      byType,
+      piOnline,
+    });
+  } catch (err) {
+    console.error('Error fetching range stats:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /defects/:id - Retrieve specific defect
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -106,7 +155,6 @@ router.get('/:id', async (req, res) => {
 
       return res.json(data);
     } else if (defectsStore) {
-      // Search in memory
       const defect = defectsStore.data.find(d => d.id == id);
       if (!defect) {
         return res.status(404).json({ error: 'Defect not found' });
@@ -121,20 +169,9 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-/**
- * POST /defects
- * Create a new defect record - REQUIRES Supabase
- * This is called automatically by the device detection endpoint
- * Body:
- *   - defect_type: type of defect (REQUIRED)
- *   - detected_at: ISO timestamp of detection
- *   - confidence: confidence score (0-1)
- *   - image_url: URL to the image in storage
- *   - image_path: path to the image in storage bucket
- */
+// POST /defects - Create new defect record
 router.post('/', async (req, res) => {
   try {
-    // Supabase is REQUIRED for saving defects
     if (!supabase) {
       return res.status(503).json({ 
         error: 'Supabase not configured',
@@ -151,7 +188,6 @@ router.post('/', async (req, res) => {
 
     const { defect_type, detected_at, image_url, image_path, confidence } = req.body;
 
-    // Validate required fields
     if (!defect_type) {
       return res.status(400).json({
         error: 'Missing required fields',
@@ -193,11 +229,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-/**
- * PATCH /defects/:id
- * Update a defect record
- * Body: any fields to update (status, notes, etc.)
- */
+// PATCH /defects/:id - Update defect record
 router.patch('/:id', async (req, res) => {
   try {
     if (!supabase) {
@@ -207,7 +239,6 @@ router.patch('/:id', async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
-    // Don't allow updating these key fields
     delete updates.id;
     delete updates.created_at;
 
@@ -232,10 +263,7 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-/**
- * DELETE /defects/:id
- * Delete a defect record
- */
+// DELETE /defects/:id - Delete defect record
 router.delete('/:id', async (req, res) => {
   try {
     if (!supabase) {
@@ -255,77 +283,6 @@ router.delete('/:id', async (req, res) => {
     res.json({ message: 'Defect deleted successfully' });
   } catch (err) {
     console.error('Error deleting defect:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-/**
- * GET /defects/stats/summary
- * Get defect statistics (legacy)
- */
-router.get('/stats/summary', async (req, res) => {
-  try {
-    if (!supabase) {
-      return res.status(503).json({ error: 'Supabase not configured' });
-    }
-    const { data, error } = await supabase
-      .from('defects')
-      .select('defect_type, confidence, detected_at');
-    if (error) return res.status(400).json({ error: error.message });
-    const records = data || [];
-    res.json({
-      totalDefects: records.length,
-      avgConfidence: records.length
-        ? records.reduce((s, d) => s + (d.confidence || 0), 0) / records.length
-        : 0,
-      byType: groupBy(records, 'defect_type'),
-    });
-  } catch (err) {
-    console.error('Error fetching statistics:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-/**
- * GET /defects/stats/range
- * Get defect statistics filtered by date range
- * Query params:
- *   - dateFrom: ISO start timestamp (inclusive)
- *   - dateTo:   ISO end timestamp   (inclusive)
- */
-router.get('/stats/range', async (req, res) => {
-  try {
-    if (!supabase) {
-      return res.status(503).json({ error: 'Supabase not configured' });
-    }
-    const { dateFrom, dateTo } = req.query;
-    let query = supabase
-      .from('defects')
-      .select('id, defect_type, confidence, detected_at')
-      .order('detected_at', { ascending: false });
-    if (dateFrom) query = query.gte('detected_at', dateFrom);
-    if (dateTo)   query = query.lte('detected_at', dateTo);
-    const { data, error } = await query;
-    if (error) return res.status(400).json({ error: error.message });
-    const records = data || [];
-    const total = records.length;
-    const avgConfidence = total
-      ? records.reduce((s, d) => s + (d.confidence || 0), 0) / total
-      : 0;
-    const lastDetected = records.length ? records[0].detected_at : null;
-    const byType = groupBy(records, 'defect_type');
-    // Raspberry Pi: online if a record was detected in the last 10 minutes
-    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    const piOnline = records.some(d => d.detected_at >= tenMinAgo);
-    res.json({
-      total,
-      avgConfidence,
-      lastDetected,
-      byType,
-      piOnline,
-    });
-  } catch (err) {
-    console.error('Error fetching range stats:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
