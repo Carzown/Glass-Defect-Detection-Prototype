@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { signOutUser } from '../supabase';
@@ -6,6 +6,7 @@ import './Dashboard.css';
 
 function Help() {
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   async function handleLogout() {
     try {
@@ -41,8 +42,20 @@ function Help() {
         ]}
         bottomItems={[]}
         activeKey="help"
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(o => !o)}
       />
-      <div style={{ flex: 1, padding: '20px', overflowY: 'auto' }}>
+      <main className="machine-main-content">
+        <header className="machine-header">
+          <button className="sidebar-hamburger" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle sidebar">
+            <span /><span /><span />
+          </button>
+          <div className="machine-header-left">
+            <h1 className="machine-header-title">Help</h1>
+            <p className="machine-header-subtitle">Documentation &amp; guidance</p>
+          </div>
+        </header>
+        <div style={{ flex: 1, padding: '20px', overflowY: 'auto' }}>
         <h1>Help & Documentation</h1>
         
         <section style={{ marginTop: '20px' }}>
@@ -138,7 +151,8 @@ function Help() {
             Glass Defect Detection System v1.0 | Powered by Supabase Authentication
           </p>
         </div>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

@@ -2,10 +2,17 @@ import React from 'react';
 import '../pages/Dashboard.css';
 import logoDefault from '../assets/AlumpreneurLogo.png';
 
-function Sidebar({ logoSrc = logoDefault, onLogout, mainItems = [], bottomItems = [], activeKey }) {
+function Sidebar({ logoSrc = logoDefault, onLogout, mainItems = [], bottomItems = [], activeKey, isOpen = false, onToggle }) {
   const items = Array.isArray(mainItems) ? mainItems : [];
   return (
-    <aside className="machine-sidebar">
+    <>
+      {onToggle && (
+        <div
+          className={`sidebar-backdrop${isOpen ? ' sidebar-open' : ''}`}
+          onClick={onToggle}
+        />
+      )}
+      <aside className={`machine-sidebar${isOpen ? ' sidebar-open' : ''}`}>
       <div className="machine-sidebar-logo">
         <img src={logoSrc} alt="Alumpreneur Logo" className="machine-logo-image" />
       </div>
@@ -57,6 +64,7 @@ function Sidebar({ logoSrc = logoDefault, onLogout, mainItems = [], bottomItems 
         </button>
       </div>
     </aside>
+    </>
   );
 }
 

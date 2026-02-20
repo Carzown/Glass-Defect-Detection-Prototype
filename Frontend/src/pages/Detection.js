@@ -37,6 +37,7 @@ function Detection() {
   const [modalOpen, setModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedDefectId, setSelectedDefectId] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
 
   // Connections
@@ -196,10 +197,15 @@ function Detection() {
         ]}
         bottomItems={[]}
         activeKey="detection"
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(o => !o)}
       />
 
       <main className="machine-main-content">
         <header className="machine-header">
+          <button className="sidebar-hamburger" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle sidebar">
+            <span /><span /><span />
+          </button>
           <div className="machine-header-left">
             <h1 className="machine-header-title">Glass Defect Detector</h1>
             <p className="machine-header-subtitle">Live Detection Feed</p>

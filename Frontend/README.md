@@ -104,8 +104,7 @@ Frontend/
 │   │   ├── Login.js         # Authentication
 │   │   └── Admin.js         # Admin panel
 │   ├── components/
-│   │   ├── Sidebar.js       # Navigation
-│   │   └── ManualWebRTCConnection.js
+│   │   └── Sidebar.js       # Navigation
 │   ├── services/
 │   │   └── defects.js       # Database queries (cleaned)
 │   ├── App.js               # Main app

@@ -37,6 +37,7 @@ function groupByDate(defects) {
 function Dashboard() {
   const navigate = useNavigate();
   const [timeFilter, setTimeFilter] = useState('today');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Sessions widget state
   const [dashSelectedSession, setDashSelectedSession] = useState(null);
@@ -98,10 +99,15 @@ function Dashboard() {
         ]}
         bottomItems={[]}
         activeKey="dashboard"
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(o => !o)}
       />
 
       <main className="machine-main-content">
         <header className="machine-header">
+          <button className="sidebar-hamburger" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle sidebar">
+            <span /><span /><span />
+          </button>
           <div className="machine-header-left">
             <h1 className="machine-header-title">Dashboard</h1>
             <p className="machine-header-subtitle">Overview and analytics</p>

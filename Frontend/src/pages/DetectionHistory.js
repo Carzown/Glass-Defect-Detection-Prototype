@@ -47,6 +47,7 @@ function DetectionHistory() {
   const [selectedDefect, setSelectedDefect] = useState(null);
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState('30days');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   async function handleLogout() {
     try {
@@ -102,10 +103,15 @@ function DetectionHistory() {
         ]}
         bottomItems={[]}
         activeKey="detection-history"
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(o => !o)}
       />
 
       <main className="machine-main-content">
         <header className="machine-header">
+          <button className="sidebar-hamburger" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle sidebar">
+            <span /><span /><span />
+          </button>
           <div className="machine-header-left">
             <h1 className="machine-header-title">Detection History</h1>
             <p className="machine-header-subtitle">View past inspection results</p>
