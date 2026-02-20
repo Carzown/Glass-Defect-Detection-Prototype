@@ -120,104 +120,7 @@ app.get("/test/supabase", async (req, res) => {
   }
 });
 
-// Device status endpoint - shows WebSocket-connected devices
-app.get("/devices/status", (req, res) => {
-  const devices = Array.from(deviceConnections.keys()).map(id => ({
-    device_id: id,
-    status: 'connected',
-    timestamp: new Date().toISOString()
-  }));
-  
-  res.json({
-    devices: devices,
-    count: devices.length,
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// WebSocket debug endpoint - shows server status
-app.get("/ws/status", (req, res) => {
-  res.json({
-    websocket_enabled: true,
-    path: '/ws',
-    devices_connected: deviceConnections.size,
-    web_clients_connected: webClients.size,
-    timestamp: new Date().toISOString(),
-    note: 'WebSocket endpoint at /ws (may require proxy configuration on Railway)'
-  });
-});
-
-// HTTP fallback endpoint for browsers - Server-Sent Events for frame streaming
-// This works when WebSocket is blocked by proxies
-app.get("/stream/frames", (req, res) => {
-  // Set proper SSE headers
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  
-  // Send current frame immediately if available
-  if (currentFrame) {
-    res.write(`data: ${JSON.stringify({
-      type: 'frame',
-      frame: currentFrame,
-      timestamp: lastFrameTime
-    })}\n\n`);
-  }
-  
-  // Handle client disconnect
-  req.on('close', () => {
-    console.log('[SSE] Client disconnected from /stream/frames');
-  });
-  
-  // Keep connection open and send frames as they arrive
-  // This is a simple polling approach - in production, use event emitters
-  const interval = setInterval(() => {
-    if (currentFrame) {
-      res.write(`data: ${JSON.stringify({
-        type: 'frame',
-        frame: currentFrame,
-        timestamp: lastFrameTime
-      })}\n\n`);
-    }
-  }, 100); // Send every 100ms
-  
-  req.on('close', () => {
-    clearInterval(interval);
-  });
-});
-
-// HTTP fallback for device registration (polling-based alternative to WebSocket)  
-app.post("/api/device/register", (req, res) => {
-  const deviceId = req.headers['x-device-id'] || req.body?.device_id || 'unknown-' + Date.now();
-  
-  // Store as HTTP device
-  deviceConnections.set('http-' + deviceId, { 
-    type: 'http',
-    id: deviceId,
-    lastSeen: Date.now()
-  });
-  
-  res.json({
-    success: true,
-    device_id: deviceId,
-    message: 'Device registered via HTTP fallback',
-    polling_endpoint: `/api/device/${deviceId}/commands`,
-    frame_stream_sse: '/stream/frames',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Defects API for glass defect management
-try {
-  const defectsRouter = require('./defects')
-  app.use('/defects', defectsRouter)
-  console.log('[SERVER] Defects API routes loaded')
-} catch (e) {
-  console.warn('[SERVER] Defects routes not loaded:', e?.message || e)
-}
-
-// HTTP endpoint for devices to send frames (alternative to WebSocket)
+// HTTP endpoint for devices to send frames
 app.post("/api/device/frames", (req, res) => {
   const deviceId = req.headers['x-device-id'] || req.body?.device_id;
   
@@ -225,24 +128,11 @@ app.post("/api/device/frames", (req, res) => {
     return res.status(400).json({ error: 'Missing device_id header or in body' });
   }
   
-  // Update current frame
-  if (req.body?.frame) {
-    currentFrame = req.body.frame;
-    lastFrameTime = Date.now();
-    
-    // Broadcast to web clients via WebSocket (if any)
-    broadcastToWeb({
-      type: 'frame',
-      frame: currentFrame,
-      timestamp: lastFrameTime,
-      device_id: deviceId
-    });
-  }
-  
   res.json({
     success: true,
     device_id: deviceId,
-    received_at: new Date().toISOString()
+    received_at: new Date().toISOString(),
+    message: 'Frame received (streaming disabled)'
   });
 });
 
@@ -254,31 +144,25 @@ app.post("/api/device/detections", (req, res) => {
     return res.status(400).json({ error: 'Missing device_id or detections' });
   }
   
-  // Store detections in memory (for WebSocket broadcast)
   const detections = req.body.detections || [];
-  detections.forEach(detection => {
-    defectsStore.addDefect({
-      device_id: deviceId,
-      defect_type: detection.defect_type || detection.type,
-      confidence: detection.confidence,
-      detected_at: req.body.timestamp || new Date().toISOString(),
-      status: 'pending'
-    });
-  });
-  
-  // Broadcast detections to web clients
-  broadcastToWeb({
-    type: 'detection',
-    device_id: deviceId,
-    detections: req.body.detections,
-    timestamp: req.body.timestamp || Date.now(),
-    stored: true
-  });
   
   res.json({
     success: true,
+    device_id: deviceId,
     received: detections.length,
-    stored: detections.length,
+    received_at: new Date().toISOString(),
+    message: 'Detections received (streaming disabled - save to Supabase directly)'
+  });
+});
+
+// HTTP fallback for device registration
+app.post("/api/device/register", (req, res) => {
+  const deviceId = req.headers['x-device-id'] || req.body?.device_id || 'unknown-' + Date.now();
+  
+  res.json({
+    success: true,
+    device_id: deviceId,
+    message: 'Device registered (streaming disabled)',
     timestamp: new Date().toISOString()
   });
 });
@@ -292,192 +176,6 @@ try {
   console.warn('[SERVER] Defects routes not loaded:', e?.message || e)
 }
 
-
-
-// ============================================================================
-// WebSocket Server Integration
-// ============================================================================
-
-const WebSocket = require('ws');
-const http = require('http');
-
-// Store current frame buffer and device connections
-const deviceConnections = new Map(); // device_id -> ws connection
-const webClients = new Set(); // web dashboard clients
-let currentFrame = null;
-let lastFrameTime = Date.now();
-
-// In-memory defects storage (fallback when Supabase not configured)
-const defectsStore = {
-  data: [], // Array of defect records
-  addDefect: function(defect) {
-    this.data.unshift({ ...defect, id: Date.now() + Math.random(), timestamp: new Date().toISOString() });
-    // Keep only last 1000 defects in memory
-    if (this.data.length > 1000) {
-      this.data = this.data.slice(0, 1000);
-    }
-    return this.data[0];
-  },
-  getDefects: function(options = {}) {
-    let results = [...this.data];
-    if (options.deviceId) {
-      results = results.filter(d => d.device_id === options.deviceId);
-    }
-    if (options.status) {
-      results = results.filter(d => d.status === options.status);
-    }
-    const limit = options.limit || 50;
-    const offset = options.offset || 0;
-    return {
-      data: results.slice(offset, offset + limit),
-      count: results.length,
-      total: this.data.length
-    };
-  },
-  clear: function() {
-    this.data = [];
-  }
-};
-
-function setupWebSocketServer(httpServer) {
-  // WebSocket server with origin validation
-  // Use specific path /ws to avoid conflicts with Express routing
-  const wss = new WebSocket.Server({ 
-    server: httpServer, 
-    path: '/ws',  // Use specific path, not root
-    perMessageDeflate: false,  // Disable compression for faster streaming
-    maxPayload: 100 * 1024 * 1024,  // 100MB max payload for large frames
-    verifyClient: (info, callback) => {
-      // For Railway/proxy compatibility, simply accept all connections
-      // Origin validation should be done at application level if needed
-      callback(true);
-    }
-  });
-
-  console.log('[WebSocket] Server initialized on path /ws with origin validation');
-
-  // Add request logging for WebSocket upgrade attempts
-  wss.on('connection', (ws, req) => {
-    console.log(`[WS Connection] New connection from ${req.socket.remoteAddress}`);
-    
-    let clientType = null; // 'device' or 'web'
-    let deviceId = null;
-    
-    ws.on('message', (data) => {
-      try {
-        const message = JSON.parse(data.toString());
-        
-        // First message should identify the client
-        if (!clientType) {
-          if (message.type === 'device_register') {
-            clientType = 'device';
-            deviceId = message.device_id || 'unknown';
-            deviceConnections.set(deviceId, ws);
-            console.log(`[WS Device] ${deviceId} registered`);
-            
-            // Notify web clients
-            broadcastToWeb({
-              type: 'device_status',
-              device_id: deviceId,
-              status: 'connected'
-            });
-            return;
-          } else if (message.type === 'web_client' || (message.type === 'register' && message.client_type === 'web_client')) {
-            clientType = 'web';
-            webClients.add(ws);
-            console.log(`[WS Web] Client registered (total: ${webClients.size})`);
-            
-            // Send current frame to new web client if available
-            if (currentFrame) {
-              ws.send(JSON.stringify({
-                type: 'frame',
-                frame: currentFrame,
-                timestamp: lastFrameTime
-              }));
-            }
-            return;
-          }
-        }
-        
-        // Route messages based on client type
-        if (clientType === 'device') {
-          handleDeviceMessage(deviceId, message);
-        } else if (clientType === 'web') {
-          handleWebMessage(message);
-        }
-        
-      } catch (error) {
-        console.error('[WS Error] Failed to parse message:', error.message);
-      }
-    });
-    
-    ws.on('close', () => {
-      if (clientType === 'device') {
-        console.log(`[WS Device] ${deviceId} disconnected`);
-        deviceConnections.delete(deviceId);
-        broadcastToWeb({
-          type: 'device_status',
-          device_id: deviceId,
-          status: 'disconnected'
-        });
-      } else if (clientType === 'web') {
-        webClients.delete(ws);
-        console.log(`[WS Web] Client disconnected (total: ${webClients.size})`);
-      }
-    });
-    
-    ws.on('error', (error) => {
-      console.error(`[WS Error] ${clientType}:`, error.message);
-    });
-  });
-
-  return wss;
-}
-
-function handleDeviceMessage(deviceId, message) {
-  if (message.type === 'frame' && message.frame) {
-    // Store frame buffer and broadcast to web clients
-    currentFrame = message.frame;
-    lastFrameTime = Date.now();
-    
-    broadcastToWeb({
-      type: 'frame',
-      frame: message.frame,
-      timestamp: lastFrameTime
-    });
-  } else if (message.type === 'detection') {
-    // Broadcast detection to web clients
-    broadcastToWeb({
-      type: 'detection',
-      device_id: deviceId,
-      defect_type: message.defect_type,
-      confidence: message.confidence,
-      timestamp: message.timestamp
-    });
-  } else if (message.type === 'ping') {
-    // Respond to keepalive ping
-    const device = deviceConnections.get(deviceId);
-    if (device) {
-      device.send(JSON.stringify({ type: 'pong' }));
-    }
-  }
-}
-
-function handleWebMessage(message) {
-  if (message.type === 'ping') {
-    // Just a keepalive, no action needed
-  }
-}
-
-function broadcastToWeb(message) {
-  const payload = JSON.stringify(message);
-  webClients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(payload);
-    }
-  });
-}
-
 // ============================================================================
 // Run server
 // ============================================================================
@@ -487,13 +185,13 @@ const maxAttempts = 10;
 
 function startServer(port, attempt = 1) {
   const onListening = () => {
-    console.log('[SERVER] ✅ HTTP + WebSocket listening on port ' + port);
+    console.log('[SERVER] ✅ HTTP listening on port ' + port);
+    console.log('[SERVER] Running in HTTP-only mode (WebSocket/streaming disabled)');
   };
 
   const onError = (err) => {
     if (err.code === 'EADDRINUSE' && attempt < maxAttempts) {
       console.warn('[SERVER] ⚠️  port ' + port + ' in use, trying ' + (port + 1) + '...');
-      // Try next port
       startServer(port + 1, attempt + 1);
     } else {
       console.error('[SERVER] ❌ failed to start:', err.message);
@@ -501,22 +199,14 @@ function startServer(port, attempt = 1) {
     }
   };
 
-  const server = http.createServer(app);
-  
-  // Log all upgrade attempts (for debugging WebSocket issues)
-  server.on('upgrade', (req, socket, head) => {
-    console.log(`[HTTP Upgrade] Received upgrade request to ${req.url} from ${req.headers.origin || 'unknown origin'}`);
-  });
-  
-  // Setup WebSocket server (will handle /ws upgrade automatically)
-  setupWebSocketServer(server);
+  const server = app.listen(port);
   
   server.once('error', onError);
-  server.listen(port, onListening);
+  server.once('listening', onListening);
 }
 
 if (require.main === module) {
   startServer(basePort);
 }
 
-module.exports = { app, defectsStore };
+module.exports = { app };

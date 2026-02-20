@@ -35,6 +35,8 @@ function Help() {
         onLogout={handleLogout}
         mainItems={[
           { key: 'dashboard', label: 'Dashboard', onClick: () => navigate('/dashboard') },
+          { key: 'detection', label: 'Detection', onClick: () => navigate('/detection') },
+          { key: 'detection-history', label: 'Detection History', onClick: () => navigate('/detection-history') },
           { key: 'help', label: 'Help', onClick: () => navigate('/help') },
         ]}
         bottomItems={[]}

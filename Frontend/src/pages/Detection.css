@@ -1,0 +1,321 @@
+/* Detection Page Styles - Reuse from Dashboard.css */
+@import './Dashboard.css';
+
+/* ─────────────────────────────────────────────────────────────────
+   Defect List Row
+   ──────────────────────────────────────────────────────────────── */
+
+.det-defect-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f0f3f7;
+  cursor: pointer;
+  transition: background 0.15s;
+  height: auto !important;
+  min-height: 56px;
+}
+
+.det-defect-row:hover {
+  background: rgba(229, 164, 69, 0.08) !important;
+}
+
+.det-defect-row:last-child {
+  border-bottom: none;
+}
+
+.det-defect-row--latest {
+  background: rgba(229, 164, 69, 0.13) !important;
+  border-left: 3px solid #e5a445;
+}
+
+/* Index circle badge */
+.det-defect-index {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1a3a52 0%, #0f2942 100%);
+  color: white;
+  font-family: 'Poppins', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.det-defect-row--latest .det-defect-index {
+  background: linear-gradient(135deg, #e5a445 0%, #d4941d 100%);
+}
+
+/* Type + time stacked */
+.det-defect-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.det-defect-type-label {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f2942;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.det-defect-row--latest .det-defect-type-label {
+  color: #1a3a52;
+}
+
+.det-defect-time-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+/* Confidence pill */
+.det-defect-confidence {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a3a52;
+  background: #f0f3f7;
+  border-radius: 99px;
+  padding: 3px 9px;
+  flex-shrink: 0;
+}
+
+.det-defect-row--latest .det-defect-confidence {
+  background: rgba(229, 164, 69, 0.2);
+  color: #d4941d;
+}
+
+/* Chevron */
+.det-defect-chevron {
+  width: 14px;
+  height: 14px;
+  color: #cbd5e1;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.det-defect-row:hover .det-defect-chevron {
+  color: #e5a445;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Modal
+   ──────────────────────────────────────────────────────────────── */
+
+.det-modal-content {
+  background: white;
+  border-radius: 16px;
+  width: 460px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.22);
+  animation: slideIn 0.25s ease;
+}
+
+/* Modal Header */
+.det-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #1a3a52 0%, #0f2942 100%);
+  border-radius: 16px 16px 0 0;
+  flex-shrink: 0;
+}
+
+.det-modal-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.det-modal-index {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(229, 164, 69, 0.8);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.det-modal-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  color: white;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.det-modal-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.det-modal-close:hover {
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.4);
+  transform: rotate(90deg);
+}
+
+/* Image area */
+.det-modal-image-area {
+  flex-shrink: 0;
+  background: #0f2942;
+  overflow: hidden;
+  max-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.det-modal-image {
+  width: 100%;
+  max-height: 260px;
+  object-fit: cover;
+  display: block;
+}
+
+.det-modal-no-image {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 20px;
+  color: rgba(255,255,255,0.3);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Detail rows */
+.det-modal-details {
+  flex: 1;
+  overflow: hidden;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.det-modal-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid #f0f3f7;
+  gap: 16px;
+}
+
+.det-modal-detail-row:last-child {
+  border-bottom: none;
+}
+
+.det-modal-detail-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.det-modal-detail-value {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f2942;
+  text-align: right;
+}
+
+.det-modal-detail-link {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #e5a445;
+  text-decoration: none;
+  text-align: right;
+}
+
+.det-modal-detail-link:hover {
+  text-decoration: underline;
+  color: #d4941d;
+}
+
+.det-modal-detail-empty {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #d1d5db;
+}
+
+/* Footer */
+.det-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  flex-shrink: 0;
+  border-radius: 0 0 16px 16px;
+}
+
+.det-modal-counter {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca3af;
+}
+
+.det-modal-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #1a3a52 0%, #0f2942 100%);
+  color: white;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(15, 41, 66, 0.2);
+}
+
+.det-modal-nav-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #e5a445 0%, #d4941d 100%);
+  box-shadow: 0 4px 12px rgba(229, 164, 69, 0.3);
+  transform: translateY(-1px);
+}
+
+.det-modal-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}

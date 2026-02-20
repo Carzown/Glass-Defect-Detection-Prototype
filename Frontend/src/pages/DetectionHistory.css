@@ -1,0 +1,19 @@
+/* DetectionHistory page — layout wrapper */
+/* All .dh-* miller-column styles live in Dashboard.css (shared) */
+
+.dh-page-content-area {
+  flex: 1;
+  padding: 24px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: linear-gradient(135deg, #f8fafb 0%, #f0f3f7 100%);
+}
+
+/* Full-page miller container overrides */
+.dh-miller-page {
+  border-radius: 12px;
+  border: 2px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}

@@ -1,388 +1,124 @@
-// Dashboard: Real-time defects from Supabase + WebSocket video stream
-// - Defects list comes from Supabase database polling
-// - Live video stream comes from WebSocket backend on Railway
-import React, { useState, useRef, useEffect } from 'react';
+// Dashboard: Dashboard page with sidebar and header
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
-import LiveDetectionPreview from '../components/LiveDetectionPreview';
 import { signOutUser } from '../supabase';
-import { fetchDefects, updateDefectStatus } from '../services/defects';
+import { fetchDefects } from '../services/defects';
 import './Dashboard.css';
 
-const DEFECT_ITEM_HEIGHT = 56;
+// ── Mock sessions (shown when Supabase has no data) ─────────────
+const MOCK_SESSIONS = [
+  {
+    detected_at: '2026-02-21T14:32:10Z', defect_type: 'scratch',
+    confidence: 0.92, status: 'unresolved', device_id: 'CAM-001', id: 'm1',
+  },
+  {
+    detected_at: '2026-02-21T14:45:03Z', defect_type: 'bubble',
+    confidence: 0.87, status: 'resolved', device_id: 'CAM-001', id: 'm2',
+  },
+  {
+    detected_at: '2026-02-21T15:01:55Z', defect_type: 'crack',
+    confidence: 0.95, status: 'unresolved', device_id: 'CAM-001', id: 'm3',
+  },
+  {
+    detected_at: '2026-02-20T09:12:40Z', defect_type: 'scratch',
+    confidence: 0.78, status: 'resolved', device_id: 'CAM-001', id: 'm4',
+  },
+  {
+    detected_at: '2026-02-20T09:58:22Z', defect_type: 'bubble',
+    confidence: 0.81, status: 'unresolved', device_id: 'CAM-002', id: 'm5',
+  },
+  {
+    detected_at: '2026-02-20T11:30:05Z', defect_type: 'crack',
+    confidence: 0.90, status: 'resolved', device_id: 'CAM-002', id: 'm6',
+  },
+  {
+    detected_at: '2026-02-20T13:44:19Z', defect_type: 'scratch',
+    confidence: 0.85, status: 'unresolved', device_id: 'CAM-001', id: 'm7',
+  },
+  {
+    detected_at: '2026-02-19T08:05:33Z', defect_type: 'crack',
+    confidence: 0.93, status: 'resolved', device_id: 'CAM-001', id: 'm8',
+  },
+  {
+    detected_at: '2026-02-19T10:22:47Z', defect_type: 'bubble',
+    confidence: 0.76, status: 'unresolved', device_id: 'CAM-002', id: 'm9',
+  },
+  {
+    detected_at: '2026-02-19T14:55:11Z', defect_type: 'scratch',
+    confidence: 0.88, status: 'resolved', device_id: 'CAM-001', id: 'm10',
+  },
+];
 
-// Helper: format Date -> [HH:MM:SS]
-function formatTime(date) {
-  const h = date.getHours().toString().padStart(2, '0');
-  const m = date.getMinutes().toString().padStart(2, '0');
-  const s = date.getSeconds().toString().padStart(2, '0');
-  return `[${h}:${m}:${s}]`;
-}
-
-// Helper: capitalize first letter of defect type
+// ── Helpers for sessions widget ──────────────────────────────────
 function capitalizeDefectType(type) {
   if (!type) return type;
   return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
 }
 
+function formatTime(dateStr) {
+  const d = new Date(dateStr);
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function groupByDate(defects) {
+  const groups = {};
+  defects.forEach((d) => {
+    const dateKey = new Date(d.detected_at).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+    });
+    if (!groups[dateKey]) groups[dateKey] = [];
+    groups[dateKey].push(d);
+  });
+  return Object.entries(groups).sort((a, b) => new Date(b[0]) - new Date(a[0]));
+}
+
 function Dashboard() {
-  // State
-  const [currentDefects, setCurrentDefects] = useState([]);
-  // eslint-disable-next-line no-unused-vars
-  const [supabaseDefects, setSupabaseDefects] = useState([]); // Supabase database defects (stored for consistency)
-  const [sessionStartTime, setSessionStartTime] = useState(null); // Track when dashboard loaded
-  const [modalOpen, setModalOpen] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [selectedDefectId, setSelectedDefectId] = useState(null);
-  const [updatingStatus, setUpdatingStatus] = useState(false); // UI state for status update
-  const [streamStatus, setStreamStatus] = useState('connecting'); // 'connecting', 'connected', 'error'
-  const [streamMessage, setStreamMessage] = useState('Connecting to backend...');
-  const [videoFrame, setVideoFrame] = useState(null);
-
-  // Connections
   const navigate = useNavigate();
-  const defectsListRef = useRef(null);
-  const videoRef = useRef(null);
-  const wsRef = useRef(null);
-  const reconnectTimeoutRef = useRef(null);
+  const [timeFilter, setTimeFilter] = useState('today');
 
-  // Load initial Supabase defects and set up polling
-  useEffect(() => {
-    // Set session start time when component mounts
-    const now = new Date();
-    setSessionStartTime(now);
-    
-    // Load initial defects
-    loadSupabaseDefects(now);
-    
-    // Poll for new defects every 3 seconds
-    const pollInterval = setInterval(() => {
-      loadSupabaseDefects(now);
-    }, 3000);
-    
-    return () => clearInterval(pollInterval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Sessions widget state
+  const [dashSessions, setDashSessions] = useState([]);
+  const [dashSelectedSession, setDashSelectedSession] = useState(null);
+  const [dashSelectedDefect, setDashSelectedDefect] = useState(null);
 
-  // WebSocket connection for real-time video frames from Railway backend
   useEffect(() => {
-    const connectWebSocket = () => {
+    async function load() {
       try {
-        // Convert backend URL to WebSocket URL
-        let wsUrl = process.env.REACT_APP_WS_URL || process.env.REACT_APP_BACKEND_URL || 'wss://glass-defect-detection-prototype-production.up.railway.app';
-        
-        // Clean up the URL
-        wsUrl = wsUrl.replace('http://', '').replace('https://', '').replace('wss://', '').replace('ws://', '').replace(/\/+$/, '');
-        
-        // Add protocol
-        const protocol = wsUrl.includes('railway') || wsUrl.includes('localhost') === false ? 'wss' : 'ws';
-        wsUrl = `${protocol}://${wsUrl}/ws`;  // Connect to /ws endpoint
-        
-        console.log('[Dashboard] Attempting WebSocket connection to:', wsUrl);
-
-        wsRef.current = new WebSocket(wsUrl);
-
-        wsRef.current.onopen = () => {
-          console.log('[Dashboard] WebSocket connected, registering as web_client');
-          setStreamStatus('connected');
-          setStreamMessage('Connected to backend');
-          
-          // Register as web_client
-          if (wsRef.current) {
-            wsRef.current.send(JSON.stringify({
-              type: 'web_client'
-            }));
-          }
-        };
-
-        wsRef.current.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-
-            // Handle frame data (for live video display)
-            if (data.type === 'frame' && data.frame) {
-              try {
-                // Create image data URL from base64
-                const imageUrl = `data:image/jpeg;base64,${data.frame}`;
-                setVideoFrame(imageUrl);
-              } catch (e) {
-                console.error('[Dashboard] Error handling frame:', e);
-              }
-            }
-
-            // Handle defect detection
-            // Note: Defects are now fetched from Supabase polling, not WebSocket
-            // to ensure we get the full defect list with proper status tracking
-
-            // Handle connection status messages
-            if (data.type === 'status') {
-              console.log('[Dashboard] Server status:', data.message);
-              setStreamMessage(data.message);
-            }
-
-          } catch (e) {
-            console.error('[Dashboard] Error parsing WebSocket message:', e);
-          }
-        };
-
-        wsRef.current.onerror = (error) => {
-          console.error('[Dashboard] WebSocket error:', error);
-          setStreamStatus('error');
-          setStreamMessage('Backend connection error');
-        };
-
-        wsRef.current.onclose = () => {
-          console.log('[Dashboard] WebSocket disconnected');
-          setStreamStatus('disconnected');
-          setStreamMessage('Connection lost. Reconnecting...');
-          
-          // Attempt reconnection after 3 seconds
-          reconnectTimeoutRef.current = setTimeout(() => {
-            console.log('[Dashboard] Attempting to reconnect WebSocket...');
-            connectWebSocket();
-          }, 3000);
-        };
-
-      } catch (error) {
-        console.error('[Dashboard] WebSocket setup error:', error);
-        setStreamStatus('error');
-        setStreamMessage(`WebSocket Error: ${error.message}`);
-        
-        // Retry connection after 3 seconds
-        reconnectTimeoutRef.current = setTimeout(() => {
-          connectWebSocket();
-        }, 3000);
+        const result = await fetchDefects({ limit: 500, offset: 0 });
+        const data = result.data || [];
+        setDashSessions(groupByDate(data.length > 0 ? data : MOCK_SESSIONS));
+      } catch (e) {
+        console.error('[Dashboard] Failed to load sessions, using mock data:', e);
+        setDashSessions(groupByDate(MOCK_SESSIONS));
       }
-    };
-
-    connectWebSocket();
-
-    return () => {
-      // Cleanup on unmount
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, []);
-
-  // Update video element with new frame
-  useEffect(() => {
-    if (videoFrame && videoRef.current) {
-      videoRef.current.src = videoFrame;
     }
-  }, [videoFrame]);
+    load();
+  }, []);
 
   async function handleLogout() {
     try {
-      // Sign out from Supabase
       await signOutUser();
     } catch (error) {
       console.error('Logout error:', error);
     }
-    
-    // Clear session storage
+
     sessionStorage.removeItem('loggedIn');
     sessionStorage.removeItem('role');
     sessionStorage.removeItem('userId');
-    
-    // If "Remember me" is not enabled, clear the email too
+
     const remembered = localStorage.getItem('rememberMe') === 'true';
     if (!remembered) {
       localStorage.removeItem('email');
     }
-    
-    // Close WebSocket
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-    
+
     navigate('/');
   }
-
-  const loadSupabaseDefects = async (filterAfterTime = null) => {
-    try {
-      console.log('[Dashboard] Fetching defects from Supabase...');
-      
-      // Save current scroll position before updating defects
-      const scrollPos = defectsListRef.current?.scrollTop || 0;
-      
-      // Fetch latest defects (unlimited to get all)
-      const result = await fetchDefects({ limit: 100, offset: 0 });
-      const supabaseData = result.data || [];
-      
-      console.log(`[Dashboard] ✅ Fetched ${supabaseData.length} defects from Supabase`);
-      
-      // Filter defects to only show ones detected after session start
-      const timeToFilter = filterAfterTime || sessionStartTime;
-      const filteredData = timeToFilter 
-        ? supabaseData.filter(d => new Date(d.detected_at) >= timeToFilter)
-        : supabaseData;
-      
-      // Convert Supabase defects to display format
-      const displayDefects = filteredData.map(d => ({
-        id: d.id,
-        time: formatTime(new Date(d.detected_at)),
-        type: capitalizeDefectType(d.defect_type),
-        imageUrl: d.image_url,
-        status: d.status,
-        // Add full Supabase object for modal
-        detected_at: d.detected_at,
-        device_id: d.device_id,
-        image_path: d.image_path,
-        notes: d.notes,
-        supabaseData: d,
-      }));
-
-      // Update the list (keep latest 20)
-      setCurrentDefects(prev => {
-        // Merge with existing, removing duplicates by id
-        const mergedMap = new Map();
-        
-        // Add existing defects
-        prev.forEach(d => {
-          if (d.id) mergedMap.set(d.id, d);
-        });
-        
-        // Add/update with Supabase defects
-        displayDefects.forEach(d => {
-          mergedMap.set(d.id, d);
-        });
-        
-        // Convert back to array, keep latest 20
-        const merged = Array.from(mergedMap.values())
-          .sort((a, b) => new Date(b.detected_at || 0) - new Date(a.detected_at || 0))
-          .slice(0, 20);
-        
-        console.log(`[Dashboard] Updated defects list: ${merged.length} items`);
-        return merged;
-      });
-      
-      // Restore scroll position after state update
-      // Use requestAnimationFrame to ensure DOM has updated
-      requestAnimationFrame(() => {
-        if (defectsListRef.current) {
-          defectsListRef.current.scrollTop = scrollPos;
-        }
-      });
-      
-      setSupabaseDefects(supabaseData);
-    } catch (error) {
-      console.error('[Dashboard] ❌ Error loading Supabase defects:', error);
-      console.error('[Dashboard] Error details:', {
-        message: error.message,
-        code: error.code,
-        status: error.status,
-        details: error.details
-      });
-    }
-  };
-
-  const handleStatusUpdate = async (defectId, newStatus) => {
-    try {
-      setUpdatingStatus(true);
-      await updateDefectStatus(defectId, newStatus);
-      // Update local state
-      setCurrentDefects(prev => 
-        prev.map(d => d.id === defectId ? { ...d, status: newStatus } : d)
-      );
-      setSupabaseDefects(prev =>
-        prev.map(d => d.id === defectId ? { ...d, status: newStatus } : d)
-      );
-      alert(`Defect marked as ${newStatus}`);
-      closeModal();
-    } catch (error) {
-      console.error('Error updating status:', error);
-      alert('Failed to update defect status');
-    } finally {
-      setUpdatingStatus(false);
-    }
-  }
-
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'pending': return '#ff9800';
-      case 'reviewed': return '#2196f3';
-      case 'resolved': return '#4caf50';
-      default: return '#999';
-    }
-  };
-
-  function openModal(index) {
-    const defect = currentDefects[index];
-    if (defect && defect.id) {
-      setSelectedDefectId(defect.id);
-      setCurrentImageIndex(index);
-      setModalOpen(true);
-    }
-  }
-
-  function closeModal() {
-    setModalOpen(false);
-    setSelectedDefectId(null);
-  }
-
-  function nextImage() {
-    setCurrentImageIndex((idx) => {
-      const last = currentDefects.length - 1;
-      if (idx < last) {
-        const nextIdx = idx + 1;
-        if (currentDefects[nextIdx]) {
-          setSelectedDefectId(currentDefects[nextIdx].id);
-        }
-        return nextIdx;
-      }
-      return idx;
-    });
-  }
-
-  function prevImage() {
-    setCurrentImageIndex((idx) => {
-      if (idx > 0) {
-        const prevIdx = idx - 1;
-        if (currentDefects[prevIdx]) {
-          setSelectedDefectId(currentDefects[prevIdx].id);
-        }
-        return prevIdx;
-      }
-      return idx;
-    });
-  }
-
-  // Sync modal index if selected defect ID is still valid
-  useEffect(() => {
-    if (modalOpen && selectedDefectId) {
-      const foundIndex = currentDefects.findIndex(d => d.id === selectedDefectId);
-      if (foundIndex !== -1 && foundIndex !== currentImageIndex) {
-        setCurrentImageIndex(foundIndex);
-      } else if (foundIndex === -1) {
-        // Defect was removed, close modal
-        closeModal();
-      }
-    }
-  }, [currentDefects, modalOpen, selectedDefectId, currentImageIndex]);
-
-  // Auto-scroll defects list so newest entries are visible
-  useEffect(() => {
-    if (defectsListRef.current) {
-      defectsListRef.current.scrollTop = defectsListRef.current.scrollHeight;
-    }
-  }, [currentDefects]);
-
-  const videoContainerStyle = {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#000',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: '#fff',
-    flexDirection: 'column',
-    padding: '16px',
-    textAlign: 'center'
-  };
 
   return (
     <div className="machine-container">
@@ -390,6 +126,8 @@ function Dashboard() {
         onLogout={handleLogout}
         mainItems={[
           { key: 'dashboard', label: 'Dashboard', onClick: () => navigate('/dashboard') },
+          { key: 'detection', label: 'Detection', onClick: () => navigate('/detection') },
+          { key: 'detection-history', label: 'Detection History', onClick: () => navigate('/detection-history') },
         ]}
         bottomItems={[]}
         activeKey="dashboard"
@@ -398,172 +136,218 @@ function Dashboard() {
       <main className="machine-main-content">
         <header className="machine-header">
           <div className="machine-header-left">
-            <h1 className="machine-header-title">Glass Defect Detector</h1>
-            <p className="machine-header-subtitle">CAM-001</p>
+            <h1 className="machine-header-title">Dashboard</h1>
+            <p className="machine-header-subtitle">Overview and analytics</p>
           </div>
         </header>
 
         <div className="machine-content-area">
-          <div className="machine-content-wrapper">
-            <div className="machine-video-section">
-              <h2 className="machine-section-title">Live Detection Stream</h2>
-
-              {/* Live Detection Preview Component */}
-              <div className="machine-video-container">
-                <LiveDetectionPreview 
-                  ws={wsRef.current}
-                  streamStatus={streamStatus}
-                  streamMessage={streamMessage}
-                />
+          {/* Top Container - Full Width */}
+          <div className="dashboard-box-wrapper dashboard-box-wrapper-full">
+            <div className="dashboard-title-row">
+              <h2 className="dashboard-box-title">Statistics</h2>
+              <select
+                className="dashboard-time-filter"
+                value={timeFilter}
+                onChange={(e) => setTimeFilter(e.target.value)}
+              >
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+              </select>
+            </div>
+            <div className="dashboard-stats-row">
+              <div className="dashboard-box dashboard-stats-box">
+                <div className="dashboard-stat-card">
+                  <span className="dashboard-stat-label">Total Defects Detected</span>
+                  <span className="dashboard-stat-value">0</span>
+                </div>
+                <div className="dashboard-stat-card">
+                  <span className="dashboard-stat-label">Average Confidence Score</span>
+                  <span className="dashboard-stat-value">0%</span>
+                </div>
+                <div className="dashboard-stat-card">
+                  <span className="dashboard-stat-label">Last Detection</span>
+                  <span className="dashboard-stat-value">--</span>
+                </div>
+              </div>
+              <div className="dashboard-box dashboard-status-box">
+                <span className="dashboard-stat-label">Raspberry Pi Status</span>
+                <span className="dashboard-stat-value dashboard-stat-status">Online</span>
               </div>
             </div>
+          </div>
 
-            {/* Defect List Section */}
-            <div className="machine-defects-panel">
-              <div className="defects-panel-header">
-                <h2 className="machine-section-title">Detected Defects ({currentDefects.length})</h2>
+          {/* Bottom Containers */}
+          <div className="machine-content-wrapper">
+            <div className="dashboard-box-wrapper">
+              <div className="dashboard-sessions-header">
+                <h2 className="dashboard-box-title">Detection History</h2>
+                <button
+                  className="dashboard-sessions-nav-btn"
+                  onClick={() => navigate('/detection-history')}
+                  title="View all history"
+                >
+                  ›
+                </button>
               </div>
-              <div className="machine-defects-list" ref={defectsListRef}>
-                <div>
-                  {currentDefects.length === 0 ? (
-                    <div className="machine-empty-state">
-                      <p className="machine-empty-state-text">No defects detected yet</p>
+              <div className="dashboard-box dashboard-sessions-box">
+                <div className="dh-miller-container">
+                  {/* Column 1: Sessions */}
+                  <div className="dh-panel dh-panel-always">
+                    <div className="dh-panel-header">
+                      <span className="dh-panel-title"></span>
+                      <span className="dh-panel-count">{dashSessions.length}</span>
                     </div>
-                  ) : (
-                    currentDefects.map((defect, index) => (
-                      <div 
-                        className="machine-defect-item" 
-                        key={defect.id || index}
-                        style={{ 
-                          height: DEFECT_ITEM_HEIGHT,
-                          backgroundColor: index % 2 === 0 ? '#f5f5f5' : '#fff',
-                          borderLeft: `4px solid ${getStatusColor(defect.status)}`,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onClick={() => openModal(index)}
-                      >
-                        <div className="machine-defect-content">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', width: '100%' }}>
-                            <span className="machine-defect-time">{defect.time}</span>
-                            <span className="machine-defect-type">{defect.type}</span>
-                            {defect.imageUrl ? (
-                              <span style={{ fontSize: '11px', backgroundColor: '#e8f5e9', color: '#2e7d32', padding: '2px 6px', borderRadius: '3px' }}>Image</span>
-                            ) : (
-                              <span style={{ fontSize: '11px', backgroundColor: '#fff3e0', color: '#e65100', padding: '2px 6px', borderRadius: '3px' }}>No Image</span>
-                            )}
-                            <span style={{ fontSize: '11px', backgroundColor: '#f3e5f5', color: '#6a1b9a', padding: '2px 6px', borderRadius: '3px', marginLeft: 'auto' }}>
-                              {defect.status}
-                            </span>
+                    <div className="dh-panel-list">
+                      {dashSessions.length === 0 ? (
+                        <div className="dh-empty">No history yet</div>
+                      ) : (
+                        dashSessions.map(([dateKey, defects]) => (
+                          <div
+                            key={dateKey}
+                            className={`dh-row${dashSelectedSession && dashSelectedSession[0] === dateKey ? ' dh-row-selected' : ''}`}
+                            onClick={() => { setDashSelectedSession([dateKey, defects]); setDashSelectedDefect(null); }}
+                          >
+                            <div className="dh-row-main">
+                              <span className="dh-row-title">{dateKey}</span>
+                              <span className="dh-row-badge">{defects.length} defect{defects.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            <svg className="dh-row-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="9 18 15 12 9 6" />
+                            </svg>
                           </div>
-                          <div style={{ fontSize: '11px', color: '#999' }}>
-                            {defect.device_id && <span>{defect.device_id}</span>}
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Column 2: Defects in selected session */}
+                  <div className={`dh-panel dh-panel-slide${dashSelectedSession ? ' dh-panel-visible' : ''}`}>
+                    {dashSelectedSession && (
+                      <>
+                        <div className="dh-panel-header">
+                          <span className="dh-panel-title">{dashSelectedSession[0]}</span>
+                          <span className="dh-panel-count">{dashSelectedSession[1].length}</span>
+                        </div>
+                        <div className="dh-panel-list">
+                          {dashSelectedSession[1].map((d, i) => (
+                            <div
+                              key={d.id || i}
+                              className={`dh-row${dashSelectedDefect && dashSelectedDefect.id === d.id ? ' dh-row-selected' : ''}`}
+                              onClick={() => setDashSelectedDefect(d)}
+                            >
+                              <div className="dh-row-main">
+                                <span className={`dh-defect-type dh-defect-${(d.defect_type || '').toLowerCase()}`}>
+                                  {capitalizeDefectType(d.defect_type)}
+                                </span>
+                                <span className="dh-row-time">{formatTime(d.detected_at)}</span>
+                              </div>
+                              <svg className="dh-row-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="9 18 15 12 9 6" />
+                              </svg>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Column 3: Defect details */}
+                  <div className={`dh-panel dh-panel-slide${dashSelectedDefect ? ' dh-panel-visible' : ''}`}>
+                    {dashSelectedDefect && (
+                      <>
+                        <div className="dh-panel-header">
+                          <span className="dh-panel-title">Details</span>
+                        </div>
+                        <div className="dh-detail-card-wrapper">
+                          <div className="dh-detail-card">
+                            <div className="dh-detail-row">
+                              <span className="dh-detail-label">Type</span>
+                              <span className={`dh-defect-type dh-defect-${(dashSelectedDefect.defect_type || '').toLowerCase()}`}>
+                                {capitalizeDefectType(dashSelectedDefect.defect_type)}
+                              </span>
+                            </div>
+                            <div className="dh-detail-row">
+                              <span className="dh-detail-label">Time Detected</span>
+                              <span className="dh-detail-value">{formatTime(dashSelectedDefect.detected_at)}</span>
+                            </div>
+                            <div className="dh-detail-row">
+                              <span className="dh-detail-label">Date</span>
+                              <span className="dh-detail-value">{formatDate(dashSelectedDefect.detected_at)}</span>
+                            </div>
+                            {dashSelectedDefect.confidence != null && (
+                              <div className="dh-detail-row">
+                                <span className="dh-detail-label">Confidence</span>
+                                <span className="dh-detail-value">
+                                  {(dashSelectedDefect.confidence * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                            )}
+                            <div className="dh-detail-row">
+                              <span className="dh-detail-label">Image URL</span>
+                              {dashSelectedDefect.image_url
+                                ? <a href={dashSelectedDefect.image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb', wordBreak: 'break-all' }}>View image</a>
+                                : <span className="dh-detail-value">—</span>
+                              }
+                            </div>
                           </div>
                         </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="dashboard-box-wrapper">
+              <h2 className="dashboard-box-title">Amount of Defects per Type</h2>
+              <div className="dashboard-box dashboard-chart-box">
+                <div className="dashboard-bar-chart">
+                  <div className="chart-y-axis-label">Defect Type</div>
+                  <div className="chart-body">
+                    <div className="chart-y-axis">
+                      <span className="chart-y-tick">Scratch</span>
+                      <span className="chart-y-tick">Bubble</span>
+                      <span className="chart-y-tick">Cracks</span>
+                    </div>
+                    <div className="chart-area">
+                      <div className="chart-grid">
+                        <div className="chart-gridline"></div>
+                        <div className="chart-gridline"></div>
+                        <div className="chart-gridline"></div>
+                        <div className="chart-gridline"></div>
+                        <div className="chart-gridline"></div>
                       </div>
-                    ))
-                  )}
+                      <div className="chart-bars">
+                        <div className="chart-bar-wrapper">
+                          <div className="dashboard-bar-fill" style={{ width: '90%' }}></div>
+                          <span className="chart-bar-value">18</span>
+                        </div>
+                        <div className="chart-bar-wrapper">
+                          <div className="dashboard-bar-fill" style={{ width: '55%' }}></div>
+                          <span className="chart-bar-value">11</span>
+                        </div>
+                        <div className="chart-bar-wrapper">
+                          <div className="dashboard-bar-fill" style={{ width: '65%' }}></div>
+                          <span className="chart-bar-value">13</span>
+                        </div>
+                      </div>
+                      <div className="chart-x-axis">
+                        <span>0</span>
+                        <span>5</span>
+                        <span>10</span>
+                        <span>15</span>
+                        <span>20</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="chart-x-axis-label">Count</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </main>
-
-      {/* Modal for defect image with navigation */}
-      {modalOpen && currentImageIndex >= 0 && currentDefects[currentImageIndex] && (
-        (() => {
-          const modalDefect = currentDefects[currentImageIndex];
-          return (
-            <div className="modal">
-              <div className="modal-content">
-                <button onClick={closeModal} className="modal-close">
-                  <svg className="icon" viewBox="0 0 24 24">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                </button>
-                <div className="modal-defect-info">
-                  {/* Image Display - Top */}
-                  {modalDefect.imageUrl && (
-                    <div style={{ marginBottom: '20px', maxWidth: '100%' }}>
-                      <img 
-                        src={modalDefect.imageUrl} 
-                        alt="Defect" 
-                        style={{ width: '100%', maxHeight: '350px', borderRadius: '4px', objectFit: 'cover' }}
-                      />
-                    </div>
-                  )}
-
-                  {/* Defect Details */}
-                  <div style={{ backgroundColor: '#f5f5f5', padding: '15px', borderRadius: '4px', marginBottom: '20px', fontSize: '13px', lineHeight: '1.8' }}>
-                    <p style={{ margin: '8px 0' }}>
-                      <strong>Detection Time:</strong> {new Date(modalDefect.detected_at || Date.now()).toLocaleString()}
-                    </p>
-                    <p style={{ margin: '8px 0' }}>
-                      <strong>Type of Defect:</strong> {modalDefect.type}
-                    </p>
-                    {modalDefect.confidence && (
-                      <p style={{ margin: '8px 0' }}>
-                        <strong>Confidence Level:</strong> {(modalDefect.confidence * 100).toFixed(1)}%
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Image Link */}
-                  {modalDefect.imageUrl && (
-                    <p style={{ fontSize: '12px', color: '#2196f3', marginBottom: '20px' }}>
-                      <a 
-                        href={modalDefect.imageUrl} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        style={{ textDecoration: 'underline', color: '#2196f3' }}
-                      >
-                        Open full image in new tab
-                      </a>
-                    </p>
-                  )}
-                </div>
-
-                {/* Modal Navigation and Actions */}
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', padding: '20px 0 0 0', borderTop: '1px solid #eee', paddingTop: '20px' }}>
-                  <button 
-                    onClick={prevImage} 
-                    disabled={currentImageIndex === 0}
-                    className="modal-next"
-                    style={{ flex: 1, minWidth: '100px', opacity: currentImageIndex === 0 ? 0.5 : 1, cursor: currentImageIndex === 0 ? 'not-allowed' : 'pointer' }}
-                  >
-                    <svg className="icon" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}>
-                      <polyline points="15 18 9 12 15 6"></polyline>
-                    </svg>
-                    Prev  
-                  </button>
-                  <button 
-                    onClick={() => handleStatusUpdate(modalDefect.id, 'reviewed')}
-                    className="modal-next"
-                    disabled={updatingStatus}
-                    style={{ flex: 1, minWidth: '100px', backgroundColor: updatingStatus ? '#ccc' : '#2196f3', cursor: updatingStatus ? 'not-allowed' : 'pointer' }}
-                  >
-                    {updatingStatus ? 'Updating...' : '✓ Mark Reviewed'}
-                  </button>
-                  <button 
-                    onClick={nextImage} 
-                    disabled={currentImageIndex === currentDefects.length - 1}
-                    className="modal-next"
-                    style={{ flex: 1, minWidth: '100px', opacity: currentImageIndex === currentDefects.length - 1 ? 0.5 : 1, cursor: currentImageIndex === currentDefects.length - 1 ? 'not-allowed' : 'pointer' }}
-                  >
-                    Next
-                    <svg className="icon" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}>
-                      <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })()
-      )}
-
     </div>
   );
 }

@@ -37,58 +37,7 @@ async function testBackendConnectivity() {
 }
 
 // ==========================================
-// 2. TEST WEBSOCKET CONNECTION
-// ==========================================
-async function testWebSocketConnection() {
-  return new Promise((resolve) => {
-    try {
-      const wsUrl = process.env.REACT_APP_WS_URL || 'wss://glass-defect-detection-prototype-production.up.railway.app/ws';
-      const ws = new WebSocket(wsUrl);
-
-      const timeout = setTimeout(() => {
-        ws.close();
-        RESULTS.push('⚠️ WEBSOCKET: Connection timeout');
-        TESTS.websocket = false;
-        resolve();
-      }, 5000);
-
-      ws.onopen = () => {
-        clearTimeout(timeout);
-        TESTS.websocket = true;
-        RESULTS.push('✅ WEBSOCKET: Connected to Railway backend');
-        console.log('✅ WebSocket is connected');
-        
-        // Send registration message
-        ws.send(JSON.stringify({
-          type: 'register',
-          client_type: 'web_client'
-        }));
-        
-        ws.close();
-        resolve();
-      };
-
-      ws.onerror = (error) => {
-        clearTimeout(timeout);
-        RESULTS.push(`❌ WEBSOCKET: ${error.message || 'Connection error'}`);
-        console.error('❌ WebSocket error:', error);
-        resolve();
-      };
-
-      ws.onclose = () => {
-        clearTimeout(timeout);
-        resolve();
-      };
-    } catch (error) {
-      RESULTS.push(`❌ WEBSOCKET: ${error.message}`);
-      console.error('❌ WebSocket error:', error);
-      resolve();
-    }
-  });
-}
-
-// ==========================================
-// 3. TEST SUPABASE CONNECTION
+// 2. TEST SUPABASE CONNECTION
 // ==========================================
 async function testSupabaseConnection() {
   try {
