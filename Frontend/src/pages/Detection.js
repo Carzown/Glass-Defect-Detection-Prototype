@@ -1,7 +1,7 @@
 // Detection: Real-time defects from Supabase database
 // - Defects list comes from Supabase database polling
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { signOutUser } from '../supabase';
 import { fetchDefects } from '../services/defects';
@@ -33,16 +33,18 @@ function capitalizeDefectType(type) {
 function Detection() {
   // State
   const [currentDefects, setCurrentDefects] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedDefectId, setSelectedDefectId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-
   // Connections
   const navigate = useNavigate();
-  const location = useLocation();
   const defectsListRef = useRef(null);
+
+  // Use a ref so the interval always calls the latest version (avoids stale closure)
+  const loadSupabaseDefectsRef = useRef(null);
 
   // Load defects from Railway backend
   const loadSupabaseDefects = async () => {
@@ -50,7 +52,6 @@ function Detection() {
       const result = await fetchDefects({ limit: 100, offset: 0 });
       const supabaseData = result.data || [];
 
-      // Don't filter by session start time - show ALL defects to ensure real-time updates
       const displayDefects = supabaseData.map(d => ({
         id: d.id,
         time: formatTime(new Date(d.detected_at)),
@@ -69,33 +70,26 @@ function Detection() {
         .slice(0, 20);
 
       setCurrentDefects(sorted);
+      setLoading(false);
     } catch (error) {
       console.error('[Detection] Error loading defects:', error);
+      setLoading(false);
     }
   };
 
-  // Load initial Supabase defects and set up polling
+  // Keep the ref always pointing to the latest function
+  loadSupabaseDefectsRef.current = loadSupabaseDefects;
+
+  // Mount: fetch immediately then poll every 2 seconds via ref (no stale closure)
   useEffect(() => {
-    // Load defects immediately on component mount
-    loadSupabaseDefects();
-    
-    // Poll every 1 second for real-time updates
+    loadSupabaseDefectsRef.current();
+
     const pollInterval = setInterval(() => {
-      loadSupabaseDefects();
-    }, 1000);
-    
+      loadSupabaseDefectsRef.current();
+    }, 2000);
+
     return () => clearInterval(pollInterval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
-  // Refresh data when navigating to this page
-  useEffect(() => {
-    if (location.pathname === '/detection') {
-      // Only load fresh data when first arriving at Detection page
-      // Don't clear existing defects - they persist until Raspberry Pi disconnects
-      loadSupabaseDefects();
-    }
-  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
   async function handleLogout() {
     try {
       await signOutUser();
@@ -212,7 +206,11 @@ function Detection() {
                 <h2 className="machine-section-title">Defect Preview</h2>
               </div>
               <div className="machine-image-preview-container">
-                {currentDefects.length === 0 ? (
+                {loading ? (
+                  <div className="machine-empty-state">
+                    <p className="machine-empty-state-text">Loading...</p>
+                  </div>
+                ) : currentDefects.length === 0 ? (
                   <div className="machine-empty-state">
                     <p className="machine-empty-state-text">No defects detected yet</p>
                   </div>
@@ -237,7 +235,11 @@ function Detection() {
               </div>
               <div className="machine-defects-list" ref={defectsListRef}>
                 <div>
-                  {currentDefects.length === 0 ? (
+                  {loading ? (
+                    <div className="machine-empty-state">
+                      <p className="machine-empty-state-text">Loading...</p>
+                    </div>
+                  ) : currentDefects.length === 0 ? (
                     <div className="machine-empty-state">
                       <p className="machine-empty-state-text">No defects detected yet</p>
                     </div>
