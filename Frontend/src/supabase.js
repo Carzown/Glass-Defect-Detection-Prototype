@@ -108,8 +108,8 @@ export async function signInAndGetRole(email, password) {
       email: authData.user.email,
       role: data?.role || 'employee',
     };
-  } catch (error) {
-    return {
+  } catch (_error) {
+      return {
       uid: authData.user.id,
       email: authData.user.email,
       role: 'employee',

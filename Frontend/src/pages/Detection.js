@@ -33,7 +33,6 @@ function capitalizeDefectType(type) {
 function Detection() {
   // State
   const [currentDefects, setCurrentDefects] = useState([]);
-  const [sessionStartTime, setSessionStartTime] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedDefectId, setSelectedDefectId] = useState(null);
@@ -77,9 +76,6 @@ function Detection() {
 
   // Load initial Supabase defects and set up polling
   useEffect(() => {
-    const now = new Date();
-    setSessionStartTime(now);
-    
     // Load defects immediately on component mount
     loadSupabaseDefects();
     
