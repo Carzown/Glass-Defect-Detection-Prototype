@@ -1,6 +1,6 @@
 // Detection History - Browse past detection sessions grouped by date
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { signOutUser } from '../supabase';
 import { fetchDefectsByRange } from '../services/defects';
@@ -39,6 +39,7 @@ function groupByDate(defects) {
 
 function DetectionHistory() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [sessions, setSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -80,6 +81,25 @@ function DetectionHistory() {
     load();
     return () => { cancelled = true; };
   }, [timeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refresh data when navigating to this page
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setSelectedSession(null);
+        setSelectedDefect(null);
+        const data = await fetchDefectsByRange(timeFilter);
+        setSessions(groupByDate(data));
+      } catch (e) {
+        console.error('[DetectionHistory] Error loading defects:', e);
+        setSessions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSessionClick(session) {
     setSelectedSession(session);

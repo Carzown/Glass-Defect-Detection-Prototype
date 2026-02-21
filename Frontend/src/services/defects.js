@@ -5,6 +5,49 @@ const BACKEND_URL =
   process.env.REACT_APP_BACKEND_URL ||
   'https://glass-defect-detection-prototype-production.up.railway.app';
 
+// ── Device Status ─────────────────────────────────────────────────────────
+
+/**
+ * Fetch the current online/offline status for a device from the
+ * `device_status` table in Supabase.
+ *
+ * Returns: { is_online: boolean, last_seen: string } or null
+ */
+export async function fetchDeviceStatus(deviceId = 'raspi') {
+  try {
+    if (!supabase) return null;
+    const { data, error } = await supabase
+      .from('device_status')
+      .select('is_online, last_seen')
+      .eq('device_id', deviceId)
+      .single();
+    if (error) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Subscribe to real-time changes on the device_status table.
+ * `callback` is called with the updated row whenever it changes.
+ * Returns an unsubscribe function.
+ */
+export function subscribeToDeviceStatus(deviceId = 'raspi', callback) {
+  if (!supabase) return () => {};
+  const channel = supabase
+    .channel('device_status_changes')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'device_status', filter: `device_id=eq.${deviceId}` },
+      (payload) => {
+        if (payload.new) callback(payload.new);
+      }
+    )
+    .subscribe();
+  return () => supabase.removeChannel(channel);
+}
+
 // Fetch all defects via Railway backend
 export async function fetchDefects(filters = {}) {
   try {

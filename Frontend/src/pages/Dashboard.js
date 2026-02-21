@@ -1,9 +1,9 @@
 // Dashboard: Dashboard page with sidebar and header
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { signOutUser } from '../supabase';
-import { fetchDefectsByRange } from '../services/defects';
+import { fetchDefectsByRange, fetchDeviceStatus, subscribeToDeviceStatus } from '../services/defects';
 import './Dashboard.css';
 
 // ── Helpers for sessions widget ──────────────────────────────────
@@ -36,6 +36,7 @@ function groupByDate(defects) {
 
 function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [timeFilter, setTimeFilter] = useState('today');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -44,6 +45,29 @@ function Dashboard() {
   const [dashSelectedDefect, setDashSelectedDefect] = useState(null);
   const [filteredDefects, setFilteredDefects] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Raspberry Pi device status (from device_status table)
+  const [deviceStatus, setDeviceStatus] = useState(null); // { is_online, last_seen }
+  const [deviceStatusLoading, setDeviceStatusLoading] = useState(true);
+
+  // Fetch initial device status and subscribe to real-time updates
+  useEffect(() => {
+    let cancelled = false;
+    setDeviceStatusLoading(true);
+    fetchDeviceStatus('raspi').then((status) => {
+      if (!cancelled) {
+        setDeviceStatus(status);
+        setDeviceStatusLoading(false);
+      }
+    });
+    const unsubscribe = subscribeToDeviceStatus('raspi', (updated) => {
+      if (!cancelled) setDeviceStatus(updated);
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-fetch from Supabase every time the date filter changes
   useEffect(() => {
@@ -66,6 +90,25 @@ function Dashboard() {
     load();
     return () => { cancelled = true; };
   }, [timeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refresh data when navigating to this page
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      setDashSelectedSession(null);
+      setDashSelectedDefect(null);
+      try {
+        const data = await fetchDefectsByRange(timeFilter);
+        setFilteredDefects(data);
+      } catch (e) {
+        console.error('[Dashboard] Failed to load defects:', e);
+        setFilteredDefects([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dashSessions = groupByDate(filteredDefects);
 
@@ -156,15 +199,25 @@ function Dashboard() {
               </div>
               <div className="dashboard-box dashboard-status-box">
                 <span className="dashboard-stat-label">Raspberry Pi Status</span>
-                {loading ? (
+                {deviceStatusLoading ? (
                   <span className="dashboard-stat-value dashboard-stat-status" style={{ color: '#94a3b8' }}>…</span>
                 ) : (() => {
-                  const online = filteredDefects.some(d => (Date.now() - new Date(d.detected_at)) < 10 * 60000);
+                  const online = deviceStatus?.is_online === true;
+                  const lastSeen = deviceStatus?.last_seen
+                    ? new Date(deviceStatus.last_seen).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                    : null;
                   return (
-                    <span className="dashboard-stat-value dashboard-stat-status" style={{ color: online ? '#22c55e' : '#ef4444', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: online ? '#22c55e' : '#ef4444', flexShrink: 0 }} />
-                      {online ? 'Online' : 'Offline'}
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span className="dashboard-stat-value dashboard-stat-status" style={{ color: online ? '#22c55e' : '#ef4444', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: online ? '#22c55e' : '#ef4444', flexShrink: 0 }} />
+                        {online ? 'Online' : deviceStatus ? 'Offline' : 'Unknown'}
+                      </span>
+                      {lastSeen && (
+                        <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                          Last seen: {lastSeen}
+                        </span>
+                      )}
+                    </div>
                   );
                 })()}
               </div>

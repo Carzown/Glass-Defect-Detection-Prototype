@@ -1,7 +1,7 @@
 // Detection: Real-time defects from Supabase database
 // - Defects list comes from Supabase database polling
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { signOutUser } from '../supabase';
 import { fetchDefects } from '../services/defects';
@@ -42,6 +42,7 @@ function Detection() {
 
   // Connections
   const navigate = useNavigate();
+  const location = useLocation();
   const defectsListRef = useRef(null);
 
   // Load defects from Railway backend
@@ -92,6 +93,15 @@ function Detection() {
     return () => clearInterval(pollInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
+  // Refresh data when navigating to this page
+  useEffect(() => {
+    const now = new Date();
+    setSessionStartTime(now);
+    setCurrentDefects([]);
+    setSelectedDefectId(null);
+    loadSupabaseDefects(now);
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
   async function handleLogout() {
     try {
       await signOutUser();
