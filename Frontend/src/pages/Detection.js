@@ -46,17 +46,13 @@ function Detection() {
   const defectsListRef = useRef(null);
 
   // Load defects from Railway backend
-  const loadSupabaseDefects = async (filterAfterTime = null) => {
+  const loadSupabaseDefects = async () => {
     try {
       const result = await fetchDefects({ limit: 100, offset: 0 });
       const supabaseData = result.data || [];
 
-      const timeToFilter = filterAfterTime || sessionStartTime;
-      const filteredData = (timeToFilter && supabaseData.length > 0)
-        ? supabaseData.filter(d => new Date(d.detected_at) >= timeToFilter)
-        : supabaseData;
-
-      const displayDefects = filteredData.map(d => ({
+      // Don't filter by session start time - show ALL defects to ensure real-time updates
+      const displayDefects = supabaseData.map(d => ({
         id: d.id,
         time: formatTime(new Date(d.detected_at)),
         type: capitalizeDefectType(d.defect_type),
@@ -84,11 +80,13 @@ function Detection() {
     const now = new Date();
     setSessionStartTime(now);
     
-    loadSupabaseDefects(now);
+    // Load defects immediately on component mount
+    loadSupabaseDefects();
     
+    // Poll every 1 second for real-time updates
     const pollInterval = setInterval(() => {
-      loadSupabaseDefects(now);
-    }, 3000);
+      loadSupabaseDefects();
+    }, 1000);
     
     return () => clearInterval(pollInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,11 +94,11 @@ function Detection() {
   
   // Refresh data when navigating to this page
   useEffect(() => {
-    const now = new Date();
-    setSessionStartTime(now);
-    setCurrentDefects([]);
-    setSelectedDefectId(null);
-    loadSupabaseDefects(now);
+    if (location.pathname === '/detection') {
+      // Only load fresh data when first arriving at Detection page
+      // Don't clear existing defects - they persist until Raspberry Pi disconnects
+      loadSupabaseDefects();
+    }
   }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
   async function handleLogout() {
     try {
@@ -206,7 +204,7 @@ function Detection() {
           </button>
           <div className="machine-header-left">
             <h1 className="machine-header-title">Glass Defect Detector</h1>
-            <p className="machine-header-subtitle">Live Detection Feed</p>
+            <p className="machine-header-subtitle">Glass Detection Preview</p>
           </div>
         </header>
 

@@ -56,8 +56,15 @@ async function downloadImage(url) {
 async function buildTaggedImage(originalBuffer, tagNumber) {
   if (!sharp) return null;
   const badge = makeBadgeSvg(tagNumber);
+  
+  // Get image dimensions to position badge at upper right
+  const metadata = await sharp(originalBuffer).metadata();
+  const imageWidth = metadata.width || 640;
+  const badgeWidth = Math.max(28, String(tagNumber).length * 9 + 16); // matches makeBadgeSvg calculation
+  const rightPosition = Math.max(0, imageWidth - badgeWidth - 8); // 8px padding from right edge
+  
   return sharp(originalBuffer)
-    .composite([{ input: badge, top: 8, left: 8 }])
+    .composite([{ input: badge, top: 8, left: rightPosition }])
     .jpeg({ quality: 92 })
     .toBuffer();
 }
