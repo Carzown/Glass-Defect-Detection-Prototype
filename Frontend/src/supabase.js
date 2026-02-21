@@ -97,7 +97,7 @@ export async function signInAndGetRole(email, password) {
       };
     }
 
-    const { data, error: _profileError } = await supabase
+    const { data } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', authData.user.id)
