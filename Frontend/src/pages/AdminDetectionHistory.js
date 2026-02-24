@@ -1,9 +1,8 @@
-// Detection History - Browse past detection sessions grouped by date
+// Admin Detection History - Browse past detection sessions grouped by date (Admin version)
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
-import { signOutUser } from '../supabase';
 import { fetchDefectsByRange, fetchDefectsByDateRange } from '../services/defects';
 import './Dashboard.css';
 import './DetectionHistory.css';
@@ -38,7 +37,7 @@ function groupByDate(defects) {
   return Object.entries(groups).sort((a, b) => new Date(b[0]) - new Date(a[0]));
 }
 
-function DetectionHistory() {
+function AdminDetectionHistory() {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -48,27 +47,20 @@ function DetectionHistory() {
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState('30days');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  // Check if employee is authenticated
-  useEffect(() => {
-    if (sessionStorage.getItem('loggedIn') !== 'true') {
-      navigate('/');
-    }
-  }, [navigate]);
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState(new Date().toISOString().split('T')[0]);
 
-  async function handleLogout() {
-    try {
-      await signOutUser();
-    } catch (err) {
-      console.error('Logout error:', err);
+  // Check if admin is authenticated
+  useEffect(() => {
+    const adminToken = sessionStorage.getItem('adminToken');
+    if (!adminToken) {
+      navigate('/');
     }
-    sessionStorage.removeItem('loggedIn');
-    sessionStorage.removeItem('role');
-    sessionStorage.removeItem('userId');
-    const remembered = localStorage.getItem('rememberMe') === 'true';
-    if (!remembered) localStorage.removeItem('email');
+  }, [navigate]);
+
+  function handleLogout() {
+    sessionStorage.removeItem('adminToken');
+    sessionStorage.removeItem('adminLoggedIn');
     navigate('/');
   }
 
@@ -92,7 +84,7 @@ function DetectionHistory() {
         }
         if (!cancelled) setSessions(groupByDate(data));
       } catch (e) {
-        console.error('[DetectionHistory] Error loading defects:', e);
+        console.error('[AdminDetectionHistory] Error loading defects:', e);
         if (!cancelled) setSessions([]);
       } finally {
         if (!cancelled) setLoading(false);
@@ -112,7 +104,7 @@ function DetectionHistory() {
         const data = await fetchDefectsByRange(timeFilter);
         setSessions(groupByDate(data));
       } catch (e) {
-        console.error('[DetectionHistory] Error loading defects:', e);
+        console.error('[AdminDetectionHistory] Error loading defects:', e);
         setSessions([]);
       } finally {
         setLoading(false);
@@ -135,14 +127,14 @@ function DetectionHistory() {
       <Sidebar
         onLogout={handleLogout}
         mainItems={[
-          { key: 'dashboard', label: 'Dashboard', onClick: () => navigate('/dashboard') },
-          { key: 'detection', label: 'Detection', onClick: () => navigate('/detection') },
-          { key: 'detection-history', label: 'Detection History', onClick: () => navigate('/detection-history') },
+          { key: 'admin-dashboard', label: 'Dashboard', onClick: () => navigate('/admin-dashboard') },
+          { key: 'admin-detection', label: 'Detection', onClick: () => navigate('/admin-detection') },
+          { key: 'admin-detection-history', label: 'Detection History', onClick: () => navigate('/admin-detection-history') },
         ]}
         bottomItems={[
-          { key: 'how-to-use', label: 'How to Use', onClick: () => navigate('/how-to-use') },
+          { key: 'admin-how-to-use', label: 'How to Use', onClick: () => navigate('/admin-how-to-use') },
         ]}
-        activeKey="detection-history"
+        activeKey="admin-detection-history"
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(o => !o)}
       />
@@ -153,7 +145,7 @@ function DetectionHistory() {
             <span /><span /><span />
           </button>
           <div className="machine-header-left">
-            <h1 className="machine-header-title">Detection History</h1>
+            <h1 className="machine-header-title">Detection History (Admin)</h1>
             <p className="machine-header-subtitle">View past inspection results</p>
           </div>
         </header>
@@ -314,4 +306,4 @@ function DetectionHistory() {
   );
 }
 
-export default DetectionHistory;
+export default AdminDetectionHistory;

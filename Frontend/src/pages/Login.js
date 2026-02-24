@@ -5,12 +5,13 @@ import './Login.css';
 import { signInWithEmail, getCurrentUser } from '../supabase';
 
 function Login() {
+  const [role, setRole] = useState('employee'); // 'admin' | 'employee'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const navigate = useNavigate();
 
   // Restore saved email if "Remember me" was previously selected
@@ -27,29 +28,36 @@ function Login() {
   useEffect(() => {
     const checkAuthState = async () => {
       try {
+        if (sessionStorage.getItem('adminLoggedIn') === 'true') {
+          navigate('/admin-dashboard');
+          return;
+        }
         const user = await getCurrentUser();
-        const hasLoggedIn = sessionStorage.getItem('loggedIn') === 'true';
-        
-        if (user && hasLoggedIn) {
+        if (user && sessionStorage.getItem('loggedIn') === 'true') {
           navigate('/dashboard');
         }
-      } catch (error) {
-        console.log('User not authenticated');
+      } catch {
+        // not authenticated
       }
     };
-    
     checkAuthState();
   }, [navigate]);
 
-  const handleSubmit = async (event) => {
+  // Clear errors when switching roles
+  const handleRoleSwitch = (newRole) => {
+    setRole(newRole);
+    setError('');
+    setEmail('');
+    setPassword('');
+  };
+
+  const handleEmployeeSubmit = async (event) => {
     event.preventDefault();
     setError('');
     setLoading(true);
-    
     try {
       const user = await signInWithEmail(email, password);
 
-      // Save email if "Remember me" checked
       if (remember) {
         localStorage.setItem('rememberMe', 'true');
         localStorage.setItem('email', email);
@@ -60,30 +68,45 @@ function Login() {
 
       sessionStorage.setItem('loggedIn', 'true');
       sessionStorage.setItem('userId', user.id);
-
       navigate('/dashboard');
-    } catch (error) {
-      console.error('Login error:', error);
-      
-      let errorMessage = 'Login failed';
-      if (error.message) {
-        if (error.message.includes('auth/invalid-email') || error.message.includes('auth/user-not-found')) {
-          errorMessage = 'Invalid email or password';
-        } else if (error.message.includes('auth/wrong-password')) {
-          errorMessage = 'Invalid email or password';
-        } else if (error.message.includes('auth/too-many-requests')) {
-          errorMessage = 'Too many login attempts. Please try again later';
-        } else if (error.message.includes('auth/operation-not-allowed')) {
-          errorMessage = 'Login is currently disabled';
-        } else {
-          errorMessage = error.message;
-        }
+    } catch (err) {
+      let msg = 'Login failed';
+      if (err.message) {
+        if (err.message.includes('Invalid login credentials')) msg = 'Invalid email or password';
+        else if (err.message.includes('too-many-requests')) msg = 'Too many attempts. Try again later';
+        else msg = err.message;
       }
-      
-      setError(errorMessage);
+      setError(msg);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAdminSubmit = (event) => {
+    event.preventDefault();
+    setError('');
+    setLoading(true);
+    const validToken = process.env.REACT_APP_ADMIN_TOKEN;
+    if (!validToken) {
+      setError('Admin configuration not found');
+      setLoading(false);
+      return;
+    }
+    if (password.trim() === validToken) {
+      if (remember) {
+        localStorage.setItem('rememberMe', 'true');
+        localStorage.setItem('email', email);
+      } else {
+        localStorage.removeItem('rememberMe');
+        localStorage.removeItem('email');
+      }
+      sessionStorage.setItem('adminToken', validToken);
+      sessionStorage.setItem('adminLoggedIn', 'true');
+      navigate('/admin-dashboard');
+    } else {
+      setError('Invalid admin password');
+    }
+    setLoading(false);
   };
 
   return (
@@ -94,49 +117,113 @@ function Login() {
         </div>
         <h1 className="login-title">Glass Defect Detector</h1>
 
-        <form className="login-form" id="loginForm" onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="email">Email Address</label>
-            <input
-              className="form-input"
-              type="email"
-              id="email"
-              placeholder="Email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="password">Password</label>
-            <input
-              className="form-input"
-              type="password"
-              id="password"
-              placeholder="Password"
-              required
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-            />
-          </div>
-          <div className="form-checkbox-wrapper">
-            <input
-              className="form-checkbox"
-              type="checkbox"
-              id="remember"
-              checked={remember}
-              onChange={e => setRemember(e.target.checked)}
-            />
-            <label className="form-checkbox-label" htmlFor="remember">Remember me</label>
-          </div>
-          {error && (
-            <div style={{ color: '#dc2626', fontSize: 13, marginTop: 8 }}>{error}</div>
-          )}
-          <button type="submit" className="login-button" disabled={loading}>
-            {loading ? 'Signing In…' : 'Sign In'}
+        {/* Role tab slider */}
+        <div className="login-role-tabs">
+          <button
+            type="button"
+            className={`role-tab${role === 'admin' ? ' active' : ''}`}
+            onClick={() => handleRoleSwitch('admin')}
+          >
+            Admin
           </button>
-        </form>
-        
+          <button
+            type="button"
+            className={`role-tab${role === 'employee' ? ' active' : ''}`}
+            onClick={() => handleRoleSwitch('employee')}
+          >
+            Employee
+          </button>
+        </div>
+
+        {/* Employee login */}
+        {role === 'employee' && (
+          <form className="login-form" onSubmit={handleEmployeeSubmit}>
+            <div className="form-group">
+              <label className="form-label" htmlFor="email">Email Address</label>
+              <input
+                className="form-input"
+                type="email"
+                id="email"
+                placeholder="Email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="password">Password</label>
+              <input
+                className="form-input"
+                type="password"
+                id="password"
+                placeholder="Password"
+                required
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+              />
+            </div>
+            <div className="form-checkbox-wrapper">
+              <input
+                className="form-checkbox"
+                type="checkbox"
+                id="remember"
+                checked={remember}
+                onChange={e => setRemember(e.target.checked)}
+              />
+              <label className="form-checkbox-label" htmlFor="remember">Remember me</label>
+            </div>
+            {error && <div className="login-error">{error}</div>}
+            <button type="submit" className="login-button" disabled={loading}>
+              {loading ? 'Signing In…' : 'Sign In'}
+            </button>
+          </form>
+        )}
+
+        {/* Admin login */}
+        {role === 'admin' && (
+          <form className="login-form" onSubmit={handleAdminSubmit}>
+            <div className="form-group">
+              <label className="form-label" htmlFor="adminEmail">Email Address</label>
+              <input
+                className="form-input"
+                type="email"
+                id="adminEmail"
+                placeholder="Email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="adminPassword">Password</label>
+              <input
+                className="form-input"
+                type="password"
+                id="adminPassword"
+                placeholder="Password"
+                required
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            <div className="form-checkbox-wrapper">
+              <input
+                className="form-checkbox"
+                type="checkbox"
+                id="adminRemember"
+                checked={remember}
+                onChange={e => setRemember(e.target.checked)}
+              />
+              <label className="form-checkbox-label" htmlFor="adminRemember">Remember me</label>
+            </div>
+            {error && <div className="login-error">{error}</div>}
+            <button type="submit" className="login-button" disabled={loading}>
+              {loading ? 'Verifying…' : 'Sign In'}
+            </button>
+          </form>
+        )}
+
         <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
           <p>Powered by Supabase Authentication</p>
         </div>
@@ -147,4 +234,3 @@ function Login() {
 
 export default Login;
 
-// Inline modal to avoid new files; styles added to Login.css below.

@@ -4,6 +4,11 @@ import Dashboard from './pages/Dashboard';
 import Detection from './pages/Detection';
 import DetectionHistory from './pages/DetectionHistory';
 import Help from './pages/Help';
+import HowToUse from './pages/HowToUse';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminDetection from './pages/AdminDetection';
+import AdminDetectionHistory from './pages/AdminDetectionHistory';
+import AdminHowToUse from './pages/AdminHowToUse';
 
 function App() {
   // GitHub Pages requires basename in production
@@ -20,6 +25,11 @@ function App() {
           <Route path="/detection" element={<Detection />} />
           <Route path="/detection-history" element={<DetectionHistory />} />
           <Route path="/help" element={<Help />} />
+          <Route path="/how-to-use" element={<HowToUse />} />
+          <Route path="/admin-dashboard" element={<AdminDashboard />} />
+          <Route path="/admin-detection" element={<AdminDetection />} />
+          <Route path="/admin-detection-history" element={<AdminDetectionHistory />} />
+          <Route path="/admin-how-to-use" element={<AdminHowToUse />} />
         </Routes>
       </Router>
     </div>

@@ -2,8 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
+import DateRangePicker from '../components/DateRangePicker';
 import { signOutUser } from '../supabase';
-import { fetchDefectsByRange, fetchDeviceStatus, subscribeToDeviceStatus } from '../services/defects';
+import { fetchDefects, fetchDefectsByRange, fetchDefectsByDateRange, fetchDeviceStatus, subscribeToDeviceStatus } from '../services/defects';
 import './Dashboard.css';
 
 // ── Helpers for sessions widget ──────────────────────────────────
@@ -15,6 +16,26 @@ function capitalizeDefectType(type) {
 function formatTime(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function formatRelativeTime(dateStr) {
+  const detectionDate = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - detectionDate;
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSecs < 60) {
+    return diffSecs === 1 ? '1 second ago' : `${diffSecs} seconds ago`;
+  } else if (diffMins < 60) {
+    return diffMins === 1 ? '1 minute ago' : `${diffMins} minutes ago`;
+  } else if (diffHours < 24) {
+    return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
+  } else {
+    return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+  }
 }
 
 function formatDate(dateStr) {
@@ -39,12 +60,23 @@ function Dashboard() {
   const location = useLocation();
   const [timeFilter, setTimeFilter] = useState('today');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [customFromDate, setCustomFromDate] = useState('');
+  const [customToDate, setCustomToDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Check if employee is authenticated
+  useEffect(() => {
+    if (sessionStorage.getItem('loggedIn') !== 'true') {
+      navigate('/');
+    }
+  }, [navigate]);
 
   // Sessions widget state
   const [dashSelectedSession, setDashSelectedSession] = useState(null);
   const [dashSelectedDefect, setDashSelectedDefect] = useState(null);
   const [filteredDefects, setFilteredDefects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [lastDetectionTime, setLastDetectionTime] = useState(null);
+  const [timeUpdateCounter, setTimeUpdateCounter] = useState(0);
 
   // Raspberry Pi device status (from device_status table)
   const [deviceStatus, setDeviceStatus] = useState(null); // { is_online, last_seen }
@@ -69,6 +101,24 @@ function Dashboard() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load the most recent defect across all time (for "Last detection" indicator)
+  const loadLastDetection = async () => {
+    try {
+      const result = await fetchDefects({ limit: 1, offset: 0, dateFrom: new Date(0).toISOString(), dateTo: new Date().toISOString() });
+      const supabaseData = result.data || [];
+      if (supabaseData.length > 0) {
+        setLastDetectionTime(supabaseData[0].detected_at);
+      }
+    } catch (error) {
+      console.error('[Dashboard] Error loading last detection:', error);
+    }
+  };
+
+  // Load last detection on mount
+  useEffect(() => {
+    loadLastDetection();
+  }, []);
+
   // Re-fetch from Supabase every time the date filter changes
   useEffect(() => {
     let cancelled = false;
@@ -78,7 +128,17 @@ function Dashboard() {
       setDashSelectedSession(null);
       setDashSelectedDefect(null);
       try {
-        const data = await fetchDefectsByRange(timeFilter);
+        let data;
+        if (timeFilter === 'custom-range') {
+          if (!customFromDate || !customToDate) {
+            setFilteredDefects([]);
+            setLoading(false);
+            return;
+          }
+          data = await fetchDefectsByDateRange(new Date(customFromDate), new Date(customToDate));
+        } else {
+          data = await fetchDefectsByRange(timeFilter);
+        }
         if (!cancelled) setFilteredDefects(data);
       } catch (e) {
         console.error('[Dashboard] Failed to load defects:', e);
@@ -89,7 +149,7 @@ function Dashboard() {
     }
     load();
     return () => { cancelled = true; };
-  }, [timeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [timeFilter, customFromDate, customToDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Refresh data when navigating to this page
   useEffect(() => {
@@ -98,7 +158,17 @@ function Dashboard() {
       setDashSelectedSession(null);
       setDashSelectedDefect(null);
       try {
-        const data = await fetchDefectsByRange(timeFilter);
+        let data;
+        if (timeFilter === 'custom-range') {
+          if (!customFromDate || !customToDate) {
+            setFilteredDefects([]);
+            setLoading(false);
+            return;
+          }
+          data = await fetchDefectsByDateRange(new Date(customFromDate), new Date(customToDate));
+        } else {
+          data = await fetchDefectsByRange(timeFilter);
+        }
         setFilteredDefects(data);
       } catch (e) {
         console.error('[Dashboard] Failed to load defects:', e);
@@ -109,6 +179,14 @@ function Dashboard() {
     };
     loadData();
   }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update relative times every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeUpdateCounter(prev => prev + 1); // Force re-render for lastDetectionTime display
+    }, 30000); // Update every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   const dashSessions = groupByDate(filteredDefects);
 
@@ -140,7 +218,9 @@ function Dashboard() {
           { key: 'detection', label: 'Detection', onClick: () => navigate('/detection') },
           { key: 'detection-history', label: 'Detection History', onClick: () => navigate('/detection-history') },
         ]}
-        bottomItems={[]}
+        bottomItems={[
+          { key: 'how-to-use', label: 'How to Use', onClick: () => navigate('/how-to-use') },
+        ]}
         activeKey="dashboard"
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(o => !o)}
@@ -160,17 +240,19 @@ function Dashboard() {
         <div className="machine-content-area">
           {/* Top Container - Full Width */}
           <div className="dashboard-box-wrapper dashboard-box-wrapper-full">
-            <div className="dashboard-title-row">
+            <div className="dashboard-title-row" style={{ gap: '12px', alignItems: 'center' }}>
               <h2 className="dashboard-box-title">Statistics</h2>
-              <select
-                className="dashboard-time-filter"
-                value={timeFilter}
-                onChange={(e) => setTimeFilter(e.target.value)}
-              >
-                <option value="today">Today</option>
-                <option value="7days">Last 7 days</option>
-                <option value="30days">Last 30 days</option>
-              </select>
+              <div style={{ minWidth: '300px' }}>
+                <DateRangePicker
+                  onApply={(result) => {
+                    setTimeFilter('custom-range');
+                    setCustomFromDate(result.from);
+                    setCustomToDate(result.to);
+                  }}
+                  initialFrom={customFromDate}
+                  initialTo={customToDate}
+                />
+              </div>
             </div>
             <div className="dashboard-stats-row">
               <div className="dashboard-box dashboard-stats-box">
@@ -189,11 +271,7 @@ function Dashboard() {
                 <div className="dashboard-stat-card">
                   <span className="dashboard-stat-label">Last Detection</span>
                   <span className="dashboard-stat-value">
-                    {loading ? '…' : filteredDefects.length > 0 ? (() => {
-                      const last = filteredDefects.slice().sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at))[0];
-                      const mins = Math.floor((Date.now() - new Date(last.detected_at)) / 60000);
-                      return mins === 0 ? 'Just now' : `${mins} min${mins > 1 ? 's' : ''} ago`;
-                    })() : '--'}
+                    {lastDetectionTime ? formatRelativeTime(lastDetectionTime) : '--'}
                   </span>
                 </div>
               </div>

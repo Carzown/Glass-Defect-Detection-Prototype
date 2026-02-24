@@ -1,10 +1,9 @@
-// Detection: Real-time defects from Supabase database
+// Admin Detection: Real-time defects from Supabase database for administrators
 // - Defects list comes from Supabase database polling
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
-import { signOutUser } from '../supabase';
 import { fetchDefects } from '../services/defects';
 import './Detection.css';
 
@@ -44,7 +43,7 @@ function capitalizeDefectType(type) {
   return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
 }
 
-function Detection() {
+function AdminDetection() {
   // State
   const [currentDefects, setCurrentDefects] = useState([]);
   const [lastDetectionTime, setLastDetectionTime] = useState(null);
@@ -62,9 +61,10 @@ function Detection() {
   const navigate = useNavigate();
   const defectsListRef = useRef(null);
 
-  // Check if employee is authenticated
+  // Check if admin is authenticated
   useEffect(() => {
-    if (sessionStorage.getItem('loggedIn') !== 'true') {
+    const adminToken = sessionStorage.getItem('adminToken');
+    if (!adminToken) {
       navigate('/');
     }
   }, [navigate]);
@@ -128,7 +128,7 @@ function Detection() {
       setCurrentDefects(sorted);
       setLoading(false);
     } catch (error) {
-      console.error('[Detection] Error loading defects:', error);
+      console.error('[AdminDetection] Error loading defects:', error);
       setLoading(false);
     }
   };
@@ -142,7 +142,7 @@ function Detection() {
         setLastDetectionTime(supabaseData[0].detected_at);
       }
     } catch (error) {
-      console.error('[Detection] Error loading last detection:', error);
+      console.error('[AdminDetection] Error loading last detection:', error);
     }
   };
 
@@ -156,24 +156,10 @@ function Detection() {
   useEffect(() => {
     loadLastDetection();
   }, []);
-  async function handleLogout() {
-    try {
-      await signOutUser();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-    
-    sessionStorage.removeItem('loggedIn');
-    sessionStorage.removeItem('role');
-    sessionStorage.removeItem('userId');
-    
-    // If "Remember me" is not enabled, clear the email too
-    const remembered = localStorage.getItem('rememberMe') === 'true';
-    if (!remembered) {
-      localStorage.removeItem('email');
-    }
-    
-    
+
+  function handleLogout() {
+    sessionStorage.removeItem('adminToken');
+    sessionStorage.removeItem('adminLoggedIn');
     navigate('/');
   }
 
@@ -255,14 +241,14 @@ function Detection() {
       <Sidebar
         onLogout={handleLogout}
         mainItems={[
-          { key: 'dashboard', label: 'Dashboard', onClick: () => navigate('/dashboard') },
-          { key: 'detection', label: 'Detection', onClick: () => navigate('/detection') },
-          { key: 'detection-history', label: 'Detection History', onClick: () => navigate('/detection-history') },
+          { key: 'admin-dashboard', label: 'Dashboard', onClick: () => navigate('/admin-dashboard') },
+          { key: 'admin-detection', label: 'Detection', onClick: () => navigate('/admin-detection') },
+          { key: 'admin-detection-history', label: 'Detection History', onClick: () => navigate('/admin-detection-history') },
         ]}
         bottomItems={[
-          { key: 'how-to-use', label: 'How to Use', onClick: () => navigate('/how-to-use') },
+          { key: 'admin-how-to-use', label: 'How to Use', onClick: () => navigate('/admin-how-to-use') },
         ]}
-        activeKey="detection"
+        activeKey="admin-detection"
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(o => !o)}
       />
@@ -274,7 +260,7 @@ function Detection() {
           </button>
           <div className="machine-header-left">
             <h1 className="machine-header-title">Glass Defect Detector</h1>
-            <p className="machine-header-subtitle">Glass Detection Preview</p>
+            <p className="machine-header-subtitle">Glass Detection Preview (Admin)</p>
           </div>
         </header>
 
@@ -482,4 +468,4 @@ function Detection() {
   );
 }
 
-export default Detection;
+export default AdminDetection;
