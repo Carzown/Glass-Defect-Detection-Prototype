@@ -167,8 +167,7 @@ const maxAttempts = 10;
 
 function startServer(port, attempt = 1) {
   const onListening = () => {
-    console.log('[SERVER] ✅ HTTP listening on port ' + port);
-    console.log('[SERVER] Running in HTTP-only mode (WebSocket/streaming disabled)');
+    console.log('[SERVER] ✅ Listening on port ' + port);
   };
 
   const onError = (err) => {

@@ -1,9 +1,7 @@
 // Defects service - API interface for glass defect records
 import { supabase } from '../supabase';
 
-const BACKEND_URL =
-  process.env.REACT_APP_BACKEND_URL ||
-  'https://glass-defect-detection-prototype-production.up.railway.app';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 // ── Device Status ─────────────────────────────────────────────────────────
 

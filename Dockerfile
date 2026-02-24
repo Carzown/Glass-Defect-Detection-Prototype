@@ -7,8 +7,8 @@ COPY . /app
 WORKDIR /app/Backend
 RUN npm install --legacy-peer-deps
 
-# Copy .env.production for production environment (contains Supabase credentials)
-COPY Backend/.env.production .env
+# Copy .env for production environment (contains Supabase credentials, overridable via ENV variables)
+COPY Backend/.env .env
 
 # Set production environment
 ENV NODE_ENV=production
