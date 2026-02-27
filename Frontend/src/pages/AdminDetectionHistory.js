@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
+import ConfirmationModal from '../components/ConfirmationModal';
 import { fetchDefectsByRange, fetchDefectsByDateRange, deleteDefect } from '../services/defects';
 import './Dashboard.css';
 import './DetectionHistory.css';
@@ -49,6 +50,7 @@ function AdminDetectionHistory() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Check if admin is authenticated
   useEffect(() => {
@@ -123,10 +125,6 @@ function AdminDetectionHistory() {
   }
 
   async function handleDeleteDefect() {
-    if (!selectedDefect || !window.confirm('Are you sure you want to delete this defect? This action cannot be undone.')) {
-      return;
-    }
-
     try {
       await deleteDefect(selectedDefect.id);
       // Refresh the current view by reloading the sessions
@@ -135,6 +133,7 @@ function AdminDetectionHistory() {
       }).filter(([, defects]) => defects.length > 0);
       setSessions(newSessions);
       setSelectedDefect(null);
+      setShowDeleteConfirm(false);
     } catch (error) {
       console.error('[AdminDetectionHistory] Error deleting defect:', error);
       alert('Failed to delete defect. Please try again.');
@@ -333,7 +332,7 @@ function AdminDetectionHistory() {
                       {/* Delete Button - Centered at Bottom */}
                       <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
                         <button
-                          onClick={handleDeleteDefect}
+                          onClick={() => setShowDeleteConfirm(true)}
                           style={{
                             padding: '10px 24px',
                             background: '#dc2626',
@@ -365,6 +364,17 @@ function AdminDetectionHistory() {
           )}
         </div>
       </main>
+
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        title="Delete Defect"
+        message="Are you sure you want to delete this defect? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        isDangerous={true}
+        onConfirm={handleDeleteDefect}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }
