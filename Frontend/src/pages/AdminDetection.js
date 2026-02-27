@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
-import { fetchDefects } from '../services/defects';
+import { fetchDefects, getDateRangeBounds } from '../services/defects';
 import './Detection.css';
 
 
@@ -54,7 +54,7 @@ function AdminDetection() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [timeFilter, setTimeFilter] = useState('today');
   const [customFromDate, setCustomFromDate] = useState('');
-  const [customToDate, setCustomToDate] = useState(new Date().toISOString().split('T')[0]);
+  const [customToDate, setCustomToDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }));
 
   // Connections
   const navigate = useNavigate();
@@ -68,30 +68,8 @@ function AdminDetection() {
     }
   }, [navigate]);
 
-  // Helper: Get date range bounds for filter
-  const getDateRangeBounds = (range) => {
-    const now = new Date();
-    const end = now.toISOString();
-    let start;
-    if (range === 'today') {
-      const s = new Date(now);
-      s.setHours(0, 0, 0, 0);
-      start = s.toISOString();
-    } else if (range === '7days') {
-      const s = new Date(now);
-      s.setDate(s.getDate() - 6);
-      s.setHours(0, 0, 0, 0);
-      start = s.toISOString();
-    } else if (range === '30days') {
-      const s = new Date(now);
-      s.setDate(s.getDate() - 29);
-      s.setHours(0, 0, 0, 0);
-      start = s.toISOString();
-    } else {
-      start = new Date(0).toISOString();
-    }
-    return { start, end };
-  };
+  // Helper: Get date range bounds for filter - uses PHT-aware version from defects service
+  // (imported above)
 
   // Load defects from Railway backend - only on mount
   const loadSupabaseDefects = useCallback(async () => {
@@ -99,8 +77,8 @@ function AdminDetection() {
       let start, end;
       if (timeFilter === 'custom-range') {
         // Use custom date range
-        start = customFromDate ? `${customFromDate}T00:00:00.000Z` : new Date(0).toISOString();
-        end = customToDate ? `${customToDate}T23:59:59.999Z` : new Date().toISOString();
+        start = customFromDate ? new Date(customFromDate + 'T00:00:00+08:00').toISOString() : new Date(0).toISOString();
+        end = customToDate ? new Date(customToDate + 'T23:59:59.999+08:00').toISOString() : new Date().toISOString();
       } else {
         // Use preset date range
         ({ start, end } = getDateRangeBounds(timeFilter));
@@ -307,11 +285,6 @@ function AdminDetection() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                 <div>
                   <h2 className="machine-section-title" style={{ marginBottom: '0' }}>Detected Defects ({currentDefects.length})</h2>
-                  {lastDetectionTime && (
-                    <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px', fontFamily: 'Inter, sans-serif' }}>
-                      Last detection: {formatTime(lastDetectionTime)}
-                    </p>
-                  )}
                 </div>
                 <div style={{ minWidth: '300px' }}>
                   <DateRangePicker
@@ -345,7 +318,6 @@ function AdminDetection() {
                         <div className="det-defect-index">{defect.tagNumber ?? (currentDefects.length - index)}</div>
                         <div className="det-defect-body">
                           <span className="det-defect-type-label">{defect.type}</span>
-                          <span className="det-defect-time-label">{defect.time}</span>
                         </div>
                         {defect.supabaseData?.confidence != null && (
                           <span className="det-defect-confidence">

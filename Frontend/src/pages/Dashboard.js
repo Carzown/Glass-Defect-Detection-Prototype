@@ -1,12 +1,13 @@
 // Dashboard: Dashboard page with sidebar and header
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
-import { signOutUser } from '../supabase';
 import { fetchDefects, fetchDefectsByRange, fetchDefectsByDateRange, fetchDeviceStatus, subscribeToDeviceStatus } from '../services/defects';
 import './Dashboard.css';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
 
 // ── Helpers for sessions widget ──────────────────────────────────
 function capitalizeDefectType(type) {
@@ -49,6 +50,7 @@ function groupByDate(defects) {
   defects.forEach((d) => {
     const dateKey = new Date(d.detected_at).toLocaleDateString('en-US', {
       year: 'numeric', month: 'short', day: 'numeric',
+      timeZone: 'Asia/Manila',
     });
     if (!groups[dateKey]) groups[dateKey] = [];
     groups[dateKey].push(d);
@@ -66,13 +68,62 @@ function aggregateDefectsByType(defects) {
   return Object.entries(counts).map(([type, count]) => ({ type, count }));
 }
 
+// Aggregate defects for trend line chart
+// When timeFilter is 'today', groups by hour (all 24 hours); otherwise groups by date
+function aggregateDefectsForTrend(defects, timeFilter) {
+  if (timeFilter === 'today') {
+    // Initialize all 24 hours with count 0
+    const hourlyData = {};
+    for (let h = 0; h < 24; h++) {
+      const timeStr = h.toString().padStart(2, '0') + ':00';
+      hourlyData[timeStr] = 0;
+    }
+
+    // Group defects by hour in PHT (Asia/Manila = UTC+8)
+    defects.forEach((d) => {
+      const dt = new Date(d.detected_at);
+      const hour = dt.toLocaleString('en-US', {
+        hour: '2-digit', hour12: false,
+        timeZone: 'Asia/Manila',
+      });
+      const key = hour.padStart(2, '0') + ':00';
+      if (hourlyData.hasOwnProperty(key)) {
+        hourlyData[key]++;
+      }
+    });
+
+    // Return all 24 hours in order
+    return Object.entries(hourlyData)
+      .map(([time, count]) => ({ date: time, count }))
+      .sort((a, b) => parseInt(a.date) - parseInt(b.date));
+  } else {
+    // Group by date
+    const counts = {};
+    const timestamps = {};
+
+    defects.forEach((d) => {
+      const dt = new Date(d.detected_at);
+      const key = dt.toLocaleDateString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric',
+        timeZone: 'Asia/Manila',
+      });
+      counts[key] = (counts[key] || 0) + 1;
+      timestamps[key] = new Date(key).getTime();
+    });
+
+    return Object.entries(counts)
+      .map(([label, count]) => ({ date: label, timestamp: timestamps[label], count }))
+      .sort((a, b) => a.timestamp - b.timestamp);
+  }
+}
+
 function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const [timeFilter, setTimeFilter] = useState('today');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [customFromDate, setCustomFromDate] = useState('');
-  const [customToDate, setCustomToDate] = useState(new Date().toISOString().split('T')[0]);
+  const [customToDate, setCustomToDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }));
 
   // Check if employee is authenticated
   useEffect(() => {
@@ -129,23 +180,24 @@ function Dashboard() {
     loadLastDetection();
   }, []);
 
-  // Re-fetch from Supabase every time the date filter changes
+  // Re-fetch whenever the date filter or page navigation changes
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      // Reset drill-down selections whenever the range changes
       setDashSelectedSession(null);
       setDashSelectedDefect(null);
       try {
         let data;
         if (timeFilter === 'custom-range') {
           if (!customFromDate || !customToDate) {
-            setFilteredDefects([]);
-            setLoading(false);
+            if (!cancelled) { setFilteredDefects([]); setLoading(false); }
             return;
           }
-          data = await fetchDefectsByDateRange(new Date(customFromDate), new Date(customToDate));
+          data = await fetchDefectsByDateRange(
+            new Date(customFromDate + 'T00:00:00+08:00'),
+            new Date(customToDate + 'T23:59:59.999+08:00')
+          );
         } else {
           data = await fetchDefectsByRange(timeFilter);
         }
@@ -159,36 +211,7 @@ function Dashboard() {
     }
     load();
     return () => { cancelled = true; };
-  }, [timeFilter, customFromDate, customToDate]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Refresh data when navigating to this page
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setDashSelectedSession(null);
-      setDashSelectedDefect(null);
-      try {
-        let data;
-        if (timeFilter === 'custom-range') {
-          if (!customFromDate || !customToDate) {
-            setFilteredDefects([]);
-            setLoading(false);
-            return;
-          }
-          data = await fetchDefectsByDateRange(new Date(customFromDate), new Date(customToDate));
-        } else {
-          data = await fetchDefectsByRange(timeFilter);
-        }
-        setFilteredDefects(data);
-      } catch (e) {
-        console.error('[Dashboard] Failed to load defects:', e);
-        setFilteredDefects([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [timeFilter, customFromDate, customToDate, location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 
@@ -196,14 +219,26 @@ function Dashboard() {
 
   async function handleLogout() {
     try {
-      await signOutUser();
+      // Call backend logout endpoint
+      await fetch(`${BACKEND_URL}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionStorage.getItem('accessToken')}`,
+        },
+      });
     } catch (error) {
       console.error('Logout error:', error);
     }
 
     sessionStorage.removeItem('loggedIn');
+    sessionStorage.removeItem('adminLoggedIn');
     sessionStorage.removeItem('role');
     sessionStorage.removeItem('userId');
+    sessionStorage.removeItem('userEmail');
+    sessionStorage.removeItem('userRole');
+    sessionStorage.removeItem('accessToken');
+    sessionStorage.removeItem('refreshToken');
 
     const remembered = localStorage.getItem('rememberMe') === 'true';
     if (!remembered) {
@@ -280,7 +315,7 @@ function Dashboard() {
                 </div>
               </div>
               <div className="dashboard-box dashboard-status-box">
-                <span className="dashboard-stat-label">Raspberry Pi Status</span>
+                <span className="dashboard-stat-label">System Status</span>
                 {deviceStatusLoading ? (
                   <span className="dashboard-stat-value dashboard-stat-status" style={{ color: '#94a3b8' }}>…</span>
                 ) : (() => {
@@ -292,7 +327,7 @@ function Dashboard() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <span className="dashboard-stat-value dashboard-stat-status" style={{ color: online ? '#22c55e' : '#ef4444', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: online ? '#22c55e' : '#ef4444', flexShrink: 0 }} />
-                        {online ? 'Online' : deviceStatus ? 'Offline' : 'Unknown'}
+                        {online ? 'Online' : 'Offline'}
                       </span>
                       {lastSeen && (
                         <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
@@ -446,13 +481,16 @@ function Dashboard() {
             <div className="dashboard-box-wrapper">
               <h2 className="dashboard-box-title">Amount of Defects per Type</h2>
               <div className="dashboard-box dashboard-chart-box">
-                {filteredDefects.length > 0 ? (
+                {filteredDefects.length > 0 ? (() => {
+                  const barData = aggregateDefectsByType(filteredDefects);
+                  const maxCount = Math.max(...barData.map(d => d.count));
+                  const xTicks = [0, Math.ceil(maxCount / 4), Math.ceil(maxCount / 2), maxCount];
+                  return (
                   <div className="dashboard-bar-chart">
-                    <div className="chart-y-axis-label">Count</div>
                     <div className="chart-body">
-                      <div className="chart-y-axis">
-                        {[0, Math.ceil(Math.max(...aggregateDefectsByType(filteredDefects).map(d => d.count)) / 4), Math.ceil(Math.max(...aggregateDefectsByType(filteredDefects).map(d => d.count)) / 2), Math.max(...aggregateDefectsByType(filteredDefects).map(d => d.count))].map((tick) => (
-                          <div key={tick} className="chart-y-tick">{tick}</div>
+                      <div className="chart-y-axis chart-y-axis--types">
+                        {barData.map((item) => (
+                          <div key={item.type} className="chart-y-tick chart-y-tick--type">{item.type}</div>
                         ))}
                       </div>
                       <div className="chart-area">
@@ -462,8 +500,7 @@ function Dashboard() {
                           ))}
                         </div>
                         <div className="chart-bars">
-                          {aggregateDefectsByType(filteredDefects).map((item) => {
-                            const maxCount = Math.max(...aggregateDefectsByType(filteredDefects).map(d => d.count));
+                          {barData.map((item) => {
                             const width = (item.count / maxCount) * 100;
                             return (
                               <div key={item.type} className="chart-bar-wrapper">
@@ -478,13 +515,95 @@ function Dashboard() {
                         </div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: '80px', marginTop: '8px', minHeight: '28px' }} className="chart-x-axis">
-                      {aggregateDefectsByType(filteredDefects).map((item) => (
-                        <span key={item.type} style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center', minWidth: '60px' }}>{item.type}</span>
+                    <div className="chart-x-axis chart-x-axis--counts">
+                      {xTicks.map((tick) => (
+                        <span key={tick}>{tick}</span>
                       ))}
                     </div>
+                    <div className="chart-x-axis-label">Count</div>
                   </div>
-                ) : (
+                  );
+                })() : (
+                  <div style={{
+                    height: 300,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#94a3b8',
+                    fontSize: 14,
+                  }}>
+                    No defects detected in this date range
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+            <div className="dashboard-box-wrapper-full" style={{ minWidth: 0 }}>
+              <div className="dashboard-box dashboard-trend-box">
+                <h2 className="dashboard-trend-title">Defect Trend Over Time</h2>
+                <div className="dashboard-trend-chart-container">
+                  {filteredDefects.length > 0 ? (() => {
+                    const trendData = aggregateDefectsForTrend(filteredDefects, timeFilter);
+                    const isTodayView = timeFilter === 'today';
+                    // For today view, show every 3 hours; for other views, show fewer labels
+                    const interval = isTodayView ? 2 : Math.max(0, Math.floor(trendData.length / 10) - 1);
+                    const needsAngle = !isTodayView && trendData.length > 6;
+                    return (
+                    <ResponsiveContainer width="100%" height={340}>
+                      <LineChart
+                        data={trendData}
+                        margin={{ top: 10, right: 40, left: 10, bottom: needsAngle ? 55 : 10 }}
+                      >
+                        <CartesianGrid strokeDasharray="" stroke="#e8eaed" vertical={true} horizontal={true} />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fontSize: 11, fill: '#6b7280', fontFamily: 'Inter, sans-serif' }}
+                          angle={needsAngle ? -45 : 0}
+                          textAnchor={needsAngle ? 'end' : 'middle'}
+                          height={needsAngle ? 65 : 36}
+                          interval={interval}
+                          axisLine={{ stroke: '#d1d5db' }}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          width={45}
+                          tick={{ fontSize: 12, fill: '#6b7280', fontFamily: 'Inter, sans-serif' }}
+                          allowDecimals={false}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                            fontSize: 13,
+                            fontFamily: 'Inter, sans-serif',
+                          }}
+                          formatter={(value) => [`${value} defect${value !== 1 ? 's' : ''}`, 'Defects']}
+                          labelStyle={{ color: '#0f2942', fontWeight: 600, marginBottom: 4 }}
+                        />
+                        <Legend
+                          verticalAlign="top"
+                          align="center"
+                          wrapperStyle={{ paddingBottom: '12px', fontSize: 13, fontFamily: 'Inter, sans-serif', color: '#374151' }}
+                          iconType="square"
+                          iconSize={14}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="count"
+                          stroke="#0f2942"
+                          dot={{ fill: '#0f2942', r: 5, strokeWidth: 0 }}
+                          activeDot={{ r: 7, fill: '#e5a445', strokeWidth: 0 }}
+                          strokeWidth={3}
+                          name="Defects"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                    );
+                  })() : (
                   <div style={{
                     height: 300,
                     display: 'flex',

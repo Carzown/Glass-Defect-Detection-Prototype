@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
 import { signOutUser } from '../supabase';
-import { fetchDefects } from '../services/defects';
+import { fetchDefects, getDateRangeBounds } from '../services/defects';
 import './Detection.css';
 
 
@@ -55,7 +55,7 @@ function Detection() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [timeFilter, setTimeFilter] = useState('today');
   const [customFromDate, setCustomFromDate] = useState('');
-  const [customToDate, setCustomToDate] = useState(new Date().toISOString().split('T')[0]);
+  const [customToDate, setCustomToDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }));
 
   // Connections
   const navigate = useNavigate();
@@ -68,30 +68,8 @@ function Detection() {
     }
   }, [navigate]);
 
-  // Helper: Get date range bounds for filter
-  const getDateRangeBounds = (range) => {
-    const now = new Date();
-    const end = now.toISOString();
-    let start;
-    if (range === 'today') {
-      const s = new Date(now);
-      s.setHours(0, 0, 0, 0);
-      start = s.toISOString();
-    } else if (range === '7days') {
-      const s = new Date(now);
-      s.setDate(s.getDate() - 6);
-      s.setHours(0, 0, 0, 0);
-      start = s.toISOString();
-    } else if (range === '30days') {
-      const s = new Date(now);
-      s.setDate(s.getDate() - 29);
-      s.setHours(0, 0, 0, 0);
-      start = s.toISOString();
-    } else {
-      start = new Date(0).toISOString();
-    }
-    return { start, end };
-  };
+  // Helper: Get date range bounds for filter - uses PHT-aware version from defects service
+  // (imported above)
 
   // Load defects from Railway backend - only on mount
   const loadSupabaseDefects = useCallback(async () => {
@@ -99,8 +77,8 @@ function Detection() {
       let start, end;
       if (timeFilter === 'custom-range') {
         // Use custom date range
-        start = customFromDate ? `${customFromDate}T00:00:00.000Z` : new Date(0).toISOString();
-        end = customToDate ? `${customToDate}T23:59:59.999Z` : new Date().toISOString();
+        start = customFromDate ? new Date(customFromDate + 'T00:00:00+08:00').toISOString() : new Date(0).toISOString();
+        end = customToDate ? new Date(customToDate + 'T23:59:59.999+08:00').toISOString() : new Date().toISOString();
       } else {
         // Use preset date range
         ({ start, end } = getDateRangeBounds(timeFilter));
@@ -256,7 +234,7 @@ function Detection() {
         onToggle={() => setSidebarOpen(o => !o)}
       />
 
-      <main className="machine-main-content">
+      <main className="machine-main-content" style={{ overflow: 'hidden' }}>
         <header className="machine-header">
           <button className="sidebar-hamburger" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle sidebar">
             <span /><span /><span />
@@ -267,8 +245,8 @@ function Detection() {
           </div>
         </header>
 
-        <div className="machine-content-area">
-          <div className="machine-content-wrapper">
+        <div className="machine-content-area" style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div className="machine-content-wrapper" style={{ flex: 1, height: 'auto', minHeight: 0 }}>
             {/* Image Preview Section - Left */}
             <div className="machine-image-preview-panel">
               <div className="image-preview-header">
@@ -290,23 +268,21 @@ function Detection() {
                       alt="Most recent defect"
                       style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '4px' }}
                     />
-                    {currentDefects[0].tagNumber != null && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '12px',
-                        left: '12px',
-                        background: '#0f2942',
-                        color: 'white',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        fontWeight: '700',
-                        fontFamily: 'Poppins, sans-serif',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
-                      }}>
-                        #{currentDefects[0].tagNumber}
-                      </div>
-                    )}
+                    <div style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      background: '#0f2942',
+                      color: 'white',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      fontFamily: 'Poppins, sans-serif',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+                    }}>
+                      #{currentDefects[0].tagNumber ?? currentDefects.length}
+                    </div>
                   </div>
                 ) : (
                   <div className="machine-empty-state">
@@ -321,11 +297,6 @@ function Detection() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                 <div>
                   <h2 className="machine-section-title" style={{ marginBottom: '0' }}>Detected Defects ({currentDefects.length})</h2>
-                  {lastDetectionTime && (
-                    <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px', fontFamily: 'Inter, sans-serif' }}>
-                      Last detection: {formatTime(lastDetectionTime)}
-                    </p>
-                  )}
                 </div>
                 <div style={{ minWidth: '300px' }}>
                   <DateRangePicker
@@ -359,7 +330,6 @@ function Detection() {
                         <div className="det-defect-index">{defect.tagNumber ?? (currentDefects.length - index)}</div>
                         <div className="det-defect-body">
                           <span className="det-defect-type-label">{defect.type}</span>
-                          <span className="det-defect-time-label">{defect.time}</span>
                         </div>
                         {defect.supabaseData?.confidence != null && (
                           <span className="det-defect-confidence">
@@ -407,23 +377,21 @@ function Detection() {
                   {modalDefect.imageUrl ? (
                     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
                       <img src={modalDefect.imageUrl} alt="Defect" className="det-modal-image" />
-                      {modalDefect.tagNumber != null && (
-                        <div style={{
-                          position: 'absolute',
-                          top: '16px',
-                          left: '16px',
-                          background: '#0f2942',
-                          color: 'white',
-                          padding: '8px 14px',
-                          borderRadius: '8px',
-                          fontSize: '16px',
-                          fontWeight: '700',
+                      <div style={{
+                        position: 'absolute',
+                        top: '16px',
+                        right: '16px',
+                        background: '#0f2942',
+                        color: 'white',
+                        padding: '8px 14px',
+                        borderRadius: '8px',
+                        fontSize: '16px',
+                        fontWeight: '700',
                           fontFamily: 'Poppins, sans-serif',
                           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
                         }}>
-                          #{modalDefect.tagNumber}
+                          #{modalDefect.tagNumber ?? (currentDefects.length - currentImageIndex)}
                         </div>
-                      )}
                     </div>
                   ) : (
                     <div className="det-modal-no-image">

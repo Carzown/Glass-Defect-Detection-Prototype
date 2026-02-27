@@ -37,6 +37,15 @@ app.get("/health", (req, res) => {
 });
 
 
+// Authentication API routes
+try {
+  const authRouter = require('./auth')
+  app.use('/auth', authRouter)
+  console.log('[SERVER] Authentication API routes loaded')
+} catch (e) {
+  console.warn('[SERVER] Auth routes not loaded:', e?.message || e)
+}
+
 // Defects API routes
 try {
   const defectsRouter = require('./defects')

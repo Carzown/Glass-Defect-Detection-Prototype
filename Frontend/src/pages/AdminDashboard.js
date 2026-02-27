@@ -6,6 +6,8 @@ import AdminEmployeeManagement from '../components/AdminEmployeeManagement';
 import { fetchDefects, fetchDefectsByRange, fetchDefectsByDateRange, fetchDeviceStatus, subscribeToDeviceStatus } from '../services/defects';
 import './AdminDashboard.css';
 
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+
 // ── Helpers ──────────────────────────────────────────────────────
 function formatRelativeTime(dateStr) {
   const detectionDate = new Date(dateStr);
@@ -33,7 +35,7 @@ function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [timeFilter, setTimeFilter] = useState('today');
   const [customFromDate, setCustomFromDate] = useState('');
-  const [customToDate, setCustomToDate] = useState(new Date().toISOString().split('T')[0]);
+  const [customToDate, setCustomToDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }));
   const [filteredDefects, setFilteredDefects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastDetectionTime, setLastDetectionTime] = useState(null);
@@ -51,10 +53,28 @@ function AdminDashboard() {
     }
   }, [navigate]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      // Call backend logout endpoint
+      await fetch(`${BACKEND_URL}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionStorage.getItem('accessToken')}`,
+        },
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+
     sessionStorage.removeItem('adminToken');
     sessionStorage.removeItem('adminLoggedIn');
+    sessionStorage.removeItem('loggedIn');
     sessionStorage.removeItem('userId');
+    sessionStorage.removeItem('userEmail');
+    sessionStorage.removeItem('userRole');
+    sessionStorage.removeItem('accessToken');
+    sessionStorage.removeItem('refreshToken');
     navigate('/');
   };
 
@@ -95,7 +115,7 @@ function AdminDashboard() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-fetch filtered defects when date filter changes
+  // Re-fetch whenever the date filter or page navigation changes
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -104,11 +124,13 @@ function AdminDashboard() {
         let data;
         if (timeFilter === 'custom-range') {
           if (!customFromDate || !customToDate) {
-            setFilteredDefects([]);
-            setLoading(false);
+            if (!cancelled) { setFilteredDefects([]); setLoading(false); }
             return;
           }
-          data = await fetchDefectsByDateRange(new Date(customFromDate), new Date(customToDate));
+          data = await fetchDefectsByDateRange(
+            new Date(customFromDate + 'T00:00:00+08:00'),
+            new Date(customToDate + 'T23:59:59.999+08:00')
+          );
         } else {
           data = await fetchDefectsByRange(timeFilter);
         }
@@ -122,34 +144,7 @@ function AdminDashboard() {
     }
     load();
     return () => { cancelled = true; };
-  }, [timeFilter, customFromDate, customToDate]);
-
-  // Refresh data when navigating to this page
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        let data;
-        if (timeFilter === 'custom-range') {
-          if (!customFromDate || !customToDate) {
-            setFilteredDefects([]);
-            setLoading(false);
-            return;
-          }
-          data = await fetchDefectsByDateRange(new Date(customFromDate), new Date(customToDate));
-        } else {
-          data = await fetchDefectsByRange(timeFilter);
-        }
-        setFilteredDefects(data);
-      } catch (e) {
-        console.error('[AdminDashboard] Failed to load defects:', e);
-        setFilteredDefects([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, [location.pathname, customFromDate, customToDate, timeFilter]);
+  }, [timeFilter, customFromDate, customToDate, location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 
@@ -225,7 +220,7 @@ function AdminDashboard() {
                 </div>
               </div>
               <div className="dashboard-box dashboard-status-box">
-                <span className="dashboard-stat-label">Raspberry Pi Status</span>
+                <span className="dashboard-stat-label">System Status</span>
                 {deviceStatusLoading ? (
                   <span className="dashboard-stat-value dashboard-stat-status" style={{ color: '#94a3b8' }}>…</span>
                 ) : (() => {
@@ -237,7 +232,7 @@ function AdminDashboard() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <span className="dashboard-stat-value dashboard-stat-status" style={{ color: online ? '#22c55e' : '#ef4444', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: online ? '#22c55e' : '#ef4444', flexShrink: 0 }} />
-                        {online ? 'Online' : deviceStatus ? 'Offline' : 'Unknown'}
+                        {online ? 'Online' : 'Offline'}
                       </span>
                       {lastSeen && (
                         <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>

@@ -30,6 +30,7 @@ function groupByDate(defects) {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
+      timeZone: 'Asia/Manila',
     });
     if (!groups[dateKey]) groups[dateKey] = [];
     groups[dateKey].push(d);
@@ -56,7 +57,7 @@ function DetectionHistory() {
     }
   }, [navigate]);
   const [customFromDate, setCustomFromDate] = useState('');
-  const [customToDate, setCustomToDate] = useState(new Date().toISOString().split('T')[0]);
+  const [customToDate, setCustomToDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }));
 
   async function handleLogout() {
     try {
@@ -86,7 +87,10 @@ function DetectionHistory() {
             setLoading(false);
             return;
           }
-          data = await fetchDefectsByDateRange(new Date(customFromDate), new Date(customToDate));
+          data = await fetchDefectsByDateRange(
+            new Date(customFromDate + 'T00:00:00+08:00'),
+            new Date(customToDate + 'T23:59:59.999+08:00')
+          );
         } else {
           data = await fetchDefectsByRange(timeFilter);
         }

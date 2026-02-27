@@ -270,24 +270,38 @@ export async function getDefectStats() {
 }
 
 // ── Date range helpers ────────────────────────────────────────────────────
+// PH timezone constant (UTC+8)
+const PH_TZ = 'Asia/Manila';
+// Get current date string in PHT as YYYY-MM-DD
+function getTodayPH() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: PH_TZ });
+}
+// Parse a YYYY-MM-DD date string as start-of-day PHT
+function phDayStart(dateStr) {
+  return new Date(dateStr + 'T00:00:00+08:00');
+}
+// Parse a YYYY-MM-DD date string as end-of-day PHT
+function phDayEnd(dateStr) {
+  return new Date(dateStr + 'T23:59:59.999+08:00');
+}
+
 export function getDateRangeBounds(range) {
   const now = new Date();
   const end = now.toISOString();
   let start;
   if (range === 'today') {
-    const s = new Date(now);
-    s.setHours(0, 0, 0, 0);
-    start = s.toISOString();
+    // Start of today in PHT (UTC+8)
+    start = phDayStart(getTodayPH()).toISOString();
   } else if (range === '7days') {
-    const s = new Date(now);
-    s.setDate(s.getDate() - 6);
-    s.setHours(0, 0, 0, 0);
-    start = s.toISOString();
+    const d = new Date();
+    d.setDate(d.getDate() - 6);
+    const dateStr = d.toLocaleDateString('en-CA', { timeZone: PH_TZ });
+    start = phDayStart(dateStr).toISOString();
   } else if (range === '30days') {
-    const s = new Date(now);
-    s.setDate(s.getDate() - 29);
-    s.setHours(0, 0, 0, 0);
-    start = s.toISOString();
+    const d = new Date();
+    d.setDate(d.getDate() - 29);
+    const dateStr = d.toLocaleDateString('en-CA', { timeZone: PH_TZ });
+    start = phDayStart(dateStr).toISOString();
   } else {
     start = new Date(0).toISOString(); // all time
   }

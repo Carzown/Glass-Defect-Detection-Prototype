@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/AlumpreneurLogo.png';
 import './Login.css';
-import { signInWithEmail, signInAndGetRole, getCurrentUser } from '../supabase';
+import { getCurrentUser } from '../supabase';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
 
 function Login() {
   const [role, setRole] = useState('employee'); // 'admin' | 'employee'
@@ -32,9 +34,9 @@ function Login() {
           navigate('/admin-dashboard');
           return;
         }
-        const user = await getCurrentUser();
-        if (user && sessionStorage.getItem('loggedIn') === 'true') {
+        if (sessionStorage.getItem('loggedIn') === 'true') {
           navigate('/dashboard');
+          return;
         }
       } catch {
         // not authenticated
@@ -47,53 +49,39 @@ function Login() {
   const handleRoleSwitch = (newRole) => {
     setRole(newRole);
     setError('');
-    setEmail('');
-    setPassword('');
   };
 
-  const handleEmployeeSubmit = async (event) => {
+  const handleBackendLogin = async (event, loginRole) => {
     event.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const user = await signInWithEmail(email, password);
+      const response = await fetch(`${BACKEND_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          role: loginRole,
+        }),
+      });
 
-      if (remember) {
-        localStorage.setItem('rememberMe', 'true');
-        localStorage.setItem('email', email);
-      } else {
-        localStorage.removeItem('rememberMe');
-        localStorage.removeItem('email');
-      }
+      const data = await response.json();
 
-      sessionStorage.setItem('loggedIn', 'true');
-      sessionStorage.setItem('userId', user.id);
-      navigate('/dashboard');
-    } catch (err) {
-      let msg = 'Login failed. Please try again.';
-      if (err.message) {
-        if (err.message.includes('Invalid login credentials')) msg = 'Invalid email or password.';
-        else if (err.message.includes('too-many-requests')) msg = 'Too many login attempts. Please try again later.';
-        else if (err.message.includes('email not confirmed')) msg = 'Please verify your email before logging in.';
-        else if (err.message.includes('already registered')) msg = 'This email is already registered.';
-      }
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAdminSubmit = async (event) => {
-    event.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      const result = await signInAndGetRole(email, password);
-      if (result.role !== 'admin') {
-        setError('This account does not have admin access.');
+      if (!response.ok) {
+        let msg = data.error || 'Login failed. Please try again.';
+        if (msg.includes('Invalid credentials')) msg = 'Invalid email or password.';
+        else if (msg.includes('too-many-requests')) msg = 'Too many login attempts. Please try again later.';
+        else if (msg.includes('email not confirmed')) msg = 'Please verify your email before logging in.';
+        else if (msg.includes('admin access')) msg = 'This account does not have admin access.';
+        setError(msg);
         setLoading(false);
         return;
       }
+
+      // Save user info and session
       if (remember) {
         localStorage.setItem('rememberMe', 'true');
         localStorage.setItem('email', email);
@@ -101,23 +89,45 @@ function Login() {
         localStorage.removeItem('rememberMe');
         localStorage.removeItem('email');
       }
-      sessionStorage.setItem('adminLoggedIn', 'true');
-      sessionStorage.setItem('adminToken', result.uid);
-      sessionStorage.setItem('userId', result.uid);
-      navigate('/admin-dashboard');
+
+      // Store session tokens
+      if (data.session?.accessToken) {
+        sessionStorage.setItem('accessToken', data.session.accessToken);
+        if (data.session.refreshToken) {
+          sessionStorage.setItem('refreshToken', data.session.refreshToken);
+        }
+      }
+
+      // Store user info
+      sessionStorage.setItem('userId', data.user.id);
+      sessionStorage.setItem('userEmail', data.user.email);
+      sessionStorage.setItem('userRole', data.user.role);
+
+      // Redirect based on role
+      if (data.user.role === 'admin') {
+        sessionStorage.setItem('adminLoggedIn', 'true');
+        sessionStorage.setItem('adminToken', data.user.id);
+        navigate('/admin-dashboard');
+      } else {
+        sessionStorage.setItem('loggedIn', 'true');
+        navigate('/dashboard');
+      }
     } catch (err) {
+      console.error('[Login] Backend login error:', err);
       let msg = 'Login failed. Please try again.';
       if (err.message) {
-        if (err.message.includes('Invalid login credentials')) msg = 'Invalid email or password.';
-        else if (err.message.includes('too-many-requests')) msg = 'Too many login attempts. Please try again later.';
-        else if (err.message.includes('email not confirmed')) msg = 'Please verify your email before logging in.';
-        else if (err.message.includes('already registered')) msg = 'This email is already registered.';
+        if (err.message.includes('Failed to fetch')) {
+          msg = 'Cannot reach the server. Please check your connection.';
+        }
       }
       setError(msg);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleEmployeeSubmit = (event) => handleBackendLogin(event, 'employee');
+  const handleAdminSubmit = (event) => handleBackendLogin(event, 'admin');
 
   return (
     <div className="login-container">

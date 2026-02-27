@@ -194,9 +194,8 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
   height: 100vh;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .machine-header {
@@ -207,6 +206,9 @@ body {
   justify-content: space-between;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .machine-header-left {
@@ -257,21 +259,18 @@ body {
 }
 
 .machine-content-area {
-  flex: 1;
   padding: 24px;
   background: linear-gradient(135deg, #f8fafb 0%, #f0f3f7 100%);
-  overflow: hidden;
   display: flex;
   flex-direction: column;
-  min-height: 0;
   gap: 24px;
 }
 
 .machine-content-wrapper {
   display: flex;
   gap: 24px;
-  min-height: 0;
-  flex: 2.7;
+  height: 520px;
+  flex-shrink: 0;
   align-items: stretch;
 }
 
@@ -761,13 +760,12 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-width: 0;
 }
 
 .dashboard-box-wrapper-full {
   width: 100%;
-  flex: 1.3;
-  min-height: 0;
+  flex-shrink: 0;
 }
 
 .dashboard-box {
@@ -776,7 +774,6 @@ body {
   border: 2px solid #e5e7eb;
   border-radius: 12px;
   padding: 16px;
-  min-height: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: all 0.3s ease;
   overflow: hidden;
@@ -935,7 +932,7 @@ body {
   text-align: center;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  padding-left: 80px;
+  padding-left: 102px;
 }
 
 .chart-body {
@@ -948,18 +945,27 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: space-around;
-  width: 80px;
+  width: 100px;
   flex-shrink: 0;
   border-right: 2px solid #0f2942;
-  padding-right: 12px;
+  padding-right: 10px;
 }
 
 .chart-y-tick {
-  font-size: 14px;
+  font-size: 13px;
   font-family: 'Poppins', sans-serif;
   font-weight: 600;
   color: #0f2942;
   text-align: right;
+}
+
+.chart-y-tick--type {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chart-area {
@@ -1032,8 +1038,12 @@ body {
   overflow: hidden;
 }
 
+.chart-x-axis--counts {
+  margin-left: 102px;
+}
+
 .chart-x-axis span {
-  font-size: 11px;
+  font-size: 12px;
   font-family: 'Inter', sans-serif;
   font-weight: 600;
   color: #6b7280;
@@ -1442,12 +1452,38 @@ body {
   }
 }
 
+/* Trend Chart - clean centered card matching reference style */
+.dashboard-trend-box {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px 28px 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+  overflow: hidden;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.dashboard-trend-box:hover {
+  border-color: #e5a445;
+  box-shadow: 0 8px 24px rgba(229, 164, 69, 0.12);
+}
+
+.dashboard-trend-title {
+  text-align: center;
+  color: #0f2942;
+  font-size: 18px;
+  font-weight: 700;
+  font-family: 'Poppins', sans-serif;
+  margin: 0 0 4px 0;
+  letter-spacing: -0.3px;
+}
+
 /* Trend Chart Container Styles */
 .dashboard-trend-chart-container {
   width: 100%;
-  height: 100%;
-  overflow-x: auto;
-  overflow-y: visible;
+  overflow: visible;
   padding-right: 8px;
 }
 

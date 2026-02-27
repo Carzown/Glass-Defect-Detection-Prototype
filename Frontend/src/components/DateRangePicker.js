@@ -72,8 +72,8 @@ function DateRangePicker({ onApply, initialFrom = '', initialTo = '' }) {
     }
 
     return {
-      from: start.toISOString().split('T')[0],
-      to: end.toISOString().split('T')[0],
+      from: start.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }),
+      to: end.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }),
     };
   };
 
