@@ -13,12 +13,13 @@ const corsOptions = {
     'http://127.0.0.1:3001',
     'https://carzown.github.io',
     'https://Carzown.github.io/Glass-Defect-Detection-Prototype',
+    'https://glass-defect-detection-prototype-production.up.railway.app',
     process.env.FRONTEND_URL || 'http://localhost:3000',
-    // Railway deployments
-    /^https:\/\/.*\.railway\.app$/, // Allow all Railway domains
+    // Railway deployments - regex pattern for all Railway domains
+    /^https:\/\/.*\.railway\.app$/,
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
