@@ -8,13 +8,17 @@ import { fetchDefects, fetchDefectsByRange, fetchDefectsByDateRange, fetchDevice
 import './Dashboard.css';
 
 const getBackendURL = () => {
+  // Use explicit backend URL from environment (required for production)
   if (process.env.REACT_APP_BACKEND_URL) {
     return process.env.REACT_APP_BACKEND_URL;
   }
-  if (window.location.hostname !== 'localhost') {
-    return window.location.origin;
+  // Development fallback only
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:5000';
   }
-  return 'http://localhost:5000';
+  // Production requires explicit backend URL - show error
+  console.error('[Dashboard] REACT_APP_BACKEND_URL not configured for production');
+  return 'http://localhost:5000'; // Will fail, but shows the issue
 };
 
 const BACKEND_URL = getBackendURL();
