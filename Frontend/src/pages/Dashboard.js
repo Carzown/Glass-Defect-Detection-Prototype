@@ -1,6 +1,7 @@
 // Dashboard: Dashboard page with sidebar and header
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
 import { signOutUser } from '../supabase';
@@ -53,6 +54,28 @@ function groupByDate(defects) {
     groups[dateKey].push(d);
   });
   return Object.entries(groups).sort((a, b) => new Date(b[0]) - new Date(a[0]));
+}
+
+// Aggregate defects by date for line chart
+function aggregateDefectsByDate(defects) {
+  const counts = {};
+  defects.forEach((d) => {
+    const dateKey = new Date(d.detected_at).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+    });
+    counts[dateKey] = (counts[dateKey] || 0) + 1;
+  });
+  
+  // Convert to sorted array for chart
+  const data = Object.entries(counts)
+    .map(([date, count]) => ({
+      date,
+      timestamp: new Date(date).getTime(),
+      count,
+    }))
+    .sort((a, b) => a.timestamp - b.timestamp);
+  
+  return data;
 }
 
 function Dashboard() {
@@ -433,60 +456,61 @@ function Dashboard() {
               </div>
             </div>
             <div className="dashboard-box-wrapper">
-              <h2 className="dashboard-box-title">Amount of Defects per Type</h2>
-              <div className="dashboard-box dashboard-chart-box">
-                <div className="dashboard-bar-chart">
-                  <div className="chart-y-axis-label">Defect Type</div>
-                  <div className="chart-body">
-                    <div className="chart-y-axis">
-                      <span className="chart-y-tick">Scratch</span>
-                      <span className="chart-y-tick">Bubble</span>
-                      <span className="chart-y-tick">Cracks</span>
+              <h2 className="dashboard-box-title">Defect Trend Over Time</h2>
+              <div className="dashboard-box dashboard-chart-box" style={{ paddingTop: '20px' }}>
+                <div className="dashboard-trend-chart-container">
+                  {filteredDefects.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart
+                        data={aggregateDefectsByDate(filteredDefects)}
+                        margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fontSize: 12 }}
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          interval={Math.max(0, Math.floor(aggregateDefectsByDate(filteredDefects).length / 8) - 1)}
+                        />
+                        <YAxis
+                          label={{ value: 'Defect Count', angle: -90, position: 'insideLeft' }}
+                          tick={{ fontSize: 12 }}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                          }}
+                          formatter={(value) => [`${value} defects`, 'Count']}
+                        />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="count"
+                          stroke="#0f2942"
+                          dot={{ fill: '#0f2942', r: 5 }}
+                          activeDot={{ r: 7 }}
+                          strokeWidth={2}
+                          name="Defects"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div style={{
+                      height: 300,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#94a3b8',
+                      fontSize: 14,
+                    }}>
+                      No defects detected in this date range
                     </div>
-                    <div className="chart-area">
-                      <div className="chart-grid">
-                        <div className="chart-gridline"></div>
-                        <div className="chart-gridline"></div>
-                        <div className="chart-gridline"></div>
-                        <div className="chart-gridline"></div>
-                        <div className="chart-gridline"></div>
-                      </div>
-                      <div className="chart-bars">
-                        {(() => {
-                          const typeCounts = { scratch: 0, bubble: 0, crack: 0 };
-                          filteredDefects.forEach(d => {
-                            const t = (d.defect_type || '').toLowerCase();
-                            if (typeCounts[t] !== undefined) typeCounts[t]++;
-                          });
-                          const dataMax = Math.max(...Object.values(typeCounts), 0);
-                          // Nice ceiling: smallest of these steps >= dataMax
-                          const steps = [5, 10, 20, 50, 100, 200, 500, 1000];
-                          const chartMax = steps.find(s => s >= dataMax) || Math.ceil(dataMax / 100) * 100;
-                          const ticks = [0, chartMax / 4, chartMax / 2, (chartMax * 3) / 4, chartMax];
-                          return (
-                            <>
-                              {[
-                                { label: 'Scratch', key: 'scratch' },
-                                { label: 'Bubble', key: 'bubble' },
-                                { label: 'Cracks', key: 'crack' },
-                              ].map(({ label, key }) => (
-                                <div className="chart-bar-wrapper" key={key}>
-                                  <div className="dashboard-bar-fill" style={{ width: `${(typeCounts[key] / chartMax) * 100}%` }}></div>
-                                  <span className="chart-bar-value">{typeCounts[key]}</span>
-                                </div>
-                              ))}
-                              <div className="chart-x-axis">
-                                {ticks.map((t, i) => (
-                                  <span key={i}>{Number.isInteger(t) ? t : Math.round(t)}</span>
-                                ))}
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="chart-x-axis-label">Count</div>
+                  )}
                 </div>
               </div>
             </div>

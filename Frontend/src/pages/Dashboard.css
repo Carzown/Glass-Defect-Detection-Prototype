@@ -1441,3 +1441,31 @@ body {
     gap: 12px;
   }
 }
+
+/* Trend Chart Container Styles */
+.dashboard-trend-chart-container {
+  width: 100%;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-right: 8px;
+}
+
+.dashboard-trend-chart-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.dashboard-trend-chart-container::-webkit-scrollbar-track {
+  background: #f0f3f7;
+  border-radius: 4px;
+}
+
+.dashboard-trend-chart-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.dashboard-trend-chart-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
