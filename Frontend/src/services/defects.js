@@ -280,10 +280,6 @@ function getTodayPH() {
 function phDayStart(dateStr) {
   return new Date(dateStr + 'T00:00:00+08:00');
 }
-// Parse a YYYY-MM-DD date string as end-of-day PHT
-function phDayEnd(dateStr) {
-  return new Date(dateStr + 'T23:59:59.999+08:00');
-}
 
 export function getDateRangeBounds(range) {
   const now = new Date();

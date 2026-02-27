@@ -47,7 +47,6 @@ function capitalizeDefectType(type) {
 function Detection() {
   // State
   const [currentDefects, setCurrentDefects] = useState([]);
-  const [lastDetectionTime, setLastDetectionTime] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -110,29 +109,13 @@ function Detection() {
     }
   }, [timeFilter, customFromDate, customToDate]);
 
-  // Load the most recent defect across all time (for "Last detection" indicator)
-  const loadLastDetection = async () => {
-    try {
-      const result = await fetchDefects({ limit: 1, offset: 0, dateFrom: new Date(0).toISOString(), dateTo: new Date().toISOString() });
-      const supabaseData = result.data || [];
-      if (supabaseData.length > 0) {
-        setLastDetectionTime(supabaseData[0].detected_at);
-      }
-    } catch (error) {
-      console.error('[Detection] Error loading last detection:', error);
-    }
-  };
-
   // Fetch when component mounts or time filter changes
   useEffect(() => {
     setLoading(true);
     loadSupabaseDefects();
   }, [loadSupabaseDefects]);
 
-  // Load last detection on mount
-  useEffect(() => {
-    loadLastDetection();
-  }, []);
+
   async function handleLogout() {
     try {
       await signOutUser();
