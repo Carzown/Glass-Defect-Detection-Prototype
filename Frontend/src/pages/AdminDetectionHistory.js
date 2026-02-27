@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
-import { fetchDefectsByRange, fetchDefectsByDateRange } from '../services/defects';
+import { fetchDefectsByRange, fetchDefectsByDateRange, deleteDefect } from '../services/defects';
 import './Dashboard.css';
 import './DetectionHistory.css';
 
@@ -122,6 +122,25 @@ function AdminDetectionHistory() {
     setSelectedDefect(defect);
   }
 
+  async function handleDeleteDefect() {
+    if (!selectedDefect || !window.confirm('Are you sure you want to delete this defect? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await deleteDefect(selectedDefect.id);
+      // Refresh the current view by reloading the sessions
+      const newSessions = sessions.map(([dateKey, defects]) => {
+        return [dateKey, defects.filter(d => d.id !== selectedDefect.id)];
+      }).filter(([, defects]) => defects.length > 0);
+      setSessions(newSessions);
+      setSelectedDefect(null);
+    } catch (error) {
+      console.error('[AdminDetectionHistory] Error deleting defect:', error);
+      alert('Failed to delete defect. Please try again.');
+    }
+  }
+
   return (
     <div className="machine-container">
       <Sidebar
@@ -145,8 +164,8 @@ function AdminDetectionHistory() {
             <span /><span /><span />
           </button>
           <div className="machine-header-left">
-            <h1 className="machine-header-title">Detection History (Admin)</h1>
-            <p className="machine-header-subtitle">View past inspection results</p>
+            <h1 className="machine-header-title">Detection History</h1>
+            <p className="machine-header-subtitle">Admin Access</p>
           </div>
         </header>
 
@@ -291,6 +310,35 @@ function AdminDetectionHistory() {
                         </div>
                         {selectedDefect.confidence != null && (
                           <div className="dh-detail-row">
+
+                        {/* Delete Button */}
+                        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
+                          <button
+                            onClick={handleDeleteDefect}
+                            style={{
+                              width: '100%',
+                              padding: '10px 16px',
+                              background: '#dc2626',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontWeight: '600',
+                              fontSize: '14px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#b91c1c';
+                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.3)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = '#dc2626';
+                              e.currentTarget.style.boxShadow = 'none';
+                            }}
+                          >
+                            Delete Defect
+                          </button>
+                        </div>
                             <span className="dh-detail-label">Confidence</span>
                             <span className="dh-detail-value">
                               {(selectedDefect.confidence * 100).toFixed(1)}%
