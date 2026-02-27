@@ -1,7 +1,7 @@
 // Dashboard: Dashboard page with sidebar and header
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
 import { signOutUser } from '../supabase';
@@ -56,26 +56,14 @@ function groupByDate(defects) {
   return Object.entries(groups).sort((a, b) => new Date(b[0]) - new Date(a[0]));
 }
 
-// Aggregate defects by date for line chart
-function aggregateDefectsByDate(defects) {
+// Aggregate defects by type for bar chart
+function aggregateDefectsByType(defects) {
   const counts = {};
   defects.forEach((d) => {
-    const dateKey = new Date(d.detected_at).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric',
-    });
-    counts[dateKey] = (counts[dateKey] || 0) + 1;
+    const type = capitalizeDefectType(d.defect_type) || 'Unknown';
+    counts[type] = (counts[type] || 0) + 1;
   });
-  
-  // Convert to sorted array for chart
-  const data = Object.entries(counts)
-    .map(([date, count]) => ({
-      date,
-      timestamp: new Date(date).getTime(),
-      count,
-    }))
-    .sort((a, b) => a.timestamp - b.timestamp);
-  
-  return data;
+  return Object.entries(counts).map(([type, count]) => ({ type, count }));
 }
 
 function Dashboard() {
@@ -456,62 +444,58 @@ function Dashboard() {
               </div>
             </div>
             <div className="dashboard-box-wrapper">
-              <h2 className="dashboard-box-title">Defect Trend Over Time</h2>
-              <div className="dashboard-box dashboard-chart-box" style={{ paddingTop: '20px' }}>
-                <div className="dashboard-trend-chart-container">
-                  {filteredDefects.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart
-                        data={aggregateDefectsByDate(filteredDefects)}
-                        margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis
-                          dataKey="date"
-                          tick={{ fontSize: 12 }}
-                          angle={-45}
-                          textAnchor="end"
-                          height={80}
-                          interval={Math.max(0, Math.floor(aggregateDefectsByDate(filteredDefects).length / 8) - 1)}
-                        />
-                        <YAxis
-                          label={{ value: 'Defect Count', angle: -90, position: 'insideLeft' }}
-                          tick={{ fontSize: 12 }}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: '#ffffff',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '6px',
-                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                          }}
-                          formatter={(value) => [`${value} defects`, 'Count']}
-                        />
-                        <Legend />
-                        <Line
-                          type="monotone"
-                          dataKey="count"
-                          stroke="#0f2942"
-                          dot={{ fill: '#0f2942', r: 5 }}
-                          activeDot={{ r: 7 }}
-                          strokeWidth={2}
-                          name="Defects"
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div style={{
-                      height: 300,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#94a3b8',
-                      fontSize: 14,
-                    }}>
-                      No defects detected in this date range
+              <h2 className="dashboard-box-title">Amount of Defects per Type</h2>
+              <div className="dashboard-box dashboard-chart-box">
+                {filteredDefects.length > 0 ? (
+                  <div className="dashboard-bar-chart">
+                    <div className="chart-y-axis-label">Count</div>
+                    <div className="chart-body">
+                      <div className="chart-y-axis">
+                        {[0, Math.ceil(Math.max(...aggregateDefectsByType(filteredDefects).map(d => d.count)) / 4), Math.ceil(Math.max(...aggregateDefectsByType(filteredDefects).map(d => d.count)) / 2), Math.max(...aggregateDefectsByType(filteredDefects).map(d => d.count))].map((tick) => (
+                          <div key={tick} className="chart-y-tick">{tick}</div>
+                        ))}
+                      </div>
+                      <div className="chart-area">
+                        <div className="chart-grid">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <div key={i} className="chart-gridline" />
+                          ))}
+                        </div>
+                        <div className="chart-bars">
+                          {aggregateDefectsByType(filteredDefects).map((item) => {
+                            const maxCount = Math.max(...aggregateDefectsByType(filteredDefects).map(d => d.count));
+                            const width = (item.count / maxCount) * 100;
+                            return (
+                              <div key={item.type} className="chart-bar-wrapper">
+                                <div
+                                  className="dashboard-bar-fill"
+                                  style={{ width: `${width}%` }}
+                                />
+                                <span className="chart-bar-value">{item.count}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: '80px', marginTop: '8px', minHeight: '28px' }} className="chart-x-axis">
+                      {aggregateDefectsByType(filteredDefects).map((item) => (
+                        <span key={item.type} style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center', minWidth: '60px' }}>{item.type}</span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    height: 300,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#94a3b8',
+                    fontSize: 14,
+                  }}>
+                    No defects detected in this date range
+                  </div>
+                )}
               </div>
             </div>
           </div>
