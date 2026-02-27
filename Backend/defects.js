@@ -3,13 +3,8 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 
+// In-memory fallback store (optional, only used if Supabase is not configured)
 let defectsStore = null;
-try {
-  const server = require('./server');
-  defectsStore = server.defectsStore;
-} catch (e) {
-  console.warn('[defects] Could not load in-memory defects store:', e.message);
-}
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;

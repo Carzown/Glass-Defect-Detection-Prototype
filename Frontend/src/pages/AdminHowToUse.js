@@ -103,7 +103,7 @@ function AdminHowToUse() {
               boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
               display: 'flex',
               flexDirection: 'column',
-              height: '100%',
+              height: '100%', 
             }}>
               {/* Instructions List */}
               <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
