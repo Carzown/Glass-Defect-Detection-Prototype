@@ -310,35 +310,6 @@ function AdminDetectionHistory() {
                         </div>
                         {selectedDefect.confidence != null && (
                           <div className="dh-detail-row">
-
-                        {/* Delete Button */}
-                        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
-                          <button
-                            onClick={handleDeleteDefect}
-                            style={{
-                              width: '100%',
-                              padding: '10px 16px',
-                              background: '#dc2626',
-                              color: '#fff',
-                              border: 'none',
-                              borderRadius: '8px',
-                              fontWeight: '600',
-                              fontSize: '14px',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = '#b91c1c';
-                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.3)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = '#dc2626';
-                              e.currentTarget.style.boxShadow = 'none';
-                            }}
-                          >
-                            Delete Defect
-                          </button>
-                        </div>
                             <span className="dh-detail-label">Confidence</span>
                             <span className="dh-detail-value">
                               {(selectedDefect.confidence * 100).toFixed(1)}%
@@ -358,6 +329,33 @@ function AdminDetectionHistory() {
                             <a href={selectedDefect.image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb' }}>View original ↗</a>
                           </div>
                         )}
+                      </div>
+                      {/* Delete Button - Centered at Bottom */}
+                      <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+                        <button
+                          onClick={handleDeleteDefect}
+                          style={{
+                            padding: '10px 24px',
+                            background: '#dc2626',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontWeight: '600',
+                            fontSize: '14px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#b91c1c';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.3)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#dc2626';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          Delete Defect
+                        </button>
                       </div>
                     </div>
                   </>
