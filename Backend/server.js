@@ -66,17 +66,25 @@ try {
 
 // Serve static files from the built frontend
 const path = require('path');
+const fs = require('fs');
 const frontendBuildPath = path.join(__dirname, '../Frontend/build');
 try {
   app.use(express.static(frontendBuildPath));
-  // SPA fallback - serve index.html for all non-API routes
-  app.get('*', (req, res) => {
-    // If it's not an API route, serve the React app
-    if (!req.path.startsWith('/api') && !req.path.startsWith('/defects')) {
-      res.sendFile(path.join(frontendBuildPath, 'index.html'));
+  // SPA fallback - serve index.html for routes not matched by API or static files
+  app.use((req, res, next) => {
+    // Skip API and defects routes
+    if (req.path.startsWith('/api') || req.path.startsWith('/defects') || req.path.startsWith('/auth')) {
+      return next();
+    }
+    // For other routes, serve index.html if it exists
+    const indexPath = path.join(frontendBuildPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      next();
     }
   });
-  console.log('[SERVER] Serving frontend from:', frontendBuildPath);
+  console.log('[SERVER] ✅ Serving frontend from:', frontendBuildPath);
 } catch (e) {
   console.warn('[SERVER] Frontend static files not available:', e?.message || e);
 }
