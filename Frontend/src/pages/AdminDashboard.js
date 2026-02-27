@@ -37,7 +37,6 @@ function AdminDashboard() {
   const [filteredDefects, setFilteredDefects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastDetectionTime, setLastDetectionTime] = useState(null);
-  const [timeUpdateCounter, setTimeUpdateCounter] = useState(0);
 
   // Raspberry Pi device status
   const [deviceStatus, setDeviceStatus] = useState(null);
@@ -152,13 +151,7 @@ function AdminDashboard() {
     loadData();
   }, [location.pathname, customFromDate, customToDate, timeFilter]);
 
-  // Update relative times every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimeUpdateCounter(prev => prev + 1);
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
+
 
   const sidebarMenuItems = [
     { key: 'admin-dashboard', label: 'Dashboard', onClick: () => navigate('/admin-dashboard') },

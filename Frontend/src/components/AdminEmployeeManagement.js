@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabase';
 import './AdminEmployeeManagement.css';
 
@@ -20,11 +20,7 @@ function AdminEmployeeManagement() {
   const [editPassword, setEditPassword] = useState('');
 
   // Load employees on mount
-  useEffect(() => {
-    loadEmployees();
-  }, []);
-
-  const loadEmployees = async () => {
+  const loadEmployees = useCallback(async () => {
 
   try {
       setLoading(true);
@@ -43,7 +39,7 @@ function AdminEmployeeManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const clearMessages = () => {
     setTimeout(() => {
@@ -51,6 +47,11 @@ function AdminEmployeeManagement() {
       setErrorMessage('');
     }, 5000);
   };
+
+  // Load employees on component mount
+  useEffect(() => {
+    loadEmployees();
+  }, [loadEmployees]);
 
   // ════════════════════════════════════════════════════════════════
   // ADD EMPLOYEE

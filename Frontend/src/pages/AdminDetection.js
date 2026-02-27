@@ -1,6 +1,6 @@
 // Admin Detection: Real-time defects from Supabase database for administrators
 // - Defects list comes from Supabase database polling
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
@@ -48,7 +48,6 @@ function AdminDetection() {
   const [currentDefects, setCurrentDefects] = useState([]);
   const [lastDetectionTime, setLastDetectionTime] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [timeUpdateCounter, setTimeUpdateCounter] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedDefectId, setSelectedDefectId] = useState(null);
@@ -95,7 +94,7 @@ function AdminDetection() {
   };
 
   // Load defects from Railway backend - only on mount
-  const loadSupabaseDefects = async () => {
+  const loadSupabaseDefects = useCallback(async () => {
     try {
       let start, end;
       if (timeFilter === 'custom-range') {
@@ -131,7 +130,7 @@ function AdminDetection() {
       console.error('[AdminDetection] Error loading defects:', error);
       setLoading(false);
     }
-  };
+  }, [timeFilter, customFromDate, customToDate]);
 
   // Load the most recent defect across all time (for "Last detection" indicator)
   const loadLastDetection = async () => {
@@ -150,7 +149,7 @@ function AdminDetection() {
   useEffect(() => {
     setLoading(true);
     loadSupabaseDefects();
-  }, [timeFilter, customFromDate, customToDate, loadSupabaseDefects]);
+  }, [loadSupabaseDefects]);
 
   // Load last detection on mount
   useEffect(() => {
@@ -224,17 +223,7 @@ function AdminDetection() {
     }
   }, [currentDefects]);
 
-  // Update relative times every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentDefects(prev => prev.map(d => ({
-        ...d,
-        time: formatTime(d.detected_at)
-      })));
-      setTimeUpdateCounter(prev => prev + 1); // Force re-render for lastDetectionTime display
-    }, 30000); // Update every 30 seconds
-    return () => clearInterval(interval);
-  }, []);
+
 
   return (
     <div className="machine-container">

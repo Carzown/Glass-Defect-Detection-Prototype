@@ -76,7 +76,6 @@ function Dashboard() {
   const [filteredDefects, setFilteredDefects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastDetectionTime, setLastDetectionTime] = useState(null);
-  const [timeUpdateCounter, setTimeUpdateCounter] = useState(0);
 
   // Raspberry Pi device status (from device_status table)
   const [deviceStatus, setDeviceStatus] = useState(null); // { is_online, last_seen }
@@ -180,13 +179,7 @@ function Dashboard() {
     loadData();
   }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update relative times every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimeUpdateCounter(prev => prev + 1); // Force re-render for lastDetectionTime display
-    }, 30000); // Update every 30 seconds
-    return () => clearInterval(interval);
-  }, []);
+
 
   const dashSessions = groupByDate(filteredDefects);
 
