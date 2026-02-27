@@ -1,77 +1,71 @@
-.admin-content-area {
+@import './Dashboard.css';
+
+/* ── Admin Dashboard page-specific overrides ─────────────────── */
+
+/* Scrollable content area for the admin dashboard sections */
+.dashboard-container {
   flex: 1;
+  overflow: hidden;
+  padding: 24px;
   display: flex;
   flex-direction: column;
+  gap: 24px;
+  min-height: 0;
+}
+
+/* Employee management wrapper expands to fill remaining space */
+.admin-emp-expand {
+  flex: 1 !important;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-emp-expand .dashboard-box {
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
-.admin-blank-content {
-  flex: 1;
+.dashboard-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dashboard-container::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+
+.dashboard-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+/* Stats section: fixed height to match employee dashboard */
+.dashboard-box-wrapper-full {
+  flex: unset;
+  width: 100%;
+}
+
+.dashboard-box-wrapper-full .dashboard-stats-row {
+  height: 120px;
+  overflow: visible;
+}
+
+.dashboard-box-wrapper-full .dashboard-stats-box {
+  height: 100%;
+  overflow: visible;
+}
+
+/* Employee management box */
+.dashboard-employee-box {
+  padding: 0 !important;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px;
-  background: linear-gradient(135deg, #f8fafb 0%, #f0f3f7 100%);
-  color: #6b7280;
 }
 
-.admin-blank-content h2 {
-  color: #1a3a52;
-  font-size: 32px;
-  font-weight: 700;
-  margin-bottom: 16px;
-}
-
-.admin-blank-content p {
-  font-size: 16px;
-  color: #9ca3af;
-}
-
-/* Machine-specific styles for header and layout */
-.machine-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #0f2942;
-  padding: 28px 32px;
-  border-bottom: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  flex-shrink: 0;
-  height: auto;
-}
-
-.machine-header-title {
-  color: white;
-  font-size: 26px;
-  font-weight: 700;
+.dashboard-employee-box > div {
   margin: 0;
-}
-
-.machine-header-spacer {
   flex: 1;
-}
-
-.hamburger-menu {
-  display: none;
-  background: none;
-  border: none;
-  color: #1a3a52;
-  cursor: pointer;
-  padding: 8px;
-  margin-right: 16px;
-}
-
-@media (max-width: 768px) {
-  .hamburger-menu {
-    display: block;
-  }
-}
-
-.machine-main-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: linear-gradient(135deg, #f8fafb 0%, #f0f3f7 100%);
+  min-height: 0;
 }

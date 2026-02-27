@@ -88,33 +88,44 @@ export async function signInAndGetRole(email, password) {
   
   if (authError) throw new Error(authError.message);
 
-  try {
-    if (!supabase) {
-      return {
-        uid: authData.user.id,
-        email: authData.user.email,
-        role: 'employee',
-      };
-    }
+  if (!supabase) throw new Error('Supabase not configured');
 
-    const { data } = await supabase
+  // Try lookup by user id first
+  let role = null;
+  const { data: byId } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', authData.user.id)
+    .maybeSingle();
+
+  if (byId?.role) {
+    role = byId.role;
+  } else {
+    // Fallback: try lookup by email
+    const { data: byEmail } = await supabase
       .from('profiles')
       .select('role')
-      .eq('id', authData.user.id)
-      .single();
-
-    return {
-      uid: authData.user.id,
-      email: authData.user.email,
-      role: data?.role || 'employee',
-    };
-  } catch (_error) {
-      return {
-      uid: authData.user.id,
-      email: authData.user.email,
-      role: 'employee',
-    };
+      .eq('email', authData.user.email)
+      .maybeSingle();
+    role = byEmail?.role || null;
   }
+
+  // Final fallback: check against REACT_APP_ADMIN_EMAILS env var
+  if (!role || role === 'employee') {
+    const adminEmails = (process.env.REACT_APP_ADMIN_EMAILS || '')
+      .split(',')
+      .map(e => e.trim().toLowerCase())
+      .filter(Boolean);
+    if (adminEmails.includes(authData.user.email.toLowerCase())) {
+      role = 'admin';
+    }
+  }
+
+  return {
+    uid: authData.user.id,
+    email: authData.user.email,
+    role: role || 'employee',
+  };
 }
 
 export async function getRole(uid) {

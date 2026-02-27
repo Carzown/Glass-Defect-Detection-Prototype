@@ -89,6 +89,7 @@ body {
   cursor: pointer;
   color: #1a3a52;
   font-weight: 600;
+  transition: background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
 }
 
 .role-tab.active {

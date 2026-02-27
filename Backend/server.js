@@ -162,6 +162,23 @@ try {
   console.warn('[SERVER] Defect tagger not started:', e?.message || e)
 }
 
+// Serve static files from the built frontend
+const path = require('path');
+const frontendBuildPath = path.join(__dirname, '../Frontend/build');
+try {
+  app.use(express.static(frontendBuildPath));
+  // SPA fallback - serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    // If it's not an API route, serve the React app
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/defects')) {
+      res.sendFile(path.join(frontendBuildPath, 'index.html'));
+    }
+  });
+  console.log('[SERVER] Serving frontend from:', frontendBuildPath);
+} catch (e) {
+  console.warn('[SERVER] Frontend static files not available:', e?.message || e);
+}
+
 let basePort = parseInt(process.env.PORT, 10) || 5000;
 const maxAttempts = 10;
 

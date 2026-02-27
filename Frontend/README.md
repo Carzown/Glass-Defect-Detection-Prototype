@@ -126,14 +126,6 @@ REACT_APP_BACKEND_URL=http://localhost:5000
 REACT_APP_WS_URL=ws://localhost:8080
 ```
 
-### Production (Vercel)
-```env
-REACT_APP_SUPABASE_URL=https://project-id.supabase.co
-REACT_APP_SUPABASE_ANON_KEY=[from Supabase]
-REACT_APP_BACKEND_URL=https://railway-backend.railway.app
-REACT_APP_WS_URL=wss://railway-backend.railway.app:8080
-```
-
 ---
 
 ## 🧪 Testing
@@ -158,31 +150,6 @@ npm run build
 | react | 18.2.0 | UI framework |
 | react-router-dom | 6.x | Navigation |
 | @supabase/supabase-js | Latest | Database client |
-
----
-
-## 🌐 Deployment
-
-### To Vercel
-```bash
-# 1. Push to GitHub
-git push origin main
-
-# 2. Connect Vercel to GitHub repository
-# https://vercel.com/new
-
-# 3. Set environment variables in Vercel dashboard
-
-# 4. Deploy automatically on push
-```
-
-### Configuration Checklist
-- [ ] Set `REACT_APP_SUPABASE_URL`
-- [ ] Set `REACT_APP_SUPABASE_ANON_KEY`
-- [ ] Set `REACT_APP_BACKEND_URL` (production)
-- [ ] Set `REACT_APP_WS_URL` (production WebSocket)
-- [ ] Enable automatic deployments
-- [ ] Configure domain (optional)
 
 ---
 

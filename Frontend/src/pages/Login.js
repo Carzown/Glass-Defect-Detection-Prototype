@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/AlumpreneurLogo.png';
 import './Login.css';
-import { signInWithEmail, getCurrentUser } from '../supabase';
+import { signInWithEmail, signInAndGetRole, getCurrentUser } from '../supabase';
 
 function Login() {
   const [role, setRole] = useState('employee'); // 'admin' | 'employee'
@@ -82,17 +82,17 @@ function Login() {
     }
   };
 
-  const handleAdminSubmit = (event) => {
+  const handleAdminSubmit = async (event) => {
     event.preventDefault();
     setError('');
     setLoading(true);
-    const validToken = process.env.REACT_APP_ADMIN_TOKEN;
-    if (!validToken) {
-      setError('Admin configuration not found');
-      setLoading(false);
-      return;
-    }
-    if (password.trim() === validToken) {
+    try {
+      const result = await signInAndGetRole(email, password);
+      if (result.role !== 'admin') {
+        setError('Access denied. This account does not have admin privileges.');
+        setLoading(false);
+        return;
+      }
       if (remember) {
         localStorage.setItem('rememberMe', 'true');
         localStorage.setItem('email', email);
@@ -100,13 +100,21 @@ function Login() {
         localStorage.removeItem('rememberMe');
         localStorage.removeItem('email');
       }
-      sessionStorage.setItem('adminToken', validToken);
       sessionStorage.setItem('adminLoggedIn', 'true');
+      sessionStorage.setItem('adminToken', result.uid);
+      sessionStorage.setItem('userId', result.uid);
       navigate('/admin-dashboard');
-    } else {
-      setError('Invalid admin password');
+    } catch (err) {
+      let msg = 'Login failed';
+      if (err.message) {
+        if (err.message.includes('Invalid login credentials')) msg = 'Invalid email or password';
+        else if (err.message.includes('too-many-requests')) msg = 'Too many attempts. Try again later';
+        else msg = err.message;
+      }
+      setError(msg);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -135,94 +143,52 @@ function Login() {
           </button>
         </div>
 
-        {/* Employee login */}
-        {role === 'employee' && (
-          <form className="login-form" onSubmit={handleEmployeeSubmit}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="email">Email Address</label>
-              <input
-                className="form-input"
-                type="email"
-                id="email"
-                placeholder="Email"
-                required
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="password">Password</label>
-              <input
-                className="form-input"
-                type="password"
-                id="password"
-                placeholder="Password"
-                required
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-              />
-            </div>
-            <div className="form-checkbox-wrapper">
-              <input
-                className="form-checkbox"
-                type="checkbox"
-                id="remember"
-                checked={remember}
-                onChange={e => setRemember(e.target.checked)}
-              />
-              <label className="form-checkbox-label" htmlFor="remember">Remember me</label>
-            </div>
-            {error && <div className="login-error">{error}</div>}
-            <button type="submit" className="login-button" disabled={loading}>
-              {loading ? 'Signing In…' : 'Sign In'}
-            </button>
-          </form>
-        )}
-
-        {/* Admin login */}
-        {role === 'admin' && (
-          <form className="login-form" onSubmit={handleAdminSubmit}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="adminEmail">Email Address</label>
-              <input
-                className="form-input"
-                type="email"
-                id="adminEmail"
-                placeholder="Email"
-                required
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="adminPassword">Password</label>
-              <input
-                className="form-input"
-                type="password"
-                id="adminPassword"
-                placeholder="Password"
-                required
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-            <div className="form-checkbox-wrapper">
-              <input
-                className="form-checkbox"
-                type="checkbox"
-                id="adminRemember"
-                checked={remember}
-                onChange={e => setRemember(e.target.checked)}
-              />
-              <label className="form-checkbox-label" htmlFor="adminRemember">Remember me</label>
-            </div>
-            {error && <div className="login-error">{error}</div>}
-            <button type="submit" className="login-button" disabled={loading}>
-              {loading ? 'Verifying…' : 'Sign In'}
-            </button>
-          </form>
-        )}
+        {/* Single stable form — handler switches based on role */}
+        <form
+          className="login-form"
+          onSubmit={role === 'admin' ? handleAdminSubmit : handleEmployeeSubmit}
+        >
+          <div className="form-group">
+            <label className="form-label" htmlFor="login-email">Email Address</label>
+            <input
+              className="form-input"
+              type="email"
+              id="login-email"
+              placeholder="Email"
+              required
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="login-password">Password</label>
+            <input
+              className="form-input"
+              type="password"
+              id="login-password"
+              placeholder="Password"
+              required
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              disabled={loading}
+            />
+          </div>
+          <div className="form-checkbox-wrapper">
+            <input
+              className="form-checkbox"
+              type="checkbox"
+              id="remember"
+              checked={remember}
+              onChange={e => setRemember(e.target.checked)}
+            />
+            <label className="form-checkbox-label" htmlFor="remember">Remember me</label>
+          </div>
+          {error && <div className="login-error">{error}</div>}
+          <button type="submit" className="login-button" disabled={loading}>
+            {loading ? (role === 'admin' ? 'Verifying…' : 'Signing In…') : 'Sign In'}
+          </button>
+        </form>
 
         <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
           <p>Powered by Supabase Authentication</p>

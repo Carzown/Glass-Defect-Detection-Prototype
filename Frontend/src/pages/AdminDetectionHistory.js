@@ -243,12 +243,29 @@ function AdminDetectionHistory() {
                     </div>
                     <div className="dh-detail-card-wrapper">
                       {(selectedDefect.tagged_image_url || selectedDefect.image_url) && (
-                        <div style={{ marginBottom: 12, borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+                        <div style={{ marginBottom: 12, borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb', position: 'relative' }}>
                           <img
                             src={selectedDefect.tagged_image_url || selectedDefect.image_url}
                             alt="Defect"
                             style={{ width: '100%', display: 'block', objectFit: 'contain', background: '#000' }}
                           />
+                          {selectedDefect.tag_number != null && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '12px',
+                              left: '12px',
+                              background: '#0f2942',
+                              color: 'white',
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              fontSize: '14px',
+                              fontWeight: '700',
+                              fontFamily: 'Poppins, sans-serif',
+                              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+                            }}>
+                              #{selectedDefect.tag_number}
+                            </div>
+                          )}
                         </div>
                       )}
                       <div className="dh-detail-card">

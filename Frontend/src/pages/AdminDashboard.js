@@ -2,15 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
-import { fetchDefects, fetchDefectsByRange, fetchDefectsByDateRange } from '../services/defects';
+import AdminEmployeeManagement from '../components/AdminEmployeeManagement';
+import { fetchDefects, fetchDefectsByRange, fetchDefectsByDateRange, fetchDeviceStatus, subscribeToDeviceStatus } from '../services/defects';
 import './AdminDashboard.css';
 
 // ── Helpers ──────────────────────────────────────────────────────
-function capitalizeDefectType(type) {
-  if (!type) return type;
-  return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
-}
-
 function formatRelativeTime(dateStr) {
   const detectionDate = new Date(dateStr);
   const now = new Date();
@@ -31,18 +27,6 @@ function formatRelativeTime(dateStr) {
   }
 }
 
-function groupByDate(defects) {
-  const groups = {};
-  defects.forEach((d) => {
-    const dateKey = new Date(d.detected_at).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric',
-    });
-    if (!groups[dateKey]) groups[dateKey] = [];
-    groups[dateKey].push(d);
-  });
-  return Object.entries(groups).sort((a, b) => new Date(b[0]) - new Date(a[0]));
-}
-
 function AdminDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -55,10 +39,15 @@ function AdminDashboard() {
   const [lastDetectionTime, setLastDetectionTime] = useState(null);
   const [timeUpdateCounter, setTimeUpdateCounter] = useState(0);
 
+  // Raspberry Pi device status
+  const [deviceStatus, setDeviceStatus] = useState(null);
+  const [deviceStatusLoading, setDeviceStatusLoading] = useState(true);
+
   // Check if admin is authenticated
   useEffect(() => {
+    const adminLoggedIn = sessionStorage.getItem('adminLoggedIn') === 'true';
     const adminToken = sessionStorage.getItem('adminToken');
-    if (!adminToken) {
+    if (!adminLoggedIn && !adminToken) {
       navigate('/');
     }
   }, [navigate]);
@@ -66,6 +55,7 @@ function AdminDashboard() {
   const handleLogout = () => {
     sessionStorage.removeItem('adminToken');
     sessionStorage.removeItem('adminLoggedIn');
+    sessionStorage.removeItem('userId');
     navigate('/');
   };
 
@@ -86,6 +76,25 @@ function AdminDashboard() {
   useEffect(() => {
     loadLastDetection();
   }, []);
+
+  // Fetch initial device status and subscribe to real-time updates
+  useEffect(() => {
+    let cancelled = false;
+    setDeviceStatusLoading(true);
+    fetchDeviceStatus('raspi').then((status) => {
+      if (!cancelled) {
+        setDeviceStatus(status);
+        setDeviceStatusLoading(false);
+      }
+    });
+    const unsubscribe = subscribeToDeviceStatus('raspi', (updated) => {
+      if (!cancelled) setDeviceStatus(updated);
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-fetch filtered defects when date filter changes
   useEffect(() => {
@@ -174,21 +183,15 @@ function AdminDashboard() {
       
       <main className="machine-main-content">
         {/* Header */}
-        <div className="machine-header">
-          <button 
-            className="hamburger-menu"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label="Toggle sidebar"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
+        <header className="machine-header">
+          <button className="sidebar-hamburger" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle sidebar">
+            <span /><span /><span />
           </button>
-          <h1 className="machine-header-title">Admin Dashboard</h1>
-          <div className="machine-header-spacer"></div>
-        </div>
+          <div className="machine-header-left">
+            <h1 className="machine-header-title">Admin Dashboard</h1>
+            <p className="machine-header-subtitle">Overview &amp; Employee Management</p>
+          </div>
+        </header>
 
         {/* Content Area */}
         <div className="dashboard-container">
@@ -228,46 +231,38 @@ function AdminDashboard() {
                   </span>
                 </div>
               </div>
+              <div className="dashboard-box dashboard-status-box">
+                <span className="dashboard-stat-label">Raspberry Pi Status</span>
+                {deviceStatusLoading ? (
+                  <span className="dashboard-stat-value dashboard-stat-status" style={{ color: '#94a3b8' }}>…</span>
+                ) : (() => {
+                  const online = deviceStatus?.is_online === true;
+                  const lastSeen = deviceStatus?.last_seen
+                    ? new Date(deviceStatus.last_seen).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                    : null;
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span className="dashboard-stat-value dashboard-stat-status" style={{ color: online ? '#22c55e' : '#ef4444', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: online ? '#22c55e' : '#ef4444', flexShrink: 0 }} />
+                        {online ? 'Online' : deviceStatus ? 'Offline' : 'Unknown'}
+                      </span>
+                      {lastSeen && (
+                        <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                          Last seen: {lastSeen}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           </div>
 
-          {/* Defect Sessions - Full width */}
-          <div className="dashboard-box-wrapper dashboard-box-wrapper-full">
-            <h2 className="dashboard-box-title">Detection Sessions ({filteredDefects.length})</h2>
-            <div className="dashboard-box dashboard-sessions-box">
-              {loading ? (
-                <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>Loading sessions...</div>
-              ) : filteredDefects.length === 0 ? (
-                <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>No defects in this period</div>
-              ) : (
-                <div className="sessions-container">
-                  {groupByDate(filteredDefects).map(([dateKey, dayDefects]) => (
-                    <div key={dateKey} className="session-group">
-                      <div className="session-date-header">{dateKey}</div>
-                      <div className="session-items">
-                        {dayDefects.map((defect, idx) => (
-                          <div key={defect.id || idx} className="session-item">
-                            <span className="session-index">{idx + 1}</span>
-                            <div className="session-info">
-                              <span className="session-type">{capitalizeDefectType(defect.defect_type)}</span>
-                              <span className="session-time">
-                                {new Date(defect.detected_at).toLocaleTimeString('en-US', { 
-                                  hour: '2-digit', 
-                                  minute: '2-digit', 
-                                  second: '2-digit' 
-                                })}
-                              </span>
-                            </div>
-                            {defect.confidence != null && (
-                              <span className="session-confidence">{(defect.confidence * 100).toFixed(0)}%</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+          {/* Employee Management Section */}
+          <div className="dashboard-box-wrapper dashboard-box-wrapper-full admin-emp-expand">
+            <h2 className="dashboard-box-title">Employee Management</h2>
+            <div className="dashboard-box dashboard-employee-box">
+              <AdminEmployeeManagement />
             </div>
           </div>
         </div>

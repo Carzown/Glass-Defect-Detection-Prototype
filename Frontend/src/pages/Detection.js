@@ -295,11 +295,30 @@ function Detection() {
                     <p className="machine-empty-state-text">No defects detected yet</p>
                   </div>
                 ) : currentDefects[0] && currentDefects[0].imageUrl ? (
-                  <img
-                    src={currentDefects[0].imageUrl}
-                    alt="Most recent defect"
-                    style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '4px' }}
-                  />
+                  <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                    <img
+                      src={currentDefects[0].imageUrl}
+                      alt="Most recent defect"
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '4px' }}
+                    />
+                    {currentDefects[0].tagNumber != null && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '12px',
+                        left: '12px',
+                        background: '#0f2942',
+                        color: 'white',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        fontWeight: '700',
+                        fontFamily: 'Poppins, sans-serif',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+                      }}>
+                        #{currentDefects[0].tagNumber}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="machine-empty-state">
                     <p className="machine-empty-state-text">No image available</p>
@@ -397,7 +416,26 @@ function Detection() {
                 {/* Image area */}
                 <div className="det-modal-image-area">
                   {modalDefect.imageUrl ? (
-                    <img src={modalDefect.imageUrl} alt="Defect" className="det-modal-image" />
+                    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                      <img src={modalDefect.imageUrl} alt="Defect" className="det-modal-image" />
+                      {modalDefect.tagNumber != null && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '16px',
+                          left: '16px',
+                          background: '#0f2942',
+                          color: 'white',
+                          padding: '8px 14px',
+                          borderRadius: '8px',
+                          fontSize: '16px',
+                          fontWeight: '700',
+                          fontFamily: 'Poppins, sans-serif',
+                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+                        }}>
+                          #{modalDefect.tagNumber}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="det-modal-no-image">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="40" height="40">
