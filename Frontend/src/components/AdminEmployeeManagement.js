@@ -13,8 +13,6 @@ function AdminEmployeeManagement() {
 
   // Form states for adding employee
   const [newEmployee, setNewEmployee] = useState({ email: '', password: '' });
-  const [changingPassword, setChangingPassword] = useState(null);
-  const [newPassword, setNewPassword] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [clearDbConfirm, setClearDbConfirm] = useState(false);
   const [editingEmployeeId, setEditingEmployeeId] = useState(null);
@@ -27,7 +25,8 @@ function AdminEmployeeManagement() {
   }, []);
 
   const loadEmployees = async () => {
-    try {
+
+  try {
       setLoading(true);
       const { data, error } = await supabase
         .from('profiles')

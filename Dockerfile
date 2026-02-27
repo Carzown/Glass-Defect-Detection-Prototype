@@ -12,7 +12,8 @@ WORKDIR /app/Backend
 RUN npm install --legacy-peer-deps
 
 # Copy .env for production environment (contains Supabase credentials, overridable via ENV variables)
-COPY Backend/.env .env 2>/dev/null || true
+# Note: .env is optional and can be provided via environment variables
+RUN test -f .env || echo "Using environment variables for configuration"
 # Expose port
 EXPOSE 5000
 

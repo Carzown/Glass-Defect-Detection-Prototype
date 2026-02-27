@@ -104,7 +104,7 @@ function AdminDetection() {
         end = customToDate ? `${customToDate}T23:59:59.999Z` : new Date().toISOString();
       } else {
         // Use preset date range
-        ({ start: start, end: end } = getDateRangeBounds(timeFilter));
+        ({ start, end } = getDateRangeBounds(timeFilter));
       }
       const result = await fetchDefects({ limit: 999999, offset: 0, dateFrom: start, dateTo: end });
       const supabaseData = result.data || [];
@@ -150,7 +150,7 @@ function AdminDetection() {
   useEffect(() => {
     setLoading(true);
     loadSupabaseDefects();
-  }, [timeFilter, customFromDate, customToDate]);
+  }, [timeFilter, customFromDate, customToDate, loadSupabaseDefects]);
 
   // Load last detection on mount
   useEffect(() => {

@@ -150,7 +150,7 @@ function AdminDashboard() {
       }
     };
     loadData();
-  }, [location.pathname]);
+  }, [location.pathname, customFromDate, customToDate, timeFilter]);
 
   // Update relative times every 30 seconds
   useEffect(() => {
