@@ -1,6 +1,6 @@
 # Glass Defect Detection - React Frontend
 
-Modern React dashboard for real-time glass defect detection with WebSocket streaming and Supabase integration.
+Modern React dashboard for real-time glass defect detection with Supabase integration.
 
 **Status**: 🟢 Production Ready | **Version**: 1.0 | **Last Updated**: February 16, 2026
 
@@ -12,7 +12,6 @@ Modern React dashboard for real-time glass defect detection with WebSocket strea
 - Node.js 16+ installed
 - Supabase project with credentials
 - Backend running (Railway.app in production)
-- WebSocket server on port 8080
 
 ### Installation
 
@@ -25,7 +24,6 @@ cat > .env.local << EOF
 REACT_APP_SUPABASE_URL=https://your-project.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=your_anon_key
 REACT_APP_BACKEND_URL=https://your-railway-backend.railway.app
-REACT_APP_WS_URL=wss://your-railway-backend.railway.app:8080
 EOF
 
 # Start development server
@@ -62,10 +60,10 @@ npm run build
 - 💾 **Session Persistence** - Remember login state
 - 👤 **User Profile** - View and manage account
 
-### Real-Time Features
-- ⚡ **WebSocket Connection** - Auto-reconnection every 3 seconds
-- 📡 **Frame Streaming** - 85% JPEG quality compressed frames
-- 🚨 **Live Defect Notifications** - Instant updates when detected
+### Analytics
+- 📊 **Defect Charts** - Visual trends and statistics
+- 📈 **Detection History** - Browse and filter past detections
+- 🏷️ **Tag Management** - Auto-numbered defect badges
 
 ---
 
@@ -75,18 +73,15 @@ npm run build
 ┌─────────────────┐
 │  React Frontend │ (This repo)
 │  Dashboard      │
-│  Real-time UI   │
 └────────┬────────┘
-         │ WebSocket (wss://)
-         ├──────────────────┐
-         │                  │
-┌────────▼────────┐  ┌─────▼──────────┐
-│  Backend API    │  │  WebSocket     │
-│  (Railway)      │  │  Server :8080  │
-│                 │  └─────┬──────────┘
-└────────┬────────┘        │
-         │                 │
-    Supabase ◄─────────────┘
+         │ HTTP API
+         │
+┌────────▼────────┐
+│  Backend API    │
+│  (Railway)      │
+└────────┬────────┘
+         │
+    Supabase
     Database + Storage
 ```
 
@@ -157,7 +152,6 @@ npm run build
 
 - ✅ Environment variables for secrets (never commit .env files)
 - ✅ Supabase RLS policies enabled
-- ✅ WebSocket uses secure wss:// in production
 - ✅ CORS configured for production domain
 - ✅ API keys properly scoped
 
@@ -167,7 +161,6 @@ npm run build
 
 | Issue | Solution |
 |-------|----------|
-| WebSocket not connecting | Verify `REACT_APP_WS_URL` uses `wss://` (HTTPS) |
 | Login not working | Check Supabase credentials in `.env.local` |
 | Defects not appearing | Ensure Backend running and connected to Supabase |
 | Build fails | Run `rm -rf node_modules package-lock.json` then `npm install` |
