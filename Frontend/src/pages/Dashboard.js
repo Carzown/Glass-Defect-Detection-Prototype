@@ -7,7 +7,17 @@ import DateRangePicker from '../components/DateRangePicker';
 import { fetchDefects, fetchDefectsByRange, fetchDefectsByDateRange, fetchDeviceStatus, subscribeToDeviceStatus } from '../services/defects';
 import './Dashboard.css';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+const getBackendURL = () => {
+  if (process.env.REACT_APP_BACKEND_URL) {
+    return process.env.REACT_APP_BACKEND_URL;
+  }
+  if (window.location.hostname !== 'localhost') {
+    return window.location.origin;
+  }
+  return 'http://localhost:5000';
+};
+
+const BACKEND_URL = getBackendURL();
 
 // ── Helpers for sessions widget ──────────────────────────────────
 function capitalizeDefectType(type) {

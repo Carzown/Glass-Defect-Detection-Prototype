@@ -6,7 +6,17 @@ import AdminEmployeeManagement from '../components/AdminEmployeeManagement';
 import { fetchDefects, fetchDefectsByRange, fetchDefectsByDateRange, fetchDeviceStatus, subscribeToDeviceStatus } from '../services/defects';
 import './AdminDashboard.css';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+const getBackendURL = () => {
+  if (process.env.REACT_APP_BACKEND_URL) {
+    return process.env.REACT_APP_BACKEND_URL;
+  }
+  if (window.location.hostname !== 'localhost') {
+    return window.location.origin;
+  }
+  return 'http://localhost:5000';
+};
+
+const BACKEND_URL = getBackendURL();
 
 // ── Helpers ──────────────────────────────────────────────────────
 function formatRelativeTime(dateStr) {

@@ -3,7 +3,17 @@
 // Auth/login is always direct-to-Supabase (no backend auth routes exist).
 import { supabase } from '../supabase';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const getBackendURL = () => {
+  if (process.env.REACT_APP_BACKEND_URL) {
+    return process.env.REACT_APP_BACKEND_URL;
+  }
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    return window.location.origin;
+  }
+  return 'http://localhost:5000';
+};
+
+const BACKEND_URL = getBackendURL();
 
 // ── Backend availability cache ────────────────────────────────────────────
 let _backendAvailable = null;

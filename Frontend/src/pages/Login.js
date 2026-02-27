@@ -3,7 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import logo from '../assets/AlumpreneurLogo.png';
 import './Login.css';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+// Determine backend URL: use env var, or detect from window location
+const getBackendURL = () => {
+  if (process.env.REACT_APP_BACKEND_URL) {
+    return process.env.REACT_APP_BACKEND_URL;
+  }
+  // In production on Railway, use same origin as frontend
+  if (window.location.hostname !== 'localhost') {
+    return window.location.origin;
+  }
+  // Development fallback
+  return 'http://localhost:5000';
+};
+
+const BACKEND_URL = getBackendURL();
 
 function Login() {
   const [role, setRole] = useState('employee'); // 'admin' | 'employee'
