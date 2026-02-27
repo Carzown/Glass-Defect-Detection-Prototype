@@ -203,7 +203,7 @@ function AdminDetection() {
         onToggle={() => setSidebarOpen(o => !o)}
       />
 
-      <main className="machine-main-content">
+      <main className="machine-main-content" style={{ overflow: 'hidden' }}>
         <header className="machine-header">
           <button className="sidebar-hamburger" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle sidebar">
             <span /><span /><span />
@@ -214,8 +214,8 @@ function AdminDetection() {
           </div>
         </header>
 
-        <div className="machine-content-area">
-          <div className="machine-content-wrapper">
+        <div className="machine-content-area" style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div className="machine-content-wrapper" style={{ flex: 1, height: 'auto', minHeight: 0 }}>
             {/* Image Preview Section - Left */}
             <div className="machine-image-preview-panel">
               <div className="image-preview-header">
