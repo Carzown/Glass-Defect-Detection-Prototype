@@ -70,11 +70,12 @@ function Login() {
       sessionStorage.setItem('userId', user.id);
       navigate('/dashboard');
     } catch (err) {
-      let msg = 'Login failed';
+      let msg = 'Login failed. Please try again.';
       if (err.message) {
-        if (err.message.includes('Invalid login credentials')) msg = 'Invalid email or password';
-        else if (err.message.includes('too-many-requests')) msg = 'Too many attempts. Try again later';
-        else msg = err.message;
+        if (err.message.includes('Invalid login credentials')) msg = 'Invalid email or password.';
+        else if (err.message.includes('too-many-requests')) msg = 'Too many login attempts. Please try again later.';
+        else if (err.message.includes('email not confirmed')) msg = 'Please verify your email before logging in.';
+        else if (err.message.includes('already registered')) msg = 'This email is already registered.';
       }
       setError(msg);
     } finally {
@@ -89,7 +90,7 @@ function Login() {
     try {
       const result = await signInAndGetRole(email, password);
       if (result.role !== 'admin') {
-        setError('Access denied. This account does not have admin privileges.');
+        setError('This account does not have admin access.');
         setLoading(false);
         return;
       }
@@ -105,11 +106,12 @@ function Login() {
       sessionStorage.setItem('userId', result.uid);
       navigate('/admin-dashboard');
     } catch (err) {
-      let msg = 'Login failed';
+      let msg = 'Login failed. Please try again.';
       if (err.message) {
-        if (err.message.includes('Invalid login credentials')) msg = 'Invalid email or password';
-        else if (err.message.includes('too-many-requests')) msg = 'Too many attempts. Try again later';
-        else msg = err.message;
+        if (err.message.includes('Invalid login credentials')) msg = 'Invalid email or password.';
+        else if (err.message.includes('too-many-requests')) msg = 'Too many login attempts. Please try again later.';
+        else if (err.message.includes('email not confirmed')) msg = 'Please verify your email before logging in.';
+        else if (err.message.includes('already registered')) msg = 'This email is already registered.';
       }
       setError(msg);
     } finally {
