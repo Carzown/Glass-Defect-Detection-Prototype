@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
 import { signOutUser } from '../supabase';
@@ -11,7 +11,6 @@ import './DetectionHistory.css';
 
 function DetectionHistory() {
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [authChecked, setAuthChecked] = useState(false);
   const [sessions, setSessions] = useState([]);

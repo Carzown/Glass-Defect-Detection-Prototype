@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
 import AdminEmployeeManagement from '../components/AdminEmployeeManagement';
@@ -14,7 +14,6 @@ const BACKEND_URL = getBackendURL();
 
 function AdminDashboard() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [authChecked, setAuthChecked] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [timeFilter, setTimeFilter] = useState('today');

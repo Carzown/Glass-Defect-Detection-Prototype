@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
@@ -69,7 +69,6 @@ function aggregateDefectsForTrend(defects, timeFilter) {
 
 function Dashboard() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [authChecked, setAuthChecked] = useState(false);
   const [timeFilter, setTimeFilter] = useState('today');
   const [sidebarOpen, setSidebarOpen] = useState(false);
