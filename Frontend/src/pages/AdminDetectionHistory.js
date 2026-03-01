@@ -18,6 +18,7 @@ function AdminDetectionHistory() {
   const [selectedSession, setSelectedSession] = useState(null);
   const [selectedDefect, setSelectedDefect] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [timeFilter, setTimeFilter] = useState('30days');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [customFromDate, setCustomFromDate] = useState('');
@@ -37,12 +38,23 @@ function AdminDetectionHistory() {
   function handleLogout() {
     sessionStorage.removeItem('adminToken');
     sessionStorage.removeItem('adminLoggedIn');
+    sessionStorage.removeItem('loggedIn');
+    sessionStorage.removeItem('userId');
+    sessionStorage.removeItem('userEmail');
+    sessionStorage.removeItem('userRole');
+    sessionStorage.removeItem('accessToken');
+    sessionStorage.removeItem('refreshToken');
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminLoggedIn');
+    localStorage.removeItem('loggedIn');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userRole');
     navigate('/');
   }
 
   useEffect(() => {
     if (!authChecked) return;
-    
     let cancelled = false;
     async function load() {
       try {
@@ -52,8 +64,7 @@ function AdminDetectionHistory() {
         let data;
         if (timeFilter === 'custom-range') {
           if (!customFromDate || !customToDate) {
-            setSessions([]);
-            setLoading(false);
+            if (!cancelled) { setSessions([]); setLoading(false); }
             return;
           }
           data = await fetchDefectsByDateRange(
@@ -63,10 +74,16 @@ function AdminDetectionHistory() {
         } else {
           data = await fetchDefectsByRange(timeFilter);
         }
-        if (!cancelled) setSessions(groupByDate(data));
+        if (!cancelled) {
+          setFetchError(null);
+          setSessions(groupByDate(data));
+        }
       } catch (e) {
         console.error('[AdminDetectionHistory] Error loading defects:', e);
-        if (!cancelled) setSessions([]);
+        if (!cancelled) {
+          setFetchError('Failed to load history. Please check your connection.');
+          setSessions([]);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -74,27 +91,6 @@ function AdminDetectionHistory() {
     load();
     return () => { cancelled = true; };
   }, [authChecked, timeFilter, customFromDate, customToDate]);
-
-  // Refresh data when navigating to this page (only after auth is verified)
-  useEffect(() => {
-    if (!authChecked) return;
-    
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        setSelectedSession(null);
-        setSelectedDefect(null);
-        const data = await fetchDefectsByRange(timeFilter);
-        setSessions(groupByDate(data));
-      } catch (e) {
-        console.error('[AdminDetectionHistory] Error loading defects:', e);
-        setSessions([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, [authChecked, timeFilter]);
 
   function handleSessionClick(session) {
     setSelectedSession(session);
@@ -117,7 +113,8 @@ function AdminDetectionHistory() {
       setShowDeleteConfirm(false);
     } catch (error) {
       console.error('[AdminDetectionHistory] Error deleting defect:', error);
-      alert('Failed to delete defect. Please try again.');
+      setFetchError('Failed to delete defect. Please try again.');
+      setShowDeleteConfirm(false);
     }
   }
 
@@ -191,7 +188,9 @@ function AdminDetectionHistory() {
                 </div>
                 <div className="dh-panel-list">
                   {sessions.length === 0 ? (
-                    <div className="dh-empty">No history found</div>
+                    <div className="dh-empty">
+                      {fetchError ? fetchError : 'No history found'}
+                    </div>
                   ) : (
                     sessions.map(([dateKey, defects]) => (
                       <div

@@ -21,6 +21,7 @@ function AdminDashboard() {
   const [customToDate, setCustomToDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }));
   const [filteredDefects, setFilteredDefects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [lastDetectionTime, setLastDetectionTime] = useState(null);
 
   // Raspberry Pi device status
@@ -39,19 +40,17 @@ function AdminDashboard() {
 
   const handleLogout = async () => {
     try {
-      // Call backend logout endpoint
       await fetch(`${BACKEND_URL}/auth/logout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionStorage.getItem('accessToken')}`,
+          'Authorization': `Bearer ${sessionStorage.getItem('accessToken') || ''}`,
         },
+        signal: AbortSignal.timeout(3000),
       });
-    } catch (error) {
-      console.error('Logout error:', error);
+    } catch {
+      // Logout is always successful locally
     }
-
-    // Clear both sessionStorage and localStorage
     sessionStorage.removeItem('adminToken');
     sessionStorage.removeItem('adminLoggedIn');
     sessionStorage.removeItem('loggedIn');
@@ -60,14 +59,12 @@ function AdminDashboard() {
     sessionStorage.removeItem('userRole');
     sessionStorage.removeItem('accessToken');
     sessionStorage.removeItem('refreshToken');
-    
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminLoggedIn');
     localStorage.removeItem('loggedIn');
     localStorage.removeItem('userId');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('userRole');
-    
     navigate('/');
   };
 
@@ -132,10 +129,16 @@ function AdminDashboard() {
         } else {
           data = await fetchDefectsByRange(timeFilter);
         }
-        if (!cancelled) setFilteredDefects(data);
+        if (!cancelled) {
+          setFetchError(null);
+          setFilteredDefects(data);
+        }
       } catch (e) {
         console.error('[AdminDashboard] Failed to load defects:', e);
-        if (!cancelled) setFilteredDefects([]);
+        if (!cancelled) {
+          setFetchError('Failed to load defects. Please check your connection.');
+          setFilteredDefects([]);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -196,6 +199,11 @@ function AdminDashboard() {
 
         {/* Content Area */}
         <div className="dashboard-container">
+          {fetchError && (
+            <div style={{ padding: '10px 16px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, color: '#dc2626', fontSize: 14, marginBottom: 12 }}>
+              {fetchError}
+            </div>
+          )}
           <div className="dashboard-box-wrapper dashboard-box-wrapper-full">
             <div className="dashboard-title-row" style={{ gap: '12px', alignItems: 'center' }}>
               <h2 className="dashboard-box-title">Statistics</h2>

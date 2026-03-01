@@ -17,6 +17,7 @@ function DetectionHistory() {
   const [selectedSession, setSelectedSession] = useState(null);
   const [selectedDefect, setSelectedDefect] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [timeFilter, setTimeFilter] = useState('30days');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -33,11 +34,7 @@ function DetectionHistory() {
   const [customToDate, setCustomToDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }));
 
   async function handleLogout() {
-    try {
-      await signOutUser();
-    } catch (err) {
-      console.error('Logout error:', err);
-    }
+    try { await signOutUser(); } catch {}
     sessionStorage.removeItem('loggedIn');
     sessionStorage.removeItem('role');
     sessionStorage.removeItem('userId');
@@ -48,7 +45,6 @@ function DetectionHistory() {
 
   useEffect(() => {
     if (!authChecked) return;
-    
     let cancelled = false;
     async function load() {
       try {
@@ -58,8 +54,7 @@ function DetectionHistory() {
         let data;
         if (timeFilter === 'custom-range') {
           if (!customFromDate || !customToDate) {
-            setSessions([]);
-            setLoading(false);
+            if (!cancelled) { setSessions([]); setLoading(false); }
             return;
           }
           data = await fetchDefectsByDateRange(
@@ -69,10 +64,16 @@ function DetectionHistory() {
         } else {
           data = await fetchDefectsByRange(timeFilter);
         }
-        if (!cancelled) setSessions(groupByDate(data));
+        if (!cancelled) {
+          setFetchError(null);
+          setSessions(groupByDate(data));
+        }
       } catch (e) {
         console.error('[DetectionHistory] Error loading defects:', e);
-        if (!cancelled) setSessions([]);
+        if (!cancelled) {
+          setFetchError('Failed to load history. Please check your connection.');
+          setSessions([]);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -80,27 +81,6 @@ function DetectionHistory() {
     load();
     return () => { cancelled = true; };
   }, [authChecked, timeFilter, customFromDate, customToDate]);
-
-  // Refresh data when navigating to this page (only after auth is verified)
-  useEffect(() => {
-    if (!authChecked) return;
-    
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        setSelectedSession(null);
-        setSelectedDefect(null);
-        const data = await fetchDefectsByRange(timeFilter);
-        setSessions(groupByDate(data));
-      } catch (e) {
-        console.error('[DetectionHistory] Error loading defects:', e);
-        setSessions([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, [authChecked, timeFilter]);
 
   function handleSessionClick(session) {
     setSelectedSession(session);
@@ -181,7 +161,9 @@ function DetectionHistory() {
                 </div>
                 <div className="dh-panel-list">
                   {sessions.length === 0 ? (
-                    <div className="dh-empty">No history found</div>
+                    <div className="dh-empty">
+                      {fetchError ? fetchError : 'No history found'}
+                    </div>
                   ) : (
                     sessions.map(([dateKey, defects]) => (
                       <div

@@ -90,6 +90,7 @@ function Dashboard() {
   const [dashSelectedDefect, setDashSelectedDefect] = useState(null);
   const [filteredDefects, setFilteredDefects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [lastDetectionTime, setLastDetectionTime] = useState(null);
 
   // Raspberry Pi device status (from device_status table)
@@ -122,11 +123,9 @@ function Dashboard() {
     try {
       const result = await fetchDefects({ limit: 1, offset: 0, dateFrom: new Date(0).toISOString(), dateTo: new Date().toISOString() });
       const supabaseData = result.data || [];
-      if (supabaseData.length > 0) {
-        setLastDetectionTime(supabaseData[0].detected_at);
-      }
-    } catch (error) {
-      console.error('[Dashboard] Error loading last detection:', error);
+      if (supabaseData.length > 0) setLastDetectionTime(supabaseData[0].detected_at);
+    } catch {
+      // Non-critical – indicator just won't update
     }
   };
 
@@ -159,10 +158,16 @@ function Dashboard() {
         } else {
           data = await fetchDefectsByRange(timeFilter);
         }
-        if (!cancelled) setFilteredDefects(data);
+        if (!cancelled) {
+          setFetchError(null);
+          setFilteredDefects(data);
+        }
       } catch (e) {
         console.error('[Dashboard] Failed to load defects:', e);
-        if (!cancelled) setFilteredDefects([]);
+        if (!cancelled) {
+          setFetchError('Failed to load defects. Please check your connection.');
+          setFilteredDefects([]);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -177,19 +182,17 @@ function Dashboard() {
 
   async function handleLogout() {
     try {
-      // Call backend logout endpoint
       await fetch(`${BACKEND_URL}/auth/logout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionStorage.getItem('accessToken')}`,
+          'Authorization': `Bearer ${sessionStorage.getItem('accessToken') || ''}`,
         },
+        signal: AbortSignal.timeout(3000),
       });
-    } catch (error) {
-      console.error('Logout error:', error);
+    } catch {
+      // Logout should always succeed locally even if server unreachable
     }
-
-    // Clear both sessionStorage and localStorage
     sessionStorage.removeItem('loggedIn');
     sessionStorage.removeItem('adminLoggedIn');
     sessionStorage.removeItem('role');
@@ -198,19 +201,14 @@ function Dashboard() {
     sessionStorage.removeItem('userRole');
     sessionStorage.removeItem('accessToken');
     sessionStorage.removeItem('refreshToken');
-    
     localStorage.removeItem('loggedIn');
     localStorage.removeItem('adminLoggedIn');
     localStorage.removeItem('userId');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('userRole');
     localStorage.removeItem('adminToken');
-
     const remembered = localStorage.getItem('rememberMe') === 'true';
-    if (!remembered) {
-      localStorage.removeItem('email');
-    }
-
+    if (!remembered) localStorage.removeItem('email');
     navigate('/');
   }
 
@@ -348,7 +346,9 @@ function Dashboard() {
                     </div>
                     <div className="dh-panel-list">
                       {dashSessions.length === 0 ? (
-                        <div className="dh-empty">No history yet</div>
+                        <div className="dh-empty">
+                          {fetchError ? fetchError : 'No history yet'}
+                        </div>
                       ) : (
                         dashSessions.map(([dateKey, defects]) => (
                           <div

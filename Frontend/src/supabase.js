@@ -9,9 +9,7 @@ let auth;
 if (supabaseUrl && supabaseKey) {
   supabase = createClient(supabaseUrl, supabaseKey);
   auth = supabase.auth;
-  console.log('✅ Supabase initialized');
 } else {
-  console.error('❌ Supabase not configured');
   auth = { currentUser: null };
   supabase = null;
 }
@@ -185,11 +183,8 @@ export async function saveDefectRecord(defectData) {
       .single();
     
     if (error) throw error;
-    
-    console.log('✅ Defect saved:', data.id);
     return data;
   } catch (error) {
-    console.error('Error saving defect:', error);
     throw error;
   }
 }

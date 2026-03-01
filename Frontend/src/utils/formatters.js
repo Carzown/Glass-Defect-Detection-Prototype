@@ -107,16 +107,24 @@ export function aggregateDefectsByType(defects) {
   return Object.entries(counts).map(([type, count]) => ({ type, count }));
 }
 
+// Production Railway backend URL – used as default when REACT_APP_BACKEND_URL is not set
+const RAILWAY_BACKEND_URL = 'https://glass-defect-detection-prototype-production.up.railway.app';
+
 /**
- * Get backend URL with fallbacks
- * @returns {string} - Backend URL
+ * Returns the backend API base URL.
+ * Priority: REACT_APP_BACKEND_URL env var → localhost (dev) → Railway (production).
+ * @returns {string}
  */
 export function getBackendURL() {
   if (process.env.REACT_APP_BACKEND_URL) {
     return process.env.REACT_APP_BACKEND_URL;
   }
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+  if (
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ) {
     return 'http://localhost:5000';
   }
-  return 'http://localhost:5000';
+  // Production fallback: always point to the Railway backend
+  return RAILWAY_BACKEND_URL;
 }

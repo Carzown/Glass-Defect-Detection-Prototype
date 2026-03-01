@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../supabase';
 import { getBackendURL } from '../utils/formatters';
 import logo from '../assets/AlumpreneurLogo.png';
 import './Login.css';
@@ -96,6 +97,18 @@ function Login() {
         if (data.session.refreshToken) {
           sessionStorage.setItem('refreshToken', data.session.refreshToken);
         }
+        // Sync the Supabase client session so direct-Supabase fallback queries
+        // are authenticated (bypasses RLS restrictions on anon role).
+        if (supabase) {
+          try {
+            await supabase.auth.setSession({
+              access_token: data.session.accessToken,
+              refresh_token: data.session.refreshToken || '',
+            });
+          } catch (_) {
+            // Non-fatal: direct queries will fall back to anon role
+          }
+        }
       }
 
       // Store user info (sessionStorage + localStorage for persistence across refresh)
@@ -121,12 +134,9 @@ function Login() {
         navigate('/dashboard');
       }
     } catch (err) {
-      console.error('[Login] Backend login error:', err);
       let msg = 'Login failed. Please try again.';
-      if (err.message) {
-        if (err.message.includes('Failed to fetch')) {
-          msg = 'Cannot reach the server. Please check your connection.';
-        }
+      if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+        msg = 'Cannot reach the server. Please check your connection.';
       }
       setError(msg);
     } finally {
@@ -210,9 +220,7 @@ function Login() {
           </button>
         </form>
 
-        <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
-          <p>Powered by Supabase Authentication</p>
-        </div>
+
       </div>
     </div>
   );

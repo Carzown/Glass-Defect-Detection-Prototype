@@ -20,6 +20,7 @@ function Detection() {
   // State
   const [currentDefects, setCurrentDefects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedDefectId, setSelectedDefectId] = useState(null);
@@ -76,9 +77,15 @@ function Detection() {
           supabaseData: d,
         }));
         const sorted = displayDefects.sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at));
-        setCurrentDefects(sorted);
+        if (!cancelled) {
+          setFetchError(null);
+          setCurrentDefects(sorted);
+        }
       } catch (error) {
-        if (!cancelled) console.error('[Detection] Error loading defects:', error);
+        if (!cancelled) {
+          console.error('[Detection] Error loading defects:', error);
+          setFetchError('Failed to load defects. Please check your connection.');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -97,14 +104,8 @@ function Detection() {
       try {
         unsubscribe = subscribeToDefects({
           onNew: (newDefect) => {
-            console.log('[Detection] ✨ New real-time defect received:', newDefect);
-            
             setCurrentDefects(prevDefects => {
-              // Check if this defect already exists
-              const exists = prevDefects.some(d => d.id === newDefect.id);
-              if (exists) return prevDefects;
-
-              // Transform the new defect to match our display format
+              if (prevDefects.some(d => d.id === newDefect.id)) return prevDefects;
               const displayDefect = {
                 id: newDefect.id,
                 time: formatRelativeTime(newDefect.detected_at),
@@ -117,33 +118,20 @@ function Detection() {
                 notes: newDefect.notes,
                 supabaseData: newDefect,
               };
-
-              // Prepend new defect to the list (newest first)
               return [displayDefect, ...prevDefects];
             });
           },
           onUpdate: (updatedDefect) => {
-            console.log('[Detection] 📝 Defect updated (real-time):', updatedDefect);
-            
-            setCurrentDefects(prevDefects => 
-              prevDefects.map(d => 
-                d.id === updatedDefect.id 
-                  ? {
-                      ...d,
-                      type: capitalizeDefectType(updatedDefect.defect_type),
-                      notes: updatedDefect.notes,
-                      supabaseData: updatedDefect,
-                    }
+            setCurrentDefects(prevDefects =>
+              prevDefects.map(d =>
+                d.id === updatedDefect.id
+                  ? { ...d, type: capitalizeDefectType(updatedDefect.defect_type), notes: updatedDefect.notes, supabaseData: updatedDefect }
                   : d
               )
             );
           },
           onDelete: (deletedId) => {
-            console.log('[Detection] 🗑️ Defect deleted (real-time):', deletedId);
-            
-            setCurrentDefects(prevDefects => 
-              prevDefects.filter(d => d.id !== deletedId)
-            );
+            setCurrentDefects(prevDefects => prevDefects.filter(d => d.id !== deletedId));
           },
         });
       } catch (error) {
@@ -153,30 +141,20 @@ function Detection() {
 
     subscribeToRealTime();
 
-    return () => {
-      unsubscribe();
-    };
+    return () => { unsubscribe(); };
   }, [authChecked, timeFilter]);
 
 
   async function handleLogout() {
-    try {
-      await signOutUser();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-    
+    try { await signOutUser(); } catch {}
+
     sessionStorage.removeItem('loggedIn');
     sessionStorage.removeItem('role');
     sessionStorage.removeItem('userId');
-    
-    // If "Remember me" is not enabled, clear the email too
+
     const remembered = localStorage.getItem('rememberMe') === 'true';
-    if (!remembered) {
-      localStorage.removeItem('email');
-    }
-    
-    
+    if (!remembered) { localStorage.removeItem('email'); }
+
     navigate('/');
   }
 
@@ -300,7 +278,9 @@ function Detection() {
                   </div>
                 ) : currentDefects.length === 0 ? (
                   <div className="machine-empty-state">
-                    <p className="machine-empty-state-text">No defects detected yet</p>
+                    <p className="machine-empty-state-text">
+                      {fetchError ? fetchError : 'No defects detected yet'}
+                    </p>
                   </div>
                 ) : currentDefects[0] && currentDefects[0].imageUrl ? (
                   <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -359,7 +339,9 @@ function Detection() {
                     </div>
                   ) : currentDefects.length === 0 ? (
                     <div className="machine-empty-state">
-                      <p className="machine-empty-state-text">No defects detected yet</p>
+                      <p className="machine-empty-state-text">
+                        {fetchError ? fetchError : 'No defects detected yet'}
+                      </p>
                     </div>
                   ) : (
                     currentDefects.map((defect, index) => (

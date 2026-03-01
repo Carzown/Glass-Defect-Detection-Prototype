@@ -17,6 +17,7 @@ function AdminDetection() {
   const [authChecked, setAuthChecked] = useState(false);
   const [currentDefects, setCurrentDefects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedDefectId, setSelectedDefectId] = useState(null);
@@ -69,9 +70,15 @@ function AdminDetection() {
           supabaseData: d,
         }));
         const sorted = displayDefects.sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at));
-        setCurrentDefects(sorted);
+        if (!cancelled) {
+          setFetchError(null);
+          setCurrentDefects(sorted);
+        }
       } catch (error) {
-        if (!cancelled) console.error('[AdminDetection] Error loading defects:', error);
+        if (!cancelled) {
+          console.error('[AdminDetection] Error loading defects:', error);
+          setFetchError('Failed to load defects. Please check your connection.');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -94,14 +101,8 @@ function AdminDetection() {
       try {
         unsubscribe = subscribeToDefects({
           onNew: (newDefect) => {
-            console.log('[AdminDetection] ✨ New real-time defect received:', newDefect);
-            
             setCurrentDefects(prevDefects => {
-              // Check if this defect already exists
-              const exists = prevDefects.some(d => d.id === newDefect.id);
-              if (exists) return prevDefects;
-
-              // Transform the new defect to match our display format
+              if (prevDefects.some(d => d.id === newDefect.id)) return prevDefects;
               const displayDefect = {
                 id: newDefect.id,
                 time: formatRelativeTime(newDefect.detected_at),
@@ -114,52 +115,47 @@ function AdminDetection() {
                 notes: newDefect.notes,
                 supabaseData: newDefect,
               };
-
-              // Prepend new defect to the list (newest first)
               return [displayDefect, ...prevDefects];
             });
           },
           onUpdate: (updatedDefect) => {
-            console.log('[AdminDetection] 📝 Defect updated (real-time):', updatedDefect);
-            
-            setCurrentDefects(prevDefects => 
-              prevDefects.map(d => 
-                d.id === updatedDefect.id 
-                  ? {
-                      ...d,
-                      type: capitalizeDefectType(updatedDefect.defect_type),
-                      notes: updatedDefect.notes,
-                      supabaseData: updatedDefect,
-                    }
+            setCurrentDefects(prevDefects =>
+              prevDefects.map(d =>
+                d.id === updatedDefect.id
+                  ? { ...d, type: capitalizeDefectType(updatedDefect.defect_type), notes: updatedDefect.notes, supabaseData: updatedDefect }
                   : d
               )
             );
           },
           onDelete: (deletedId) => {
-            console.log('[AdminDetection] 🗑️ Defect deleted (real-time):', deletedId);
-            
-            setCurrentDefects(prevDefects => 
-              prevDefects.filter(d => d.id !== deletedId)
-            );
+            setCurrentDefects(prevDefects => prevDefects.filter(d => d.id !== deletedId));
           },
         });
-      } catch (error) {
-        console.error('[AdminDetection] Failed to subscribe to real-time updates:', error);
+      } catch {
+        // subscription failure is non-fatal
       }
     };
 
     subscribeToRealTime();
-
-    return () => {
-      unsubscribe();
-    };
+    return () => { unsubscribe(); };
   }, [authChecked, timeFilter]);
-
 
 
   function handleLogout() {
     sessionStorage.removeItem('adminToken');
     sessionStorage.removeItem('adminLoggedIn');
+    sessionStorage.removeItem('loggedIn');
+    sessionStorage.removeItem('userId');
+    sessionStorage.removeItem('userEmail');
+    sessionStorage.removeItem('userRole');
+    sessionStorage.removeItem('accessToken');
+    sessionStorage.removeItem('refreshToken');
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminLoggedIn');
+    localStorage.removeItem('loggedIn');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userRole');
     navigate('/');
   }
 
@@ -283,7 +279,9 @@ function AdminDetection() {
                   </div>
                 ) : currentDefects.length === 0 ? (
                   <div className="machine-empty-state">
-                    <p className="machine-empty-state-text">No defects detected yet</p>
+                    <p className="machine-empty-state-text">
+                      {fetchError ? fetchError : 'No defects detected yet'}
+                    </p>
                   </div>
                 ) : currentDefects[0] && currentDefects[0].imageUrl ? (
                   <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -344,7 +342,9 @@ function AdminDetection() {
                     </div>
                   ) : currentDefects.length === 0 ? (
                     <div className="machine-empty-state">
-                      <p className="machine-empty-state-text">No defects detected yet</p>
+                      <p className="machine-empty-state-text">
+                        {fetchError ? fetchError : 'No defects detected yet'}
+                      </p>
                     </div>
                   ) : (
                     currentDefects.map((defect, index) => (

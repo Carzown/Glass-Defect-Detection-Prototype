@@ -18,13 +18,12 @@ async function isBackendAvailable() {
   }
   try {
     if (!BACKEND_URL) { _backendAvailable = false; _backendCheckedAt = now; return false; }
-    const res = await fetch(`${BACKEND_URL}/health`, { signal: AbortSignal.timeout(4000) });
+    const res = await fetch(`${BACKEND_URL}/health`, { signal: AbortSignal.timeout(5000) });
     _backendAvailable = res.ok;
   } catch {
     _backendAvailable = false;
   }
   _backendCheckedAt = now;
-  if (!_backendAvailable) console.warn('[defects] ⚠️ Backend unavailable – using Supabase direct');
   return _backendAvailable;
 }
 
@@ -87,21 +86,17 @@ export async function fetchDefects(filters = {}) {
       const params = new URLSearchParams({ limit, offset });
       if (dateFrom) params.set('dateFrom', dateFrom);
       if (dateTo) params.set('dateTo', dateTo);
-      console.log('[fetchDefects] → backend');
       const res = await fetch(`${BACKEND_URL}/defects?${params}`, { signal: AbortSignal.timeout(8000) });
       if (!res.ok) throw new Error(`Backend responded ${res.status}`);
-      const json = await res.json();
-      console.log(`[fetchDefects] ✅ backend (${(json.data || []).length} records)`);
-      return json;
+      return await res.json();
     } catch (err) {
-      console.warn('[fetchDefects] backend failed, falling back to Supabase:', err.message);
+      console.warn('[defects] fetchDefects backend error, falling back to Supabase:', err.message);
       invalidateBackendCache();
     }
   }
 
   // Supabase direct fallback
   if (!supabase) throw new Error('Neither backend nor Supabase is available');
-  console.log('[fetchDefects] → Supabase direct');
   let query = supabase
     .from('defects')
     .select('*', { count: 'exact' })
@@ -118,18 +113,16 @@ export async function fetchDefects(filters = {}) {
 export async function fetchDefectById(id) {
   if (await isBackendAvailable()) {
     try {
-      console.log('[fetchDefectById] → backend');
       const res = await fetch(`${BACKEND_URL}/defects/${id}`, { signal: AbortSignal.timeout(8000) });
       if (!res.ok) throw new Error(`Backend responded ${res.status}`);
       return await res.json();
     } catch (err) {
-      console.warn('[fetchDefectById] backend failed, falling back to Supabase:', err.message);
+      console.warn('[defects] fetchDefectById backend error, falling back:', err.message);
       invalidateBackendCache();
     }
   }
 
   if (!supabase) throw new Error('Neither backend nor Supabase is available');
-  console.log('[fetchDefectById] → Supabase direct');
   const { data, error } = await supabase.from('defects').select('*').eq('id', id).single();
   if (error) throw error;
   return data;
@@ -139,7 +132,6 @@ export async function fetchDefectById(id) {
 export async function createDefect(defectData) {
   if (await isBackendAvailable()) {
     try {
-      console.log('[createDefect] → backend');
       const res = await fetch(`${BACKEND_URL}/defects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -150,13 +142,12 @@ export async function createDefect(defectData) {
       const json = await res.json();
       return json.data || json;
     } catch (err) {
-      console.warn('[createDefect] backend failed, falling back to Supabase:', err.message);
+      console.warn('[defects] createDefect backend error, falling back:', err.message);
       invalidateBackendCache();
     }
   }
 
   if (!supabase) throw new Error('Neither backend nor Supabase is available');
-  console.log('[createDefect] → Supabase direct');
   const { data, error } = await supabase.from('defects').insert([defectData]).select().single();
   if (error) throw error;
   return data;
@@ -166,7 +157,6 @@ export async function createDefect(defectData) {
 export async function updateDefect(id, updates) {
   if (await isBackendAvailable()) {
     try {
-      console.log('[updateDefect] → backend');
       const res = await fetch(`${BACKEND_URL}/defects/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -176,13 +166,12 @@ export async function updateDefect(id, updates) {
       if (!res.ok) throw new Error(`Backend responded ${res.status}`);
       return await res.json();
     } catch (err) {
-      console.warn('[updateDefect] backend failed, falling back to Supabase:', err.message);
+      console.warn('[defects] updateDefect backend error, falling back:', err.message);
       invalidateBackendCache();
     }
   }
 
   if (!supabase) throw new Error('Neither backend nor Supabase is available');
-  console.log('[updateDefect] → Supabase direct');
   const { data, error } = await supabase.from('defects').update(updates).eq('id', id).select().single();
   if (error) throw error;
   return data;
@@ -192,7 +181,6 @@ export async function updateDefect(id, updates) {
 export async function deleteDefect(id) {
   if (await isBackendAvailable()) {
     try {
-      console.log('[deleteDefect] → backend');
       const res = await fetch(`${BACKEND_URL}/defects/${id}`, {
         method: 'DELETE',
         signal: AbortSignal.timeout(8000),
@@ -200,7 +188,7 @@ export async function deleteDefect(id) {
       if (!res.ok) throw new Error(`Backend responded ${res.status}`);
       return true;
     } catch (err) {
-      console.warn('[deleteDefect] backend failed, falling back to Supabase:', err.message);
+      console.warn('[defects] deleteDefect backend error, falling back:', err.message);
       invalidateBackendCache();
     }
   }
@@ -235,10 +223,7 @@ export async function deleteAllDefects() {
  */
 export function subscribeToDefects({ onNew, onUpdate, onDelete } = {}) {
   try {
-    if (!supabase) {
-      console.warn('[subscribeToDefects] Supabase not initialized');
-      return () => {};
-    }
+    if (!supabase) return () => {};
     
     const defaultCallback = () => {};
     const handleNew = onNew || defaultCallback;
@@ -247,49 +232,24 @@ export function subscribeToDefects({ onNew, onUpdate, onDelete } = {}) {
     
     const channel = supabase
       .channel('defects_realtime', { config: { broadcast: { self: false } } })
-      .on('postgres_changes', 
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'defects' 
-        }, 
-        (payload) => {
-          console.log('[subscribeToDefects] 🔴 New defect detected (real-time):', payload.new);
-          handleNew(payload.new);
-        }
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'defects' },
+        (payload) => { handleNew(payload.new); }
       )
-      .on('postgres_changes', 
-        { 
-          event: 'UPDATE', 
-          schema: 'public', 
-          table: 'defects' 
-        }, 
-        (payload) => {
-          console.log('[subscribeToDefects] 🟡 Defect updated (real-time):', payload.new);
-          handleUpdate(payload.new);
-        }
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'defects' },
+        (payload) => { handleUpdate(payload.new); }
       )
-      .on('postgres_changes', 
-        { 
-          event: 'DELETE', 
-          schema: 'public', 
-          table: 'defects' 
-        }, 
-        (payload) => {
-          console.log('[subscribeToDefects] ⚪ Defect deleted (real-time):', payload.old.id);
-          handleDelete(payload.old.id);
-        }
+      .on('postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'defects' },
+        (payload) => { handleDelete(payload.old.id); }
       )
-      .subscribe((status) => {
-        console.log('[subscribeToDefects] Subscription status:', status);
-      });
-    
+      .subscribe();
+
     return () => {
-      console.log('[subscribeToDefects] ✋ Unsubscribing from real-time updates');
       supabase.removeChannel(channel);
     };
-  } catch (error) {
-    console.error('[subscribeToDefects] Error subscribing to defects:', error);
+  } catch {
     return () => {};
   }
 }
@@ -298,20 +258,17 @@ export function subscribeToDefects({ onNew, onUpdate, onDelete } = {}) {
 export async function getDefectStats() {
   if (await isBackendAvailable()) {
     try {
-      console.log('[getDefectStats] → backend');
       const res = await fetch(`${BACKEND_URL}/defects/stats/summary`, { signal: AbortSignal.timeout(8000) });
       if (!res.ok) throw new Error(`Backend responded ${res.status}`);
       const json = await res.json();
-      // Normalise to { total, byType }
       return { total: json.totalDefects ?? json.total ?? 0, byType: json.byType || {} };
     } catch (err) {
-      console.warn('[getDefectStats] backend failed, falling back to Supabase:', err.message);
+      console.warn('[defects] getDefectStats backend error, falling back:', err.message);
       invalidateBackendCache();
     }
   }
 
   if (!supabase) throw new Error('Neither backend nor Supabase is available');
-  console.log('[getDefectStats] → Supabase direct');
   const { data: allDefects, error } = await supabase.from('defects').select('defect_type');
   if (error) throw error;
   const stats = { total: allDefects?.length || 0, byType: {} };
@@ -371,19 +328,17 @@ export async function fetchDefectsByDateRange(startDate, endDate) {
         limit: 1000,
         offset: 0,
       });
-      console.log('[fetchDefectsByDateRange] → backend');
       const res = await fetch(`${BACKEND_URL}/defects?${params}`, { signal: AbortSignal.timeout(8000) });
       if (!res.ok) throw new Error(`Backend responded ${res.status}`);
       const json = await res.json();
       return json.data || [];
     } catch (err) {
-      console.warn('[fetchDefectsByDateRange] backend failed, falling back to Supabase:', err.message);
+      console.warn('[defects] fetchDefectsByDateRange backend error, falling back:', err.message);
       invalidateBackendCache();
     }
   }
 
   if (!supabase) throw new Error('Neither backend nor Supabase is available');
-  console.log('[fetchDefectsByDateRange] → Supabase direct');
   const { data, error } = await supabase
     .from('defects')
     .select('*')
@@ -429,61 +384,39 @@ export function connectWebSocket({ onNew, onUpdate, onDelete } = {}) {
 
     ws = new WebSocket(wsURL);
 
-    ws.onopen = () => {
-      console.log('[WebSocket] ✅ Connected to real-time server');
-    };
+    ws.onopen = () => {};
 
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        
         switch (message.type) {
-          case 'connected':
-            console.log('[WebSocket] 🎉 Server connection confirmed');
-            break;
-
           case 'new_defect':
-            console.log('[WebSocket] 🔴 New defect (via WebSocket):', message.data);
             if (onNew) onNew(message.data);
             break;
-
           case 'defect_update':
-            console.log('[WebSocket] 🟡 Defect update (via WebSocket):', message.defectId);
             if (onUpdate) onUpdate(message);
             break;
-
           case 'defect_delete':
-            console.log('[WebSocket] ⚪ Defect deleted (via WebSocket):', message.defectId);
             if (onDelete) onDelete(message.defectId);
             break;
-
           default:
-            console.log('[WebSocket] 📩 Unknown message type:', message.type);
+            break;
         }
-      } catch (err) {
-        console.error('[WebSocket] Failed to parse message:', err);
+      } catch {
+        // Ignore malformed messages
       }
     };
 
-    ws.onerror = (error) => {
-      console.error('[WebSocket] ❌ Connection error:', error);
-    };
+    ws.onerror = () => {};
 
-    ws.onclose = () => {
-      console.log('[WebSocket] ✋ Connection closed');
-      ws = null;
-    };
+    ws.onclose = () => { ws = null; };
 
     // Return unsubscribe function
     return () => {
-      console.log('[WebSocket] 🔌 Closing WebSocket connection');
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.close();
-      }
+      if (ws && ws.readyState === WebSocket.OPEN) ws.close();
       ws = null;
     };
-  } catch (error) {
-    console.error('[WebSocket] Failed to connect:', error);
+  } catch {
     return () => {};
   }
 }

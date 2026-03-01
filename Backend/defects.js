@@ -21,9 +21,8 @@ let supabase = null;
 
 if (supabaseUrl && supabaseKey) {
   supabase = createClient(supabaseUrl, supabaseKey);
-  console.log('✅ Supabase client initialized for defects');
 } else {
-  console.warn('⚠️ Supabase not configured - using in-memory storage');
+  console.warn('[defects] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set – falling back to in-memory store (no persistence)');
 }
 
 // GET /defects - Retrieve all defects with pagination
