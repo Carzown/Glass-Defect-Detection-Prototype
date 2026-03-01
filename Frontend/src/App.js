@@ -3,7 +3,6 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Detection from './pages/Detection';
 import DetectionHistory from './pages/DetectionHistory';
-import Help from './pages/Help';
 import HowToUse from './pages/HowToUse';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminDetection from './pages/AdminDetection';
@@ -34,7 +33,6 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/detection" element={<Detection />} />
           <Route path="/detection-history" element={<DetectionHistory />} />
-          <Route path="/help" element={<Help />} />
           <Route path="/how-to-use" element={<HowToUse />} />
           <Route path="/admin-dashboard" element={<AdminDashboard />} />
           <Route path="/admin-detection" element={<AdminDetection />} />

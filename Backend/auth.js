@@ -8,7 +8,11 @@ try {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
   
-  if (supabaseUrl && supabaseKey) {\n    supabase = createClient(supabaseUrl, supabaseKey);\n  } else {\n    console.warn('[AUTH] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set \u2013 auth routes will return 500');\n  }
+  if (supabaseUrl && supabaseKey) {
+    supabase = createClient(supabaseUrl, supabaseKey);
+  } else {
+    console.warn('[AUTH] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set - auth routes will return 500');
+  }
 } catch (e) {
   console.warn('[AUTH] Failed to initialize Supabase:', e.message);
 }
