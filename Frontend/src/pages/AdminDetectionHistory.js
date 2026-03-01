@@ -123,8 +123,23 @@ function AdminDetectionHistory() {
   }
 
   return (
-    <div className="machine-container">
-      <Sidebar
+    <>
+      {!authChecked ? (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          width: '100vw',
+          backgroundColor: '#f5f5f5',
+          fontSize: '18px',
+          color: '#666'
+        }}>
+          Loading...
+        </div>
+      ) : (
+        <div className="machine-container">
+          <Sidebar
         onLogout={handleLogout}
         mainItems={[
           { key: 'admin-dashboard', label: 'Dashboard', onClick: () => navigate('/admin-dashboard') },
@@ -347,17 +362,19 @@ function AdminDetectionHistory() {
         </div>
       </main>
 
-      <ConfirmationModal
-        isOpen={showDeleteConfirm}
-        title="Delete Defect"
-        message="Are you sure you want to delete this defect? This action cannot be undone."
-        confirmText="Delete"
-        cancelText="Cancel"
-        isDangerous={true}
-        onConfirm={handleDeleteDefect}
-        onCancel={() => setShowDeleteConfirm(false)}
-      />
-    </div>
+        <ConfirmationModal
+          isOpen={showDeleteConfirm}
+          title="Delete Defect"
+          message="Are you sure you want to delete this defect? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          isDangerous={true}
+          onConfirm={handleDeleteDefect}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+        </div>
+      )}
+    </>
   );
 }
 

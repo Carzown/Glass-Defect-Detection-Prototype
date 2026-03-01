@@ -216,8 +216,23 @@ function Dashboard() {
   }
 
   return (
-    <div className="machine-container">
-      <Sidebar
+    <>
+      {!authChecked ? (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          width: '100vw',
+          backgroundColor: '#f5f5f5',
+          fontSize: '18px',
+          color: '#666'
+        }}>
+          Loading...
+        </div>
+      ) : (
+        <div className="machine-container">
+          <Sidebar
         onLogout={handleLogout}
         mainItems={[
           { key: 'dashboard', label: 'Dashboard', onClick: () => navigate('/dashboard') },
@@ -587,7 +602,9 @@ function Dashboard() {
           </div>
         </div>
       </main>
-    </div>
+        </div>
+      )}
+    </>
   );
 }
 
