@@ -59,11 +59,22 @@ function AdminDetection() {
   const navigate = useNavigate();
   const defectsListRef = useRef(null);
 
-  // Check if admin is authenticated
+  // Check if admin is authenticated - restore from localStorage if needed
   useEffect(() => {
-    const adminToken = sessionStorage.getItem('adminToken');
+    const adminToken = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken');
+    
     if (!adminToken) {
       navigate('/');
+      return;
+    }
+    
+    // Restore session data from localStorage if sessionStorage was cleared (e.g., after refresh)
+    if (!sessionStorage.getItem('userId') && localStorage.getItem('userId')) {
+      sessionStorage.setItem('userId', localStorage.getItem('userId'));
+      sessionStorage.setItem('userEmail', localStorage.getItem('userEmail'));
+      sessionStorage.setItem('userRole', localStorage.getItem('userRole'));
+      sessionStorage.setItem('adminToken', localStorage.getItem('adminToken'));
+      sessionStorage.setItem('adminLoggedIn', 'true');
     }
   }, [navigate]);
 

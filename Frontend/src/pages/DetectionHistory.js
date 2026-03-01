@@ -50,10 +50,21 @@ function DetectionHistory() {
   const [timeFilter, setTimeFilter] = useState('30days');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Check if employee is authenticated
+  // Check if employee is authenticated - restore from localStorage if needed
   useEffect(() => {
-    if (sessionStorage.getItem('loggedIn') !== 'true') {
+    const isLoggedIn = sessionStorage.getItem('loggedIn') === 'true' || localStorage.getItem('loggedIn') === 'true';
+    
+    if (!isLoggedIn) {
       navigate('/');
+      return;
+    }
+    
+    // Restore session data from localStorage if sessionStorage was cleared (e.g., after refresh)
+    if (!sessionStorage.getItem('userId') && localStorage.getItem('userId')) {
+      sessionStorage.setItem('userId', localStorage.getItem('userId'));
+      sessionStorage.setItem('userEmail', localStorage.getItem('userEmail'));
+      sessionStorage.setItem('userRole', localStorage.getItem('userRole'));
+      sessionStorage.setItem('loggedIn', 'true');
     }
   }, [navigate]);
   const [customFromDate, setCustomFromDate] = useState('');

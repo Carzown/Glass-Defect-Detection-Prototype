@@ -139,10 +139,21 @@ function Dashboard() {
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }));
 
-  // Check if employee is authenticated
+  // Check if employee is authenticated - restore from localStorage if needed
   useEffect(() => {
-    if (sessionStorage.getItem('loggedIn') !== 'true') {
+    const isLoggedIn = sessionStorage.getItem('loggedIn') === 'true' || localStorage.getItem('loggedIn') === 'true';
+    
+    if (!isLoggedIn) {
       navigate('/');
+      return;
+    }
+    
+    // Restore session data from localStorage if sessionStorage was cleared (e.g., after refresh)
+    if (!sessionStorage.getItem('userId') && localStorage.getItem('userId')) {
+      sessionStorage.setItem('userId', localStorage.getItem('userId'));
+      sessionStorage.setItem('userEmail', localStorage.getItem('userEmail'));
+      sessionStorage.setItem('userRole', localStorage.getItem('userRole'));
+      sessionStorage.setItem('loggedIn', 'true');
     }
   }, [navigate]);
 
@@ -245,6 +256,7 @@ function Dashboard() {
       console.error('Logout error:', error);
     }
 
+    // Clear both sessionStorage and localStorage
     sessionStorage.removeItem('loggedIn');
     sessionStorage.removeItem('adminLoggedIn');
     sessionStorage.removeItem('role');
@@ -253,6 +265,13 @@ function Dashboard() {
     sessionStorage.removeItem('userRole');
     sessionStorage.removeItem('accessToken');
     sessionStorage.removeItem('refreshToken');
+    
+    localStorage.removeItem('loggedIn');
+    localStorage.removeItem('adminLoggedIn');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('adminToken');
 
     const remembered = localStorage.getItem('rememberMe') === 'true';
     if (!remembered) {

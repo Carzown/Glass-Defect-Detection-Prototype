@@ -58,12 +58,23 @@ function AdminDashboard() {
   const [deviceStatus, setDeviceStatus] = useState(null);
   const [deviceStatusLoading, setDeviceStatusLoading] = useState(true);
 
-  // Check if admin is authenticated
+  // Check if admin is authenticated - restore from localStorage if needed
   useEffect(() => {
-    const adminLoggedIn = sessionStorage.getItem('adminLoggedIn') === 'true';
-    const adminToken = sessionStorage.getItem('adminToken');
+    const adminLoggedIn = sessionStorage.getItem('adminLoggedIn') === 'true' || localStorage.getItem('adminLoggedIn') === 'true';
+    const adminToken = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken');
+    
     if (!adminLoggedIn && !adminToken) {
       navigate('/');
+      return;
+    }
+    
+    // Restore session data from localStorage if sessionStorage was cleared (e.g., after refresh)
+    if (!sessionStorage.getItem('userId') && localStorage.getItem('userId')) {
+      sessionStorage.setItem('userId', localStorage.getItem('userId'));
+      sessionStorage.setItem('userEmail', localStorage.getItem('userEmail'));
+      sessionStorage.setItem('userRole', localStorage.getItem('userRole'));
+      sessionStorage.setItem('adminLoggedIn', 'true');
+      sessionStorage.setItem('adminToken', localStorage.getItem('adminToken'));
     }
   }, [navigate]);
 
@@ -81,6 +92,7 @@ function AdminDashboard() {
       console.error('Logout error:', error);
     }
 
+    // Clear both sessionStorage and localStorage
     sessionStorage.removeItem('adminToken');
     sessionStorage.removeItem('adminLoggedIn');
     sessionStorage.removeItem('loggedIn');
@@ -89,6 +101,14 @@ function AdminDashboard() {
     sessionStorage.removeItem('userRole');
     sessionStorage.removeItem('accessToken');
     sessionStorage.removeItem('refreshToken');
+    
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminLoggedIn');
+    localStorage.removeItem('loggedIn');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userRole');
+    
     navigate('/');
   };
 

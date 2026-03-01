@@ -104,7 +104,7 @@ function Login() {
         localStorage.removeItem('email');
       }
 
-      // Store session tokens
+      // Store session tokens (sessionStorage - session-only)
       if (data.session?.accessToken) {
         sessionStorage.setItem('accessToken', data.session.accessToken);
         if (data.session.refreshToken) {
@@ -112,18 +112,26 @@ function Login() {
         }
       }
 
-      // Store user info
+      // Store user info (sessionStorage + localStorage for persistence across refresh)
       sessionStorage.setItem('userId', data.user.id);
       sessionStorage.setItem('userEmail', data.user.email);
       sessionStorage.setItem('userRole', data.user.role);
+      
+      // Persist auth state to localStorage so refresh doesn't lose login
+      localStorage.setItem('userId', data.user.id);
+      localStorage.setItem('userEmail', data.user.email);
+      localStorage.setItem('userRole', data.user.role);
 
       // Redirect based on role
       if (data.user.role === 'admin') {
         sessionStorage.setItem('adminLoggedIn', 'true');
         sessionStorage.setItem('adminToken', data.user.id);
+        localStorage.setItem('adminLoggedIn', 'true');
+        localStorage.setItem('adminToken', data.user.id);
         navigate('/admin-dashboard');
       } else {
         sessionStorage.setItem('loggedIn', 'true');
+        localStorage.setItem('loggedIn', 'true');
         navigate('/dashboard');
       }
     } catch (err) {
