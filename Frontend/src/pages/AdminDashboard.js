@@ -3,49 +3,19 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
 import AdminEmployeeManagement from '../components/AdminEmployeeManagement';
+import { formatRelativeTime, getBackendURL } from '../utils/formatters';
+import { restoreAdminAuthState, isAdminAuthenticated } from '../utils/auth';
 import { fetchDefects, fetchDefectsByRange, fetchDefectsByDateRange, fetchDeviceStatus, subscribeToDeviceStatus } from '../services/defects';
 import './AdminDashboard.css';
-
-const getBackendURL = () => {
-  // Use explicit backend URL from environment (required for production)
-  if (process.env.REACT_APP_BACKEND_URL) {
-    return process.env.REACT_APP_BACKEND_URL;
-  }
-  // Development fallback only
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:5000';
-  }
-  // Production requires explicit backend URL - show error
-  console.error('[AdminDashboard] REACT_APP_BACKEND_URL not configured for production');
-  return 'http://localhost:5000'; // Will fail, but shows the issue
-};
 
 const BACKEND_URL = getBackendURL();
 
 // ── Helpers ──────────────────────────────────────────────────────
-function formatRelativeTime(dateStr) {
-  const detectionDate = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now - detectionDate;
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffSecs < 60) {
-    return diffSecs === 1 ? '1 second ago' : `${diffSecs} seconds ago`;
-  } else if (diffMins < 60) {
-    return diffMins === 1 ? '1 minute ago' : `${diffMins} minutes ago`;
-  } else if (diffHours < 24) {
-    return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
-  } else {
-    return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
-  }
-}
 
 function AdminDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [authChecked, setAuthChecked] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [timeFilter, setTimeFilter] = useState('today');
   const [customFromDate, setCustomFromDate] = useState('');
@@ -60,22 +30,12 @@ function AdminDashboard() {
 
   // Check if admin is authenticated - restore from localStorage if needed
   useEffect(() => {
-    const adminLoggedIn = sessionStorage.getItem('adminLoggedIn') === 'true' || localStorage.getItem('adminLoggedIn') === 'true';
-    const adminToken = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken');
-    
-    if (!adminLoggedIn && !adminToken) {
+    restoreAdminAuthState();
+    if (!isAdminAuthenticated()) {
       navigate('/');
       return;
     }
-    
-    // Restore session data from localStorage if sessionStorage was cleared (e.g., after refresh)
-    if (!sessionStorage.getItem('userId') && localStorage.getItem('userId')) {
-      sessionStorage.setItem('userId', localStorage.getItem('userId'));
-      sessionStorage.setItem('userEmail', localStorage.getItem('userEmail'));
-      sessionStorage.setItem('userRole', localStorage.getItem('userRole'));
-      sessionStorage.setItem('adminLoggedIn', 'true');
-      sessionStorage.setItem('adminToken', localStorage.getItem('adminToken'));
-    }
+    setAuthChecked(true);
   }, [navigate]);
 
   const handleLogout = async () => {
@@ -125,13 +85,16 @@ function AdminDashboard() {
     }
   };
 
-  // Load last detection on mount
+  // Load last detection on mount (only after auth is verified)
   useEffect(() => {
+    if (!authChecked) return;
     loadLastDetection();
-  }, []);
+  }, [authChecked]);
 
   // Fetch initial device status and subscribe to real-time updates
   useEffect(() => {
+    if (!authChecked) return;
+    
     let cancelled = false;
     setDeviceStatusLoading(true);
     fetchDeviceStatus('raspi').then((status) => {
@@ -147,10 +110,12 @@ function AdminDashboard() {
       cancelled = true;
       unsubscribe();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authChecked]);
 
-  // Re-fetch whenever the date filter or page navigation changes
+  // Re-fetch whenever the date filter or page navigation changes (only after auth is verified)
   useEffect(() => {
+    if (!authChecked) return;
+    
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -178,7 +143,7 @@ function AdminDashboard() {
     }
     load();
     return () => { cancelled = true; };
-  }, [timeFilter, customFromDate, customToDate, location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authChecked, timeFilter, customFromDate, customToDate]);
 
 
 

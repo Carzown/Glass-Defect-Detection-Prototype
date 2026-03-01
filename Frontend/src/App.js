@@ -11,10 +11,20 @@ import AdminDetectionHistory from './pages/AdminDetectionHistory';
 import AdminHowToUse from './pages/AdminHowToUse';
 
 function App() {
-  // GitHub Pages requires basename in production
-  const basename = process.env.NODE_ENV === 'production' 
-    ? '/Glass-Defect-Detection-Prototype/' 
-    : '/';
+  // Calculate basename based on environment:
+  // - Local development (npm start): '/'
+  // - GitHub Pages (npm run build): '/Glass-Defect-Detection-Prototype/'
+  let basename = '/';
+  
+  // PUBLIC_URL is automatically set by Create React App based on package.json homepage
+  if (process.env.PUBLIC_URL) {
+    // Extract path from PUBLIC_URL (e.g., '/Glass-Defect-Detection-Prototype/')
+    basename = process.env.PUBLIC_URL.replace(/^https?:\/\/[^/]+/, '');
+    // Ensure trailing slash for proper routing
+    if (!basename.endsWith('/')) {
+      basename += '/';
+    }
+  }
 
   return (
     <div>

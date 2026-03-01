@@ -1,86 +1,22 @@
-// Dashboard: Dashboard page with sidebar and header
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
+import {
+  capitalizeDefectType,
+  formatTime,
+  formatRelativeTime,
+  formatDate,
+  groupByDate,
+  aggregateDefectsByType,
+  getBackendURL,
+} from '../utils/formatters';
+import { restoreAuthState, isUserAuthenticated } from '../utils/auth';
 import { fetchDefects, fetchDefectsByRange, fetchDefectsByDateRange, fetchDeviceStatus, subscribeToDeviceStatus } from '../services/defects';
 import './Dashboard.css';
 
-const getBackendURL = () => {
-  // Use explicit backend URL from environment (required for production)
-  if (process.env.REACT_APP_BACKEND_URL) {
-    return process.env.REACT_APP_BACKEND_URL;
-  }
-  // Development fallback only
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:5000';
-  }
-  // Production requires explicit backend URL - show error
-  console.error('[Dashboard] REACT_APP_BACKEND_URL not configured for production');
-  return 'http://localhost:5000'; // Will fail, but shows the issue
-};
-
 const BACKEND_URL = getBackendURL();
-
-// ── Helpers for sessions widget ──────────────────────────────────
-function capitalizeDefectType(type) {
-  if (!type) return type;
-  return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
-}
-
-function formatTime(dateStr) {
-  const d = new Date(dateStr);
-  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
-
-function formatRelativeTime(dateStr) {
-  const detectionDate = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now - detectionDate;
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffSecs < 60) {
-    return diffSecs === 1 ? '1 second ago' : `${diffSecs} seconds ago`;
-  } else if (diffMins < 60) {
-    return diffMins === 1 ? '1 minute ago' : `${diffMins} minutes ago`;
-  } else if (diffHours < 24) {
-    return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
-  } else {
-    return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
-  }
-}
-
-function formatDate(dateStr) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function groupByDate(defects) {
-  const groups = {};
-  defects.forEach((d) => {
-    const dateKey = new Date(d.detected_at).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      timeZone: 'Asia/Manila',
-    });
-    if (!groups[dateKey]) groups[dateKey] = [];
-    groups[dateKey].push(d);
-  });
-  return Object.entries(groups).sort((a, b) => new Date(b[0]) - new Date(a[0]));
-}
-
-// Aggregate defects by type for bar chart
-function aggregateDefectsByType(defects) {
-  const counts = {};
-  defects.forEach((d) => {
-    const type = capitalizeDefectType(d.defect_type) || 'Unknown';
-    counts[type] = (counts[type] || 0) + 1;
-  });
-  return Object.entries(counts).map(([type, count]) => ({ type, count }));
-}
 
 // Aggregate defects for trend line chart
 // When timeFilter is 'today', groups by hour (all 24 hours); otherwise groups by date
@@ -134,6 +70,7 @@ function aggregateDefectsForTrend(defects, timeFilter) {
 function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [authChecked, setAuthChecked] = useState(false);
   const [timeFilter, setTimeFilter] = useState('today');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [customFromDate, setCustomFromDate] = useState('');
@@ -141,20 +78,12 @@ function Dashboard() {
 
   // Check if employee is authenticated - restore from localStorage if needed
   useEffect(() => {
-    const isLoggedIn = sessionStorage.getItem('loggedIn') === 'true' || localStorage.getItem('loggedIn') === 'true';
-    
-    if (!isLoggedIn) {
+    restoreAuthState();
+    if (!isUserAuthenticated()) {
       navigate('/');
       return;
     }
-    
-    // Restore session data from localStorage if sessionStorage was cleared (e.g., after refresh)
-    if (!sessionStorage.getItem('userId') && localStorage.getItem('userId')) {
-      sessionStorage.setItem('userId', localStorage.getItem('userId'));
-      sessionStorage.setItem('userEmail', localStorage.getItem('userEmail'));
-      sessionStorage.setItem('userRole', localStorage.getItem('userRole'));
-      sessionStorage.setItem('loggedIn', 'true');
-    }
+    setAuthChecked(true);
   }, [navigate]);
 
   // Sessions widget state
@@ -170,6 +99,8 @@ function Dashboard() {
 
   // Fetch initial device status and subscribe to real-time updates
   useEffect(() => {
+    if (!authChecked) return;
+    
     let cancelled = false;
     setDeviceStatusLoading(true);
     fetchDeviceStatus('raspi').then((status) => {
@@ -185,7 +116,7 @@ function Dashboard() {
       cancelled = true;
       unsubscribe();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authChecked]);
 
   // Load the most recent defect across all time (for "Last detection" indicator)
   const loadLastDetection = async () => {
@@ -200,13 +131,16 @@ function Dashboard() {
     }
   };
 
-  // Load last detection on mount
+  // Load last detection on mount (only after auth is verified)
   useEffect(() => {
+    if (!authChecked) return;
     loadLastDetection();
-  }, []);
+  }, [authChecked]);
 
-  // Re-fetch whenever the date filter or page navigation changes
+  // Re-fetch whenever the date filter or page navigation changes (only after auth is verified)
   useEffect(() => {
+    if (!authChecked) return;
+    
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -236,7 +170,7 @@ function Dashboard() {
     }
     load();
     return () => { cancelled = true; };
-  }, [timeFilter, customFromDate, customToDate, location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authChecked, timeFilter, customFromDate, customToDate]);
 
 
 

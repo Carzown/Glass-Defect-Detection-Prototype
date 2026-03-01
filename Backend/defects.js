@@ -3,6 +3,14 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 
+// Real-time WebSocket broadcasting (optional - will gracefully fail if not available)
+let realtime = null;
+try {
+  realtime = require('./realtime');
+} catch (e) {
+  console.warn('[DEFECTS] Real-time module not loaded:', e?.message);
+}
+
 // In-memory fallback store (optional, only used if Supabase is not configured)
 let defectsStore = null;
 
@@ -212,6 +220,15 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Broadcast new defect to WebSocket clients
+    if (realtime && data[0]) {
+      try {
+        realtime.broadcastNewDefect(data[0]);
+      } catch (broadcastErr) {
+        console.warn('[DEFECTS] Failed to broadcast via WebSocket:', broadcastErr.message);
+      }
+    }
+
     return res.status(201).json({
       success: true,
       data: data[0],
@@ -251,6 +268,15 @@ router.patch('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Defect not found' });
     }
 
+    // Broadcast defect update to WebSocket clients
+    if (realtime && data[0]) {
+      try {
+        realtime.broadcastDefectUpdate(id, updates);
+      } catch (broadcastErr) {
+        console.warn('[DEFECTS] Failed to broadcast update via WebSocket:', broadcastErr.message);
+      }
+    }
+
     res.json(data[0]);
   } catch (err) {
     console.error('Error updating defect:', err);
@@ -273,6 +299,15 @@ router.delete('/:id', async (req, res) => {
 
     if (error) {
       return res.status(400).json({ error: error.message });
+    }
+
+    // Broadcast defect deletion to WebSocket clients
+    if (realtime) {
+      try {
+        realtime.broadcastDefectDelete(id);
+      } catch (broadcastErr) {
+        console.warn('[DEFECTS] Failed to broadcast delete via WebSocket:', broadcastErr.message);
+      }
     }
 
     res.json({ message: 'Defect deleted successfully' });

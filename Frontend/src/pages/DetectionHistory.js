@@ -1,48 +1,19 @@
-// Detection History - Browse past detection sessions grouped by date
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
 import { signOutUser } from '../supabase';
+import { capitalizeDefectType, formatDate, formatTime, groupByDate } from '../utils/formatters';
+import { restoreAuthState, isUserAuthenticated } from '../utils/auth';
 import { fetchDefectsByRange, fetchDefectsByDateRange } from '../services/defects';
 import './Dashboard.css';
 import './DetectionHistory.css';
-
-function capitalizeDefectType(type) {
-  if (!type) return type;
-  return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
-}
-
-function formatDate(dateStr) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function formatTime(dateStr) {
-  const d = new Date(dateStr);
-  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
-
-function groupByDate(defects) {
-  const groups = {};
-  defects.forEach((d) => {
-    const dateKey = new Date(d.detected_at).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'Asia/Manila',
-    });
-    if (!groups[dateKey]) groups[dateKey] = [];
-    groups[dateKey].push(d);
-  });
-  // Sort by date descending
-  return Object.entries(groups).sort((a, b) => new Date(b[0]) - new Date(a[0]));
-}
 
 function DetectionHistory() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [authChecked, setAuthChecked] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
   const [selectedDefect, setSelectedDefect] = useState(null);
@@ -52,20 +23,12 @@ function DetectionHistory() {
 
   // Check if employee is authenticated - restore from localStorage if needed
   useEffect(() => {
-    const isLoggedIn = sessionStorage.getItem('loggedIn') === 'true' || localStorage.getItem('loggedIn') === 'true';
-    
-    if (!isLoggedIn) {
+    restoreAuthState();
+    if (!isUserAuthenticated()) {
       navigate('/');
       return;
     }
-    
-    // Restore session data from localStorage if sessionStorage was cleared (e.g., after refresh)
-    if (!sessionStorage.getItem('userId') && localStorage.getItem('userId')) {
-      sessionStorage.setItem('userId', localStorage.getItem('userId'));
-      sessionStorage.setItem('userEmail', localStorage.getItem('userEmail'));
-      sessionStorage.setItem('userRole', localStorage.getItem('userRole'));
-      sessionStorage.setItem('loggedIn', 'true');
-    }
+    setAuthChecked(true);
   }, [navigate]);
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }));
@@ -85,6 +48,8 @@ function DetectionHistory() {
   }
 
   useEffect(() => {
+    if (!authChecked) return;
+    
     let cancelled = false;
     async function load() {
       try {
@@ -115,10 +80,12 @@ function DetectionHistory() {
     }
     load();
     return () => { cancelled = true; };
-  }, [timeFilter, customFromDate, customToDate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authChecked, timeFilter, customFromDate, customToDate]);
 
-  // Refresh data when navigating to this page
+  // Refresh data when navigating to this page (only after auth is verified)
   useEffect(() => {
+    if (!authChecked) return;
+    
     const loadData = async () => {
       try {
         setLoading(true);
@@ -134,7 +101,7 @@ function DetectionHistory() {
       }
     };
     loadData();
-  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authChecked, timeFilter]);
 
   function handleSessionClick(session) {
     setSelectedSession(session);

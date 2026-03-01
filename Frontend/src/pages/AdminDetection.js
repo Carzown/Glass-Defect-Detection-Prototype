@@ -1,50 +1,20 @@
-// Admin Detection: Real-time defects from Supabase database for administrators
-// - Defects list comes from Supabase database polling
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
-import { fetchDefects, getDateRangeBounds } from '../services/defects';
+import {
+  formatRelativeTime,
+  formatDisplayDate,
+  formatDisplayTime,
+  capitalizeDefectType,
+} from '../utils/formatters';
+import { restoreAdminAuthState, isAdminAuthenticated } from '../utils/auth';
+import { fetchDefects, getDateRangeBounds, subscribeToDefects } from '../services/defects';
 import './Detection.css';
-
-
-
-// Helper: format Date -> relative time (e.g. "2 minutes ago", "3 hours ago", "5 days ago")
-function formatTime(dateStr) {
-  const detectionDate = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now - detectionDate;
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffSecs < 60) {
-    return diffSecs === 1 ? '1 second ago' : `${diffSecs} seconds ago`;
-  } else if (diffMins < 60) {
-    return diffMins === 1 ? '1 minute ago' : `${diffMins} minutes ago`;
-  } else if (diffHours < 24) {
-    return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
-  } else {
-    return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
-  }
-}
-
-function formatDisplayDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function formatDisplayTime(dateStr) {
-  return new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
-
-function capitalizeDefectType(type) {
-  if (!type) return type;
-  return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
-}
 
 function AdminDetection() {
   // State
+  const [authChecked, setAuthChecked] = useState(false);
   const [currentDefects, setCurrentDefects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -61,21 +31,12 @@ function AdminDetection() {
 
   // Check if admin is authenticated - restore from localStorage if needed
   useEffect(() => {
-    const adminToken = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken');
-    
-    if (!adminToken) {
+    restoreAdminAuthState();
+    if (!isAdminAuthenticated()) {
       navigate('/');
       return;
     }
-    
-    // Restore session data from localStorage if sessionStorage was cleared (e.g., after refresh)
-    if (!sessionStorage.getItem('userId') && localStorage.getItem('userId')) {
-      sessionStorage.setItem('userId', localStorage.getItem('userId'));
-      sessionStorage.setItem('userEmail', localStorage.getItem('userEmail'));
-      sessionStorage.setItem('userRole', localStorage.getItem('userRole'));
-      sessionStorage.setItem('adminToken', localStorage.getItem('adminToken'));
-      sessionStorage.setItem('adminLoggedIn', 'true');
-    }
+    setAuthChecked(true);
   }, [navigate]);
 
   // Helper: Get date range bounds for filter - uses PHT-aware version from defects service
@@ -98,7 +59,7 @@ function AdminDetection() {
 
       const displayDefects = supabaseData.map(d => ({
         id: d.id,
-        time: formatTime(d.detected_at),
+        time: formatRelativeTime(d.detected_at),
         type: capitalizeDefectType(d.defect_type),
         imageUrl: d.tagged_image_url || d.image_url,
         originalImageUrl: d.image_url,
@@ -120,11 +81,88 @@ function AdminDetection() {
     }
   }, [timeFilter, customFromDate, customToDate]);
 
-  // Fetch when component mounts or time filter changes
+  // Fetch when component mounts or time filter changes (only after auth is verified)
   useEffect(() => {
+    if (!authChecked) return;
     setLoading(true);
     loadSupabaseDefects();
-  }, [loadSupabaseDefects]);
+  }, [authChecked, loadSupabaseDefects]);
+
+  // Subscribe to real-time defect updates (new detections)
+  useEffect(() => {
+    if (!authChecked) return;
+    
+    // Only subscribe if we're on the 'today' filter (otherwise we're looking at historical data)
+    if (timeFilter !== 'today' && timeFilter !== 'custom-range') {
+      return;
+    }
+
+    let unsubscribe = () => {};
+
+    const subscribeToRealTime = async () => {
+      try {
+        unsubscribe = subscribeToDefects({
+          onNew: (newDefect) => {
+            console.log('[AdminDetection] ✨ New real-time defect received:', newDefect);
+            
+            setCurrentDefects(prevDefects => {
+              // Check if this defect already exists
+              const exists = prevDefects.some(d => d.id === newDefect.id);
+              if (exists) return prevDefects;
+
+              // Transform the new defect to match our display format
+              const displayDefect = {
+                id: newDefect.id,
+                time: formatRelativeTime(newDefect.detected_at),
+                type: capitalizeDefectType(newDefect.defect_type),
+                imageUrl: newDefect.tagged_image_url || newDefect.image_url,
+                originalImageUrl: newDefect.image_url,
+                tagNumber: newDefect.tag_number,
+                detected_at: newDefect.detected_at,
+                image_path: newDefect.image_path,
+                notes: newDefect.notes,
+                supabaseData: newDefect,
+              };
+
+              // Prepend new defect to the list (newest first)
+              return [displayDefect, ...prevDefects];
+            });
+          },
+          onUpdate: (updatedDefect) => {
+            console.log('[AdminDetection] 📝 Defect updated (real-time):', updatedDefect);
+            
+            setCurrentDefects(prevDefects => 
+              prevDefects.map(d => 
+                d.id === updatedDefect.id 
+                  ? {
+                      ...d,
+                      type: capitalizeDefectType(updatedDefect.defect_type),
+                      notes: updatedDefect.notes,
+                      supabaseData: updatedDefect,
+                    }
+                  : d
+              )
+            );
+          },
+          onDelete: (deletedId) => {
+            console.log('[AdminDetection] 🗑️ Defect deleted (real-time):', deletedId);
+            
+            setCurrentDefects(prevDefects => 
+              prevDefects.filter(d => d.id !== deletedId)
+            );
+          },
+        });
+      } catch (error) {
+        console.error('[AdminDetection] Failed to subscribe to real-time updates:', error);
+      }
+    };
+
+    subscribeToRealTime();
+
+    return () => {
+      unsubscribe();
+    };
+  }, [authChecked, timeFilter]);
 
 
 

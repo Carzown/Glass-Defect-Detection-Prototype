@@ -2,20 +2,7 @@
 // Strategy: backend (Railway) is primary; Supabase direct is the fallback.
 // Auth/login is always direct-to-Supabase (no backend auth routes exist).
 import { supabase } from '../supabase';
-
-const getBackendURL = () => {
-  // Use explicit backend URL from environment (required for production)
-  if (process.env.REACT_APP_BACKEND_URL) {
-    return process.env.REACT_APP_BACKEND_URL;
-  }
-  // Development fallback only
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return 'http://localhost:5000';
-  }
-  // Production requires explicit backend URL - show error
-  console.error('[defects.js] REACT_APP_BACKEND_URL not configured for production');
-  return 'http://localhost:5000'; // Will fail, but shows the issue
-};
+import { getBackendURL } from '../utils/formatters';
 
 const BACKEND_URL = getBackendURL();
 
@@ -239,19 +226,70 @@ export async function deleteAllDefects() {
 }
 
 // ── Real-time subscription (Supabase direct – no backend equivalent) ──────
-export function subscribeToDefects(callback) {
+/**
+ * Subscribe to real-time defect updates.
+ * Calls `onNew(defect)` when a new defect is inserted
+ * Calls `onUpdate(defect)` when an existing defect is updated
+ * Calls `onDelete(id)` when a defect is deleted
+ * Returns an unsubscribe function to cleanup the subscription.
+ */
+export function subscribeToDefects({ onNew, onUpdate, onDelete } = {}) {
   try {
-    if (!supabase) return () => {};
+    if (!supabase) {
+      console.warn('[subscribeToDefects] Supabase not initialized');
+      return () => {};
+    }
+    
+    const defaultCallback = () => {};
+    const handleNew = onNew || defaultCallback;
+    const handleUpdate = onUpdate || defaultCallback;
+    const handleDelete = onDelete || defaultCallback;
+    
     const channel = supabase
-      .channel('defects_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'defects' }, (payload) => {
-        console.log('Real-time update:', payload);
-        callback(payload);
-      })
-      .subscribe();
-    return () => supabase.removeChannel(channel);
+      .channel('defects_realtime', { config: { broadcast: { self: false } } })
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'defects' 
+        }, 
+        (payload) => {
+          console.log('[subscribeToDefects] 🔴 New defect detected (real-time):', payload.new);
+          handleNew(payload.new);
+        }
+      )
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'defects' 
+        }, 
+        (payload) => {
+          console.log('[subscribeToDefects] 🟡 Defect updated (real-time):', payload.new);
+          handleUpdate(payload.new);
+        }
+      )
+      .on('postgres_changes', 
+        { 
+          event: 'DELETE', 
+          schema: 'public', 
+          table: 'defects' 
+        }, 
+        (payload) => {
+          console.log('[subscribeToDefects] ⚪ Defect deleted (real-time):', payload.old.id);
+          handleDelete(payload.old.id);
+        }
+      )
+      .subscribe((status) => {
+        console.log('[subscribeToDefects] Subscription status:', status);
+      });
+    
+    return () => {
+      console.log('[subscribeToDefects] ✋ Unsubscribing from real-time updates');
+      supabase.removeChannel(channel);
+    };
   } catch (error) {
-    console.error('Error subscribing to defects:', error);
+    console.error('[subscribeToDefects] Error subscribing to defects:', error);
     return () => {};
   }
 }
@@ -355,4 +393,120 @@ export async function fetchDefectsByDateRange(startDate, endDate) {
     .limit(1000);
   if (error) throw error;
   return data || [];
+}
+
+// ── WebSocket real-time connection (optional, as supplement to Supabase) ─
+let ws = null;
+
+/**
+ * Connect to WebSocket server for real-time defect updates.
+ * Falls back to Supabase if WebSocket is unavailable.
+ * 
+ * Usage:
+ * ```
+ * const unsubscribe = connectWebSocket({
+ *   onNew: (defect) => console.log('New:', defect),
+ *   onUpdate: (defect) => console.log('Update:', defect),
+ *   onDelete: (id) => console.log('Delete:', id),
+ * });
+ * // Later: unsubscribe();
+ * ```
+ */
+export function connectWebSocket({ onNew, onUpdate, onDelete } = {}) {
+  try {
+    if (!BACKEND_URL) {
+      console.warn('[WebSocket] No backend URL configured, skipping WebSocket connection');
+      return () => {};
+    }
+
+    // Build WebSocket URL
+    const wsURL = BACKEND_URL
+      .replace(/^http:/, 'ws:')
+      .replace(/^https:/, 'wss:')
+      + '/ws/defects';
+
+    console.log('[WebSocket] 🔌 Connecting to', wsURL);
+
+    ws = new WebSocket(wsURL);
+
+    ws.onopen = () => {
+      console.log('[WebSocket] ✅ Connected to real-time server');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        
+        switch (message.type) {
+          case 'connected':
+            console.log('[WebSocket] 🎉 Server connection confirmed');
+            break;
+
+          case 'new_defect':
+            console.log('[WebSocket] 🔴 New defect (via WebSocket):', message.data);
+            if (onNew) onNew(message.data);
+            break;
+
+          case 'defect_update':
+            console.log('[WebSocket] 🟡 Defect update (via WebSocket):', message.defectId);
+            if (onUpdate) onUpdate(message);
+            break;
+
+          case 'defect_delete':
+            console.log('[WebSocket] ⚪ Defect deleted (via WebSocket):', message.defectId);
+            if (onDelete) onDelete(message.defectId);
+            break;
+
+          default:
+            console.log('[WebSocket] 📩 Unknown message type:', message.type);
+        }
+      } catch (err) {
+        console.error('[WebSocket] Failed to parse message:', err);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('[WebSocket] ❌ Connection error:', error);
+    };
+
+    ws.onclose = () => {
+      console.log('[WebSocket] ✋ Connection closed');
+      ws = null;
+    };
+
+    // Return unsubscribe function
+    return () => {
+      console.log('[WebSocket] 🔌 Closing WebSocket connection');
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+      ws = null;
+    };
+  } catch (error) {
+    console.error('[WebSocket] Failed to connect:', error);
+    return () => {};
+  }
+}
+
+/**
+ * Get current WebSocket connection status
+ */
+export function getWebSocketStatus() {
+  if (!ws) return 'disconnected';
+  switch (ws.readyState) {
+    case WebSocket.CONNECTING: return 'connecting';
+    case WebSocket.OPEN: return 'connected';
+    case WebSocket.CLOSING: return 'closing';
+    case WebSocket.CLOSED: return 'closed';
+    default: return 'unknown';
+  }
+}
+
+/**
+ * Disconnect from WebSocket server
+ */
+export function disconnectWebSocket() {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.close();
+  }
 }

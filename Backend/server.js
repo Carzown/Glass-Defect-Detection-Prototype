@@ -2,6 +2,7 @@ try { require('dotenv').config(); } catch (_) {}
 
 const express = require("express");
 const cors = require("cors");
+const http = require("http");
 
 const app = express();
 
@@ -110,10 +111,19 @@ function startServer(port, attempt = 1) {
     }
   };
 
-  const server = app.listen(port);
+  const server = http.createServer(app);
+  
+  // Initialize WebSocket server for real-time defect streaming
+  try {
+    const realtime = require('./realtime');
+    realtime.initializeWebSocketServer(server);
+  } catch (e) {
+    console.warn('[SERVER] WebSocket initialization failed:', e?.message || e);
+  }
   
   server.once('error', onError);
   server.once('listening', onListening);
+  server.listen(port);
 }
 
 if (require.main === module) {
