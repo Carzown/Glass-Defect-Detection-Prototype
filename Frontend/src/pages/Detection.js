@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
@@ -46,57 +46,50 @@ function Detection() {
     setAuthChecked(true);
   }, [navigate]);
 
-  // Load defects from Railway backend - only on mount
-  const loadSupabaseDefects = useCallback(async () => {
-    try {
-      let start, end;
-      if (timeFilter === 'custom-range') {
-        // Use custom date range
-        start = customFromDate ? new Date(customFromDate + 'T00:00:00+08:00').toISOString() : new Date(0).toISOString();
-        end = customToDate ? new Date(customToDate + 'T23:59:59.999+08:00').toISOString() : new Date().toISOString();
-      } else {
-        // Use preset date range
-        ({ start, end } = getDateRangeBounds(timeFilter));
-      }
-      const result = await fetchDefects({ limit: 999999, offset: 0, dateFrom: start, dateTo: end });
-      const supabaseData = result.data || [];
-
-      const displayDefects = supabaseData.map(d => ({
-        id: d.id,
-        time: formatRelativeTime(d.detected_at),
-        type: capitalizeDefectType(d.defect_type),
-        imageUrl: d.tagged_image_url || d.image_url,
-        originalImageUrl: d.image_url,
-        tagNumber: d.tag_number,
-        detected_at: d.detected_at,
-        image_path: d.image_path,
-        notes: d.notes,
-        supabaseData: d,
-      }));
-
-      const sorted = displayDefects
-        .sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at));
-
-      setCurrentDefects(sorted);
-      setLoading(false);
-    } catch (error) {
-      console.error('[Detection] Error loading defects:', error);
-      setLoading(false);
-    }
-  }, [timeFilter, customFromDate, customToDate]);
-
-  // Only load data after auth is verified
+  // Fetch defects whenever auth is verified or filter changes
   useEffect(() => {
     if (!authChecked) return;
-    loadSupabaseDefects();
-  }, [authChecked, loadSupabaseDefects]);
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      try {
+        let start, end;
+        if (timeFilter === 'custom-range') {
+          start = customFromDate ? new Date(customFromDate + 'T00:00:00+08:00').toISOString() : new Date(0).toISOString();
+          end = customToDate ? new Date(customToDate + 'T23:59:59.999+08:00').toISOString() : new Date().toISOString();
+        } else {
+          ({ start, end } = getDateRangeBounds(timeFilter));
+        }
+        const result = await fetchDefects({ limit: 999999, offset: 0, dateFrom: start, dateTo: end });
+        if (cancelled) return;
+        const supabaseData = result.data || [];
+        const displayDefects = supabaseData.map(d => ({
+          id: d.id,
+          time: formatRelativeTime(d.detected_at),
+          type: capitalizeDefectType(d.defect_type),
+          imageUrl: d.tagged_image_url || d.image_url,
+          originalImageUrl: d.image_url,
+          tagNumber: d.tag_number,
+          detected_at: d.detected_at,
+          image_path: d.image_path,
+          notes: d.notes,
+          supabaseData: d,
+        }));
+        const sorted = displayDefects.sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at));
+        setCurrentDefects(sorted);
+      } catch (error) {
+        if (!cancelled) console.error('[Detection] Error loading defects:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [authChecked, timeFilter, customFromDate, customToDate]);
 
   // Subscribe to real-time defect updates (new detections)
   useEffect(() => {
-    // Only subscribe if we're on the 'today' filter (otherwise we're looking at historical data)
-    if (timeFilter !== 'today' && timeFilter !== 'custom-range') {
-      return;
-    }
+    if (!authChecked) return;
+    if (timeFilter !== 'today' && timeFilter !== 'custom-range') return;
 
     let unsubscribe = () => {};
 
@@ -163,7 +156,7 @@ function Detection() {
     return () => {
       unsubscribe();
     };
-  }, [timeFilter]);
+  }, [authChecked, timeFilter]);
 
 
   async function handleLogout() {
