@@ -61,8 +61,7 @@ function AdminDetection() {
           id: d.id,
           time: formatRelativeTime(d.detected_at),
           type: capitalizeDefectType(d.defect_type),
-          imageUrl: d.tagged_image_url || d.image_url,
-          originalImageUrl: d.image_url,
+          imageUrl: d.image_url,
           tagNumber: d.tag_number,
           detected_at: d.detected_at,
           image_path: d.image_path,
@@ -107,8 +106,7 @@ function AdminDetection() {
                 id: newDefect.id,
                 time: formatRelativeTime(newDefect.detected_at),
                 type: capitalizeDefectType(newDefect.defect_type),
-                imageUrl: newDefect.tagged_image_url || newDefect.image_url,
-                originalImageUrl: newDefect.image_url,
+                imageUrl: newDefect.image_url,
                 tagNumber: newDefect.tag_number,
                 detected_at: newDefect.detected_at,
                 image_path: newDefect.image_path,
@@ -353,7 +351,7 @@ function AdminDetection() {
                         key={defect.id || index}
                         onClick={() => openModal(index)}
                       >
-                        <div className="det-defect-index">{defect.tagNumber ?? (currentDefects.length - index)}</div>
+                        <div className="det-defect-index">{currentDefects.length - index}</div>
                         <div className="det-defect-body">
                           <span className="det-defect-type-label">{defect.type}</span>
                         </div>
@@ -447,12 +445,6 @@ function AdminDetection() {
                     <span className="det-modal-detail-label">Date</span>
                     <span className="det-modal-detail-value">{formatDisplayDate(modalDefect.detected_at)}</span>
                   </div>
-                  {modalDefect.tagNumber != null && (
-                    <div className="det-modal-detail-row">
-                      <span className="det-modal-detail-label">Tag #</span>
-                      <span className="det-modal-detail-value" style={{ fontWeight: 800, color: '#0f2942' }}>#{modalDefect.tagNumber}</span>
-                    </div>
-                  )}
                   {confidence != null && (
                     <div className="det-modal-detail-row">
                       <span className="det-modal-detail-label">Confidence</span>
@@ -460,18 +452,12 @@ function AdminDetection() {
                     </div>
                   )}
                   <div className="det-modal-detail-row">
-                    <span className="det-modal-detail-label">Tagged Image</span>
+                    <span className="det-modal-detail-label">Image</span>
                     {modalDefect.imageUrl
-                      ? <a href={modalDefect.imageUrl} target="_blank" rel="noreferrer" className="det-modal-detail-link">View tagged ↗</a>
+                      ? <a href={modalDefect.imageUrl} target="_blank" rel="noreferrer" className="det-modal-detail-link">View image ↗</a>
                       : <span className="det-modal-detail-empty">—</span>
                     }
                   </div>
-                  {modalDefect.originalImageUrl && modalDefect.originalImageUrl !== modalDefect.imageUrl && (
-                    <div className="det-modal-detail-row">
-                      <span className="det-modal-detail-label">Original</span>
-                      <a href={modalDefect.originalImageUrl} target="_blank" rel="noreferrer" className="det-modal-detail-link">View original ↗</a>
-                    </div>
-                  )}
                 </div>
 
                 {/* Footer nav */}

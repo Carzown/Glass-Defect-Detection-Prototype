@@ -234,9 +234,6 @@ function AdminDetectionHistory() {
                             </span>
                             <span className="dh-row-time">{formatTime(d.detected_at)}</span>
                           </div>
-                          {d.tag_number != null && (
-                            <span style={{ background: '#0f2942', color: 'white', borderRadius: 4, fontSize: 10, fontWeight: 700, padding: '2px 6px', fontFamily: 'Inter', flexShrink: 0, marginRight: 4 }}>#{d.tag_number}</span>
-                          )}
                           <svg className="dh-row-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <polyline points="9 18 15 12 9 6" />
                           </svg>
@@ -255,10 +252,10 @@ function AdminDetectionHistory() {
                       <span className="dh-panel-title">Details</span>
                     </div>
                     <div className="dh-detail-card-wrapper">
-                      {(selectedDefect.tagged_image_url || selectedDefect.image_url) && (
+                      {selectedDefect.image_url && (
                         <div style={{ marginBottom: 12, borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb', position: 'relative' }}>
                           <img
-                            src={selectedDefect.tagged_image_url || selectedDefect.image_url}
+                            src={selectedDefect.image_url}
                             alt="Defect"
                             style={{ width: '100%', display: 'block', objectFit: 'contain', background: '#000' }}
                           />
@@ -282,12 +279,6 @@ function AdminDetectionHistory() {
                         </div>
                       )}
                       <div className="dh-detail-card">
-                        {selectedDefect.tag_number != null && (
-                          <div className="dh-detail-row">
-                            <span className="dh-detail-label">Tag #</span>
-                            <span className="dh-detail-value" style={{ fontWeight: 800, color: '#0f2942' }}>#{selectedDefect.tag_number}</span>
-                          </div>
-                        )}
                         <div className="dh-detail-row">
                           <span className="dh-detail-label">Type</span>
                           <span className={`dh-defect-type dh-defect-${(selectedDefect.defect_type || '').toLowerCase()}`}>
@@ -310,17 +301,10 @@ function AdminDetectionHistory() {
                             </span>
                           </div>
                         )}
-                        <div className="dh-detail-row">
-                          <span className="dh-detail-label">Tagged Image</span>
-                          {selectedDefect.tagged_image_url
-                            ? <a href={selectedDefect.tagged_image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb' }}>View tagged ↗</a>
-                            : <span className="dh-detail-value" style={{ color: '#d1d5db' }}>Pending…</span>
-                          }
-                        </div>
                         {selectedDefect.image_url && (
                           <div className="dh-detail-row">
-                            <span className="dh-detail-label">Original</span>
-                            <a href={selectedDefect.image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb' }}>View original ↗</a>
+                            <span className="dh-detail-label">Image</span>
+                            <a href={selectedDefect.image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb' }}>View image ↗</a>
                           </div>
                         )}
                       </div>

@@ -195,7 +195,7 @@ body {
   flex-direction: column;
   min-width: 0;
   height: 100vh;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .machine-header {
@@ -264,16 +264,12 @@ body {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
 }
 
 .machine-content-wrapper {
   display: flex;
   gap: 24px;
-  flex: 1;
-  min-height: 200px;
+  height: 520px;
   align-items: stretch;
 }
 
