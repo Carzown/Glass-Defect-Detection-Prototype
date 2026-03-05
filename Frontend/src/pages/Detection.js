@@ -435,8 +435,8 @@ function Detection() {
                 {/* Details */}
                 <div className="det-modal-details">
                   <div className="det-modal-detail-row">
-                    <span className="det-modal-detail-label">Detected</span>
-                    <span className="det-modal-detail-value">{modalDefect.type}</span>
+                    <span className="det-modal-detail-label">Defect Count</span>
+                    <span className="det-modal-detail-value">{modalDefect.defects.length}</span>
                   </div>
                   {modalDefect.defects.map((d, i) => (
                     <div key={i} className="det-modal-detail-row">
@@ -455,7 +455,7 @@ function Detection() {
                   <div className="det-modal-detail-row">
                     <span className="det-modal-detail-label">Image URL</span>
                     {modalDefect.imageUrl
-                      ? <a href={modalDefect.imageUrl} target="_blank" rel="noreferrer" className="det-modal-detail-link">↗</a>
+                      ? <a href={modalDefect.imageUrl} target="_blank" rel="noreferrer" className="det-modal-detail-link">Image Link ↗</a>
                       : <span className="det-modal-detail-empty">—</span>
                     }
                   </div>
