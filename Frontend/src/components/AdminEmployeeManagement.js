@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../supabase';
+import { getBackendURL } from '../utils/formatters';
 import './AdminEmployeeManagement.css';
+
+const BACKEND_URL = getBackendURL();
 
 function AdminEmployeeManagement() {
   const [employees, setEmployees] = useState([]);
@@ -21,17 +23,12 @@ function AdminEmployeeManagement() {
 
   // Load employees on mount
   const loadEmployees = useCallback(async () => {
-
-  try {
+    try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, email, role, created_at')
-        .eq('role', 'employee')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setEmployees(data || []);
+      const res = await fetch(`${BACKEND_URL}/auth/employees`);
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to load employees');
+      setEmployees(json.employees || []);
       clearMessages();
     } catch (error) {
       console.error('Error loading employees:', error);
@@ -64,26 +61,13 @@ function AdminEmployeeManagement() {
     }
 
     try {
-      // Create user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newEmployee.email,
-        password: newEmployee.password,
+      const res = await fetch(`${BACKEND_URL}/auth/employees`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newEmployee.email, password: newEmployee.password }),
       });
-
-      if (authError) throw authError;
-
-      // Add profile to database
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: authData.user.id,
-            email: newEmployee.email,
-            role: 'employee',
-          },
-        ]);
-
-      if (profileError) throw profileError;
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to add employee');
 
       setSuccessMessage(`Employee ${newEmployee.email} added successfully`);
       setNewEmployee({ email: '', password: '' });
@@ -106,22 +90,16 @@ function AdminEmployeeManagement() {
       return;
     }
     try {
-      // Update email in profiles table
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ email: editEmail })
-        .eq('id', id);
+      const body = { email: editEmail };
+      if (editPassword.trim()) body.password = editPassword;
 
-      if (updateError) throw updateError;
-
-      // Update password in auth if provided
-      if (editPassword.trim()) {
-        const { error: passwordError } = await supabase.auth.admin.updateUserById(
-          id,
-          { password: editPassword }
-        );
-        if (passwordError) throw passwordError;
-      }
+      const res = await fetch(`${BACKEND_URL}/auth/employees/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to update employee');
 
       setSuccessMessage(`✅ Employee ${email} updated successfully`);
       setEditingEmployeeId(null);
@@ -140,13 +118,9 @@ function AdminEmployeeManagement() {
   // ════════════════════════════════════════════════════════════════
   const handleDeleteEmployee = async (id, email) => {
     try {
-      // Delete from profiles table (will cascade)
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      const res = await fetch(`${BACKEND_URL}/auth/employees/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to delete employee');
 
       setSuccessMessage(`✅ Employee ${email} deleted successfully`);
       setDeleteConfirm(null);
@@ -164,13 +138,9 @@ function AdminEmployeeManagement() {
   // ════════════════════════════════════════════════════════════════
   const handleClearDatabase = async () => {
     try {
-      // Delete all defects
-      const { error } = await supabase
-        .from('defects')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
-
-      if (error) throw error;
+      const res = await fetch(`${BACKEND_URL}/defects/all`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!json.success && !json.ok) throw new Error(json.error || 'Failed to clear database');
 
       setSuccessMessage('✅ Database cleared - all defects deleted');
       setClearDbConfirm(false);

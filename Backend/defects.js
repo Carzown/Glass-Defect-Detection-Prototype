@@ -293,6 +293,24 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
+// DELETE /defects/all - Delete ALL defect records (admin action)
+router.delete('/all', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Supabase not configured' });
+    }
+    const { error } = await supabase
+      .from('defects')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) return res.status(400).json({ success: false, error: error.message });
+    res.json({ success: true, message: 'All defects deleted' });
+  } catch (err) {
+    console.error('Error clearing defects:', err);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
 // DELETE /defects/:id - Delete defect record
 router.delete('/:id', async (req, res) => {
   try {

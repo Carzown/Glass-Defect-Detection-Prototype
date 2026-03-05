@@ -207,4 +207,118 @@ router.post('/verify-session', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────
+// EMPLOYEE MANAGEMENT (requires service role key on backend)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * GET /auth/employees
+ * List all users with role = 'employee'
+ */
+router.get('/employees', async (req, res) => {
+  try {
+    if (!supabase) return res.status(500).json({ success: false, error: 'Auth service unavailable' });
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email, role, created_at')
+      .eq('role', 'employee')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return res.status(200).json({ success: true, employees: data || [] });
+  } catch (error) {
+    console.error('[AUTH] List employees error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /auth/employees
+ * Create a new employee account
+ * Body: { email, password }
+ */
+router.post('/employees', async (req, res) => {
+  try {
+    if (!supabase) return res.status(500).json({ success: false, error: 'Auth service unavailable' });
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ success: false, error: 'Email and password are required' });
+
+    // Create auth user via admin API (requires service role)
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+    if (authError) throw authError;
+
+    // Upsert profile row
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert([{ id: authData.user.id, email, role: 'employee' }]);
+    if (profileError) throw profileError;
+
+    return res.status(201).json({ success: true, user: { id: authData.user.id, email } });
+  } catch (error) {
+    console.error('[AUTH] Create employee error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * PUT /auth/employees/:id
+ * Update employee email and/or password
+ * Body: { email?, password? }
+ */
+router.put('/employees/:id', async (req, res) => {
+  try {
+    if (!supabase) return res.status(500).json({ success: false, error: 'Auth service unavailable' });
+    const { id } = req.params;
+    const { email, password } = req.body;
+
+    const updates = {};
+    if (email) updates.email = email;
+    if (password) updates.password = password;
+
+    if (Object.keys(updates).length > 0) {
+      const { error: authError } = await supabase.auth.admin.updateUserById(id, updates);
+      if (authError) throw authError;
+    }
+
+    if (email) {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ email })
+        .eq('id', id);
+      if (profileError) throw profileError;
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('[AUTH] Update employee error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * DELETE /auth/employees/:id
+ * Delete an employee account
+ */
+router.delete('/employees/:id', async (req, res) => {
+  try {
+    if (!supabase) return res.status(500).json({ success: false, error: 'Auth service unavailable' });
+    const { id } = req.params;
+
+    // Delete from auth (cascades to profiles if FK is set, otherwise delete manually)
+    const { error: authError } = await supabase.auth.admin.deleteUser(id);
+    if (authError) throw authError;
+
+    // Also delete from profiles table in case there's no cascade
+    await supabase.from('profiles').delete().eq('id', id);
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('[AUTH] Delete employee error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;

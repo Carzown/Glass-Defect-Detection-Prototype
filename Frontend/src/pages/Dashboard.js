@@ -104,13 +104,13 @@ function Dashboard() {
     
     let cancelled = false;
     setDeviceStatusLoading(true);
-    fetchDeviceStatus('raspi').then((status) => {
+    fetchDeviceStatus('raspi-pi-1').then((status) => {
       if (!cancelled) {
         setDeviceStatus(status);
         setDeviceStatusLoading(false);
       }
     });
-    const unsubscribe = subscribeToDeviceStatus('raspi', (updated) => {
+    const unsubscribe = subscribeToDeviceStatus('raspi-pi-1', (updated) => {
       if (!cancelled) setDeviceStatus(updated);
     });
     return () => {
