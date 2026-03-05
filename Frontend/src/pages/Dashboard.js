@@ -443,12 +443,12 @@ function Dashboard() {
                               <span className="dh-detail-label">Defect Count</span>
                               <span className="dh-detail-value">{(dashSelectedDefect.detected_defects || []).length}</span>
                             </div>
-                            {(dashSelectedDefect.detected_defects || []).map((d, i) => (
-                              <div key={i} className="dh-detail-row">
+                            {(dashSelectedDefect.detected_defects || []).length > 0 && (
+                              <div className="dh-detail-row">
                                 <span className="dh-detail-label">Type</span>
-                                <span className="dh-detail-value">{capitalizeDefectType(d.type)}</span>
+                                <span className="dh-detail-value">{(dashSelectedDefect.detected_defects || []).map(d => capitalizeDefectType(d.type)).join(', ')}</span>
                               </div>
-                            ))}
+                            )}
                             <div className="dh-detail-row">
                               <span className="dh-detail-label">Time Detected</span>
                               <span className="dh-detail-value">{formatTime(dashSelectedDefect.detected_at)}</span>

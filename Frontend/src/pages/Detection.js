@@ -433,12 +433,12 @@ function Detection() {
                     <span className="det-modal-detail-label">Defect Count</span>
                     <span className="det-modal-detail-value">{modalDefect.defects.length}</span>
                   </div>
-                  {modalDefect.defects.map((d, i) => (
-                    <div key={i} className="det-modal-detail-row">
+                  {modalDefect.defects.length > 0 && (
+                    <div className="det-modal-detail-row">
                       <span className="det-modal-detail-label">Type</span>
-                      <span className="det-modal-detail-value">{capitalizeDefectType(d.type)}</span>
+                      <span className="det-modal-detail-value">{modalDefect.defects.map(d => capitalizeDefectType(d.type)).join(', ')}</span>
                     </div>
-                  ))}
+                  )}
                   <div className="det-modal-detail-row">
                     <span className="det-modal-detail-label">Time Detected</span>
                     <span className="det-modal-detail-value">{formatDisplayTime(modalDefect.detected_at)}</span>
