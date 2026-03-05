@@ -436,7 +436,7 @@ function Detection() {
                   {modalDefect.defects.length > 0 && (
                     <div className="det-modal-detail-row">
                       <span className="det-modal-detail-label">Type</span>
-                      <span className="det-modal-detail-value">{modalDefect.defects.map(d => capitalizeDefectType(d.type)).join(', ')}</span>
+                      <span className="det-modal-detail-value">{[...new Set(modalDefect.defects.map(d => capitalizeDefectType(d.type)))].join(', ')}</span>
                     </div>
                   )}
                   <div className="det-modal-detail-row">

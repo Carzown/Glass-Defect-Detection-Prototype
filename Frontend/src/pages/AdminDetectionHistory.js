@@ -286,7 +286,7 @@ function AdminDetectionHistory() {
                         {(selectedDefect.detected_defects || []).length > 0 && (
                           <div className="dh-detail-row">
                             <span className="dh-detail-label">Type</span>
-                            <span className="dh-detail-value">{(selectedDefect.detected_defects || []).map(d => capitalizeDefectType(d.type)).join(', ')}</span>
+                            <span className="dh-detail-value">{[...new Set((selectedDefect.detected_defects || []).map(d => capitalizeDefectType(d.type)))].join(', ')}</span>
                           </div>
                         )}
                         <div className="dh-detail-row">
