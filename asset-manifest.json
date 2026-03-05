@@ -1,14 +1,14 @@
 {
   "files": {
-    "main.css": "/Glass-Defect-Detection-Prototype/static/css/main.acd51e53.css",
-    "main.js": "/Glass-Defect-Detection-Prototype/static/js/main.dfc51c4e.js",
+    "main.css": "/Glass-Defect-Detection-Prototype/static/css/main.99fa798c.css",
+    "main.js": "/Glass-Defect-Detection-Prototype/static/js/main.aa5bb84c.js",
     "static/media/AlumpreneurLogo.png": "/Glass-Defect-Detection-Prototype/static/media/AlumpreneurLogo.e6b5aa49800e62283073.png",
     "index.html": "/Glass-Defect-Detection-Prototype/index.html",
-    "main.acd51e53.css.map": "/Glass-Defect-Detection-Prototype/static/css/main.acd51e53.css.map",
-    "main.dfc51c4e.js.map": "/Glass-Defect-Detection-Prototype/static/js/main.dfc51c4e.js.map"
+    "main.99fa798c.css.map": "/Glass-Defect-Detection-Prototype/static/css/main.99fa798c.css.map",
+    "main.aa5bb84c.js.map": "/Glass-Defect-Detection-Prototype/static/js/main.aa5bb84c.js.map"
   },
   "entrypoints": [
-    "static/css/main.acd51e53.css",
-    "static/js/main.dfc51c4e.js"
+    "static/css/main.99fa798c.css",
+    "static/js/main.aa5bb84c.js"
   ]
 }
