@@ -280,15 +280,13 @@ function AdminDetectionHistory() {
                       )}
                       <div className="dh-detail-card">
                         <div className="dh-detail-row">
-                          <span className="dh-detail-label">Detected</span>
-                          <span className="dh-defect-type">
-                            {getDefectTypesLabel(selectedDefect)}
-                          </span>
+                          <span className="dh-detail-label">Defect Count</span>
+                          <span className="dh-detail-value">{(selectedDefect.detected_defects || []).length}</span>
                         </div>
                         {(selectedDefect.detected_defects || []).map((d, i) => (
                           <div key={i} className="dh-detail-row">
-                            <span className="dh-detail-label">{capitalizeDefectType(d.type)}</span>
-                            <span className="dh-detail-value">{(d.confidence * 100).toFixed(1)}%</span>
+                            <span className="dh-detail-label">Type</span>
+                            <span className="dh-detail-value">{capitalizeDefectType(d.type)}</span>
                           </div>
                         ))}
                         <div className="dh-detail-row">
@@ -301,8 +299,8 @@ function AdminDetectionHistory() {
                         </div>
                         {selectedDefect.image_url && (
                           <div className="dh-detail-row">
-                            <span className="dh-detail-label">Image</span>
-                            <a href={selectedDefect.image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb' }}>View image ↗</a>
+                            <span className="dh-detail-label">Image URL</span>
+                            <a href={selectedDefect.image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb' }}>Image Link ↗</a>
                           </div>
                         )}
                       </div>

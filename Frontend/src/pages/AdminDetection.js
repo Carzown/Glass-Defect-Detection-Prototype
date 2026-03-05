@@ -358,11 +358,6 @@ function AdminDetection() {
                         <div className="det-defect-body">
                           <span className="det-defect-type-label">{defect.type}</span>
                         </div>
-                        {defect.defects.length > 0 && (
-                          <span className="det-defect-confidence">
-                            {(Math.max(...defect.defects.map(d => d.confidence || 0)) * 100).toFixed(0)}%
-                          </span>
-                        )}
                         <svg className="det-defect-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <polyline points="9 18 15 12 9 6" />
                         </svg>
@@ -441,8 +436,8 @@ function AdminDetection() {
                   </div>
                   {modalDefect.defects.map((d, i) => (
                     <div key={i} className="det-modal-detail-row">
-                      <span className="det-modal-detail-label">{capitalizeDefectType(d.type)}</span>
-                      <span className="det-modal-detail-value">{(d.confidence * 100).toFixed(1)}%</span>
+                      <span className="det-modal-detail-label">Type</span>
+                      <span className="det-modal-detail-value">{capitalizeDefectType(d.type)}</span>
                     </div>
                   ))}
                   <div className="det-modal-detail-row">
