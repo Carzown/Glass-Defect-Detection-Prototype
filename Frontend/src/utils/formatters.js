@@ -13,6 +13,17 @@ export function capitalizeDefectType(type) {
 }
 
 /**
+ * Get a display label for all detected defects in a record
+ * @param {object} record - Supabase defect record with detected_defects array
+ * @returns {string} - e.g. "Crack, Scratch" or "Bubble"
+ */
+export function getDefectTypesLabel(record) {
+  const defects = record?.detected_defects;
+  if (!Array.isArray(defects) || defects.length === 0) return 'Unknown';
+  return defects.map(d => capitalizeDefectType(d.type)).join(', ');
+}
+
+/**
  * Format date to localized time string (HH:MM:SS)
  * @param {string} dateStr - ISO date string
  * @returns {string} - Formatted time
@@ -100,9 +111,12 @@ export function groupByDate(defects) {
  */
 export function aggregateDefectsByType(defects) {
   const counts = {};
-  defects.forEach((d) => {
-    const type = capitalizeDefectType(d.defect_type) || 'Unknown';
-    counts[type] = (counts[type] || 0) + 1;
+  defects.forEach((record) => {
+    const items = Array.isArray(record.detected_defects) ? record.detected_defects : [];
+    items.forEach(d => {
+      const type = capitalizeDefectType(d.type) || 'Unknown';
+      counts[type] = (counts[type] || 0) + 1;
+    });
   });
   return Object.entries(counts).map(([type, count]) => ({ type, count }));
 }

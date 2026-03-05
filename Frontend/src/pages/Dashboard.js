@@ -11,6 +11,7 @@ import {
   groupByDate,
   aggregateDefectsByType,
   getBackendURL,
+  getDefectTypesLabel,
 } from '../utils/formatters';
 import { restoreAuthState, isUserAuthenticated } from '../utils/auth';
 import { fetchDefects, fetchDefectsByRange, fetchDefectsByDateRange, fetchDeviceStatus, subscribeToDeviceStatus } from '../services/defects';
@@ -281,9 +282,12 @@ function Dashboard() {
                 <div className="dashboard-stat-card">
                   <span className="dashboard-stat-label">Average Confidence Score</span>
                   <span className="dashboard-stat-value">
-                    {loading ? '…' : filteredDefects.length > 0
-                      ? `${(filteredDefects.reduce((sum, d) => sum + (d.confidence || 0), 0) / filteredDefects.length * 100).toFixed(1)}%`
-                      : '0%'}
+                    {loading ? '…' : (() => {
+                      const allItems = filteredDefects.flatMap(r => Array.isArray(r.detected_defects) ? r.detected_defects : []);
+                      return allItems.length > 0
+                        ? `${(allItems.reduce((sum, d) => sum + (d.confidence || 0), 0) / allItems.length * 100).toFixed(1)}%`
+                        : '0%';
+                    })()}
                   </span>
                 </div>
                 <div className="dashboard-stat-card">
@@ -385,8 +389,8 @@ function Dashboard() {
                               onClick={() => setDashSelectedDefect(d)}
                             >
                               <div className="dh-row-main">
-                                <span className={`dh-defect-type dh-defect-${(d.defect_type || '').toLowerCase()}`}>
-                                  {capitalizeDefectType(d.defect_type)}
+                                <span className="dh-defect-type">
+                                  {getDefectTypesLabel(d)}
                                 </span>
                                 <span className="dh-row-time">{formatTime(d.detected_at)}</span>
                               </div>
@@ -408,19 +412,45 @@ function Dashboard() {
                           <span className="dh-panel-title">Details</span>
                         </div>
                         <div className="dh-detail-card-wrapper">
+                          {dashSelectedDefect.image_url && (
+                            <div style={{ marginBottom: 12, borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb', position: 'relative' }}>
+                              <img
+                                src={dashSelectedDefect.image_url}
+                                alt="Defect"
+                                style={{ width: '100%', display: 'block', objectFit: 'contain', background: '#000' }}
+                              />
+                              {dashSelectedDefect.tag_number != null && (
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '12px',
+                                  left: '12px',
+                                  background: '#0f2942',
+                                  color: 'white',
+                                  padding: '6px 12px',
+                                  borderRadius: '6px',
+                                  fontSize: '14px',
+                                  fontWeight: '700',
+                                  fontFamily: 'Poppins, sans-serif',
+                                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+                                }}>
+                                  #{dashSelectedDefect.tag_number}
+                                </div>
+                              )}
+                            </div>
+                          )}
                           <div className="dh-detail-card">
-                            {dashSelectedDefect.tag_number != null && (
-                              <div className="dh-detail-row">
-                                <span className="dh-detail-label">Tag #</span>
-                                <span className="dh-detail-value" style={{ fontWeight: 800, color: '#0f2942' }}>#{dashSelectedDefect.tag_number}</span>
-                              </div>
-                            )}
                             <div className="dh-detail-row">
-                              <span className="dh-detail-label">Type</span>
-                              <span className={`dh-defect-type dh-defect-${(dashSelectedDefect.defect_type || '').toLowerCase()}`}>
-                                {capitalizeDefectType(dashSelectedDefect.defect_type)}
+                              <span className="dh-detail-label">Detected</span>
+                              <span className="dh-defect-type">
+                                {getDefectTypesLabel(dashSelectedDefect)}
                               </span>
                             </div>
+                            {(dashSelectedDefect.detected_defects || []).map((d, i) => (
+                              <div key={i} className="dh-detail-row">
+                                <span className="dh-detail-label">{capitalizeDefectType(d.type)}</span>
+                                <span className="dh-detail-value">{(d.confidence * 100).toFixed(1)}%</span>
+                              </div>
+                            ))}
                             <div className="dh-detail-row">
                               <span className="dh-detail-label">Time Detected</span>
                               <span className="dh-detail-value">{formatTime(dashSelectedDefect.detected_at)}</span>
@@ -429,25 +459,10 @@ function Dashboard() {
                               <span className="dh-detail-label">Date</span>
                               <span className="dh-detail-value">{formatDate(dashSelectedDefect.detected_at)}</span>
                             </div>
-                            {dashSelectedDefect.confidence != null && (
-                              <div className="dh-detail-row">
-                                <span className="dh-detail-label">Confidence</span>
-                                <span className="dh-detail-value">
-                                  {(dashSelectedDefect.confidence * 100).toFixed(1)}%
-                                </span>
-                              </div>
-                            )}
-                            <div className="dh-detail-row">
-                              <span className="dh-detail-label">Tagged Image</span>
-                              {dashSelectedDefect.tagged_image_url
-                                ? <a href={dashSelectedDefect.tagged_image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb' }}>View tagged ↗</a>
-                                : <span className="dh-detail-value" style={{ color: '#d1d5db' }}>Pending…</span>
-                              }
-                            </div>
                             {dashSelectedDefect.image_url && (
                               <div className="dh-detail-row">
-                                <span className="dh-detail-label">Original</span>
-                                <a href={dashSelectedDefect.image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb' }}>View original ↗</a>
+                                <span className="dh-detail-label">Image</span>
+                                <a href={dashSelectedDefect.image_url} target="_blank" rel="noreferrer" className="dh-detail-value" style={{ color: '#2563eb' }}>View image ↗</a>
                               </div>
                             )}
                           </div>

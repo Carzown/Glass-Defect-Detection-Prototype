@@ -8,6 +8,7 @@ import {
   formatDisplayDate,
   formatDisplayTime,
   capitalizeDefectType,
+  getDefectTypesLabel,
 } from '../utils/formatters';
 import { restoreAuthState, isUserAuthenticated } from '../utils/auth';
 import { fetchDefects, getDateRangeBounds, subscribeToDefects } from '../services/defects';
@@ -67,7 +68,8 @@ function Detection() {
         const displayDefects = supabaseData.map(d => ({
           id: d.id,
           time: formatRelativeTime(d.detected_at),
-          type: capitalizeDefectType(d.defect_type),
+          type: getDefectTypesLabel(d),
+          defects: d.detected_defects || [],
           imageUrl: d.image_url,
           tagNumber: d.tag_number,
           detected_at: d.detected_at,
@@ -108,7 +110,8 @@ function Detection() {
               const displayDefect = {
                 id: newDefect.id,
                 time: formatRelativeTime(newDefect.detected_at),
-                type: capitalizeDefectType(newDefect.defect_type),
+                type: getDefectTypesLabel(newDefect),
+                defects: newDefect.detected_defects || [],
                 imageUrl: newDefect.image_url,
                 tagNumber: newDefect.tag_number,
                 detected_at: newDefect.detected_at,
@@ -354,9 +357,9 @@ function Detection() {
                         <div className="det-defect-body">
                           <span className="det-defect-type-label">{defect.type}</span>
                         </div>
-                        {defect.supabaseData?.confidence != null && (
+                        {defect.defects.length > 0 && (
                           <span className="det-defect-confidence">
-                            {(defect.supabaseData.confidence * 100).toFixed(0)}%
+                            {(Math.max(...defect.defects.map(d => d.confidence || 0)) * 100).toFixed(0)}%
                           </span>
                         )}
                         <svg className="det-defect-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -376,7 +379,6 @@ function Detection() {
       {modalOpen && currentImageIndex >= 0 && currentDefects[currentImageIndex] && (
         (() => {
           const modalDefect = currentDefects[currentImageIndex];
-          const confidence = modalDefect.supabaseData?.confidence ?? modalDefect.confidence;
           return (
             <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
               <div className="det-modal-content">
@@ -433,9 +435,15 @@ function Detection() {
                 {/* Details */}
                 <div className="det-modal-details">
                   <div className="det-modal-detail-row">
-                    <span className="det-modal-detail-label">Type</span>
+                    <span className="det-modal-detail-label">Detected</span>
                     <span className="det-modal-detail-value">{modalDefect.type}</span>
                   </div>
+                  {modalDefect.defects.map((d, i) => (
+                    <div key={i} className="det-modal-detail-row">
+                      <span className="det-modal-detail-label">{capitalizeDefectType(d.type)}</span>
+                      <span className="det-modal-detail-value">{(d.confidence * 100).toFixed(1)}%</span>
+                    </div>
+                  ))}
                   <div className="det-modal-detail-row">
                     <span className="det-modal-detail-label">Time Detected</span>
                     <span className="det-modal-detail-value">{formatDisplayTime(modalDefect.detected_at)}</span>
@@ -444,16 +452,10 @@ function Detection() {
                     <span className="det-modal-detail-label">Date</span>
                     <span className="det-modal-detail-value">{formatDisplayDate(modalDefect.detected_at)}</span>
                   </div>
-                  {confidence != null && (
-                    <div className="det-modal-detail-row">
-                      <span className="det-modal-detail-label">Confidence</span>
-                      <span className="det-modal-detail-value">{(confidence * 100).toFixed(1)}%</span>
-                    </div>
-                  )}
                   <div className="det-modal-detail-row">
-                    <span className="det-modal-detail-label">Image</span>
+                    <span className="det-modal-detail-label">Image URL</span>
                     {modalDefect.imageUrl
-                      ? <a href={modalDefect.imageUrl} target="_blank" rel="noreferrer" className="det-modal-detail-link">View image ↗</a>
+                      ? <a href={modalDefect.imageUrl} target="_blank" rel="noreferrer" className="det-modal-detail-link det-modal-detail-url" title={modalDefect.imageUrl}>{modalDefect.imageUrl}</a>
                       : <span className="det-modal-detail-empty">—</span>
                     }
                   </div>

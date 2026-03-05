@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
 import ConfirmationModal from '../components/ConfirmationModal';
-import { capitalizeDefectType, formatDate, formatTime, groupByDate } from '../utils/formatters';
+import { capitalizeDefectType, formatDate, formatTime, groupByDate, getDefectTypesLabel } from '../utils/formatters';
 import { restoreAdminAuthState, isAdminAuthenticated } from '../utils/auth';
 import { fetchDefectsByRange, fetchDefectsByDateRange, deleteDefect } from '../services/defects';
 import './Dashboard.css';
@@ -229,8 +229,8 @@ function AdminDetectionHistory() {
                           onClick={() => handleDefectClick(d)}
                         >
                           <div className="dh-row-main">
-                            <span className={`dh-defect-type dh-defect-${(d.defect_type || '').toLowerCase()}`}>
-                              {capitalizeDefectType(d.defect_type)}
+                            <span className="dh-defect-type">
+                              {getDefectTypesLabel(d)}
                             </span>
                             <span className="dh-row-time">{formatTime(d.detected_at)}</span>
                           </div>
@@ -280,11 +280,17 @@ function AdminDetectionHistory() {
                       )}
                       <div className="dh-detail-card">
                         <div className="dh-detail-row">
-                          <span className="dh-detail-label">Type</span>
-                          <span className={`dh-defect-type dh-defect-${(selectedDefect.defect_type || '').toLowerCase()}`}>
-                            {capitalizeDefectType(selectedDefect.defect_type)}
+                          <span className="dh-detail-label">Detected</span>
+                          <span className="dh-defect-type">
+                            {getDefectTypesLabel(selectedDefect)}
                           </span>
                         </div>
+                        {(selectedDefect.detected_defects || []).map((d, i) => (
+                          <div key={i} className="dh-detail-row">
+                            <span className="dh-detail-label">{capitalizeDefectType(d.type)}</span>
+                            <span className="dh-detail-value">{(d.confidence * 100).toFixed(1)}%</span>
+                          </div>
+                        ))}
                         <div className="dh-detail-row">
                           <span className="dh-detail-label">Time Detected</span>
                           <span className="dh-detail-value">{formatTime(selectedDefect.detected_at)}</span>
@@ -293,14 +299,6 @@ function AdminDetectionHistory() {
                           <span className="dh-detail-label">Date</span>
                           <span className="dh-detail-value">{formatDate(selectedDefect.detected_at)}</span>
                         </div>
-                        {selectedDefect.confidence != null && (
-                          <div className="dh-detail-row">
-                            <span className="dh-detail-label">Confidence</span>
-                            <span className="dh-detail-value">
-                              {(selectedDefect.confidence * 100).toFixed(1)}%
-                            </span>
-                          </div>
-                        )}
                         {selectedDefect.image_url && (
                           <div className="dh-detail-row">
                             <span className="dh-detail-label">Image</span>

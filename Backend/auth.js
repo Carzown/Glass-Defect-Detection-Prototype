@@ -84,19 +84,20 @@ router.post('/login', async (req, res) => {
         if (!adminEmails.includes(email.toLowerCase())) {
           return res.status(403).json({
             success: false,
-            error: 'This account does not have admin access'
+            error: 'This email belongs to an employee account, not an admin account'
           });
         }
         userRole = 'admin';
       }
-    } else {
-      // For employee login, accept any non-admin or admin role
-      // (admin can also login as employee)
+    } else if (role === 'employee') {
+      // For employee login, reject if user is admin
       if (userRole === 'admin') {
-        userRole = 'admin'; // Keep their admin role
-      } else {
-        userRole = 'employee';
+        return res.status(403).json({
+          success: false,
+          error: 'This email belongs to an admin account, not an employee account'
+        });
       }
+      userRole = 'employee';
     }
 
     // Return user info and auth session

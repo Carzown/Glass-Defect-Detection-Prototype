@@ -269,11 +269,14 @@ export async function getDefectStats() {
   }
 
   if (!supabase) throw new Error('Neither backend nor Supabase is available');
-  const { data: allDefects, error } = await supabase.from('defects').select('defect_type');
+  const { data: allDefects, error } = await supabase.from('defects').select('detected_defects');
   if (error) throw error;
   const stats = { total: allDefects?.length || 0, byType: {} };
-  for (const defect of allDefects || []) {
-    stats.byType[defect.defect_type] = (stats.byType[defect.defect_type] || 0) + 1;
+  for (const record of allDefects || []) {
+    for (const d of (record.detected_defects || [])) {
+      const t = d.type || 'Unknown';
+      stats.byType[t] = (stats.byType[t] || 0) + 1;
+    }
   }
   return stats;
 }

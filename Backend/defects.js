@@ -86,15 +86,20 @@ router.get('/stats/summary', async (req, res) => {
     }
     const { data, error } = await supabase
       .from('defects')
-      .select('defect_type, confidence, detected_at');
+      .select('detected_defects, defect_count, detected_at');
     if (error) return res.status(400).json({ error: error.message });
     const records = data || [];
+    const allDefectItems = records.flatMap(r => Array.isArray(r.detected_defects) ? r.detected_defects : []);
     res.json({
       totalDefects: records.length,
-      avgConfidence: records.length
-        ? records.reduce((s, d) => s + (d.confidence || 0), 0) / records.length
+      avgConfidence: allDefectItems.length
+        ? allDefectItems.reduce((s, d) => s + (d.confidence || 0), 0) / allDefectItems.length
         : 0,
-      byType: groupBy(records, 'defect_type'),
+      byType: allDefectItems.reduce((acc, d) => {
+        const t = d.type || 'Unknown';
+        acc[t] = (acc[t] || 0) + 1;
+        return acc;
+      }, {}),
     });
   } catch (err) {
     console.error('Error fetching statistics:', err);
@@ -111,7 +116,7 @@ router.get('/stats/range', async (req, res) => {
     const { dateFrom, dateTo } = req.query;
     let query = supabase
       .from('defects')
-      .select('id, defect_type, confidence, detected_at')
+      .select('id, detected_defects, defect_count, detected_at')
       .order('detected_at', { ascending: false });
     if (dateFrom) query = query.gte('detected_at', dateFrom);
     if (dateTo)   query = query.lte('detected_at', dateTo);
@@ -119,11 +124,16 @@ router.get('/stats/range', async (req, res) => {
     if (error) return res.status(400).json({ error: error.message });
     const records = data || [];
     const total = records.length;
-    const avgConfidence = total
-      ? records.reduce((s, d) => s + (d.confidence || 0), 0) / total
+    const allDefectItems = records.flatMap(r => Array.isArray(r.detected_defects) ? r.detected_defects : []);
+    const avgConfidence = allDefectItems.length
+      ? allDefectItems.reduce((s, d) => s + (d.confidence || 0), 0) / allDefectItems.length
       : 0;
     const lastDetected = records.length ? records[0].detected_at : null;
-    const byType = groupBy(records, 'defect_type');
+    const byType = allDefectItems.reduce((acc, d) => {
+      const t = d.type || 'Unknown';
+      acc[t] = (acc[t] || 0) + 1;
+      return acc;
+    }, {});
     const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const piOnline = records.some(d => d.detected_at >= tenMinAgo);
     res.json({
@@ -188,12 +198,12 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const { defect_type, detected_at, image_url, image_path, confidence } = req.body;
+    const { detected_defects, defect_count, detected_at, image_url, image_path } = req.body;
 
-    if (!defect_type) {
+    if (!detected_defects || !Array.isArray(detected_defects) || detected_defects.length === 0) {
       return res.status(400).json({
         error: 'Missing required fields',
-        required: ['defect_type']
+        required: ['detected_defects']
       });
     }
 
@@ -202,11 +212,11 @@ router.post('/', async (req, res) => {
       .from('defects')
       .insert([
         {
-          defect_type,
+          detected_defects,
+          defect_count: defect_count || detected_defects.length,
           detected_at: detected_at || new Date().toISOString(),
           image_url: image_url || null,
           image_path: image_path || null,
-          confidence: confidence || null,
         },
       ])
       .select();

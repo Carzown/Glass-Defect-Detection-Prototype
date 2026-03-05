@@ -228,9 +228,12 @@ function AdminDashboard() {
                 <div className="dashboard-stat-card">
                   <span className="dashboard-stat-label">Average Confidence Score</span>
                   <span className="dashboard-stat-value">
-                    {loading ? '…' : filteredDefects.length > 0
-                      ? `${(filteredDefects.reduce((sum, d) => sum + (d.confidence || 0), 0) / filteredDefects.length * 100).toFixed(1)}%`
-                      : '0%'}
+                    {loading ? '…' : (() => {
+                      const allItems = filteredDefects.flatMap(r => Array.isArray(r.detected_defects) ? r.detected_defects : []);
+                      return allItems.length > 0
+                        ? `${(allItems.reduce((sum, d) => sum + (d.confidence || 0), 0) / allItems.length * 100).toFixed(1)}%`
+                        : '0%';
+                    })()}
                   </span>
                 </div>
                 <div className="dashboard-stat-card">

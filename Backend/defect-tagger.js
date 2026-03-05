@@ -115,27 +115,14 @@ async function processUntagged() {
     const tagNumber = baseTag + i;
 
     try {
-      let taggedUrl = null;
-
-      if (defect.image_url) {
-        const original = await downloadImage(defect.image_url);
-        const tagged   = await buildTaggedImage(original, tagNumber);
-        if (tagged) {
-          taggedUrl = await uploadToStorage(defect.id, tagNumber, tagged);
-        }
-      }
-
       const { error: updateErr } = await supabase
         .from('defects')
-        .update({ tag_number: tagNumber, tagged_image_url: taggedUrl })
+        .update({ tag_number: tagNumber })
         .eq('id', defect.id);
 
       if (updateErr) throw new Error(updateErr.message);
 
-      console.log(
-        `[Tagger] ✅ #${tagNumber} → defect ${defect.id}` +
-        (taggedUrl ? ' (image tagged & stored)' : ' (no image — number assigned)')
-      );
+      console.log(`[Tagger] ✅ #${tagNumber} → defect ${defect.id}`);
     } catch (err) {
       console.error(`[Tagger] ❌ defect ${defect.id}:`, err.message);
     }

@@ -76,7 +76,8 @@ function Login() {
         if (msg.includes('Invalid credentials')) msg = 'Invalid email or password.';
         else if (msg.includes('too-many-requests')) msg = 'Too many login attempts. Please try again later.';
         else if (msg.includes('email not confirmed')) msg = 'Please verify your email before logging in.';
-        else if (msg.includes('admin access')) msg = 'This account does not have admin access.';
+        else if (msg.includes('employee account, not an admin')) msg = 'This email is an employee account, not an admin account. Please select the Employee tab.';
+        else if (msg.includes('admin account, not an employee')) msg = 'This email is an admin account, not an employee account. Please select the Admin tab.';
         setError(msg);
         setLoading(false);
         return;
