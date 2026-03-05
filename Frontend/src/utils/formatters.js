@@ -20,7 +20,14 @@ export function capitalizeDefectType(type) {
 export function getDefectTypesLabel(record) {
   const defects = record?.detected_defects;
   if (!Array.isArray(defects) || defects.length === 0) return 'Unknown';
-  return defects.map(d => capitalizeDefectType(d.type)).join(', ');
+  // Count occurrences of each type
+  const counts = {};
+  defects.forEach(d => {
+    const t = capitalizeDefectType(d.type) || 'Unknown';
+    counts[t] = (counts[t] || 0) + 1;
+  });
+  // Format as "2 Scratch, 1 Bubble"
+  return Object.entries(counts).map(([type, count]) => `${count} ${type}`).join(', ');
 }
 
 /**
