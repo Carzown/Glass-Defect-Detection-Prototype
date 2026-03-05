@@ -269,7 +269,7 @@ function AdminDetection() {
         <div className="machine-content-area" style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div className="machine-content-wrapper" style={{ flex: 1, height: 'auto', minHeight: 0 }}>
             {/* Image Preview Section - Left */}
-            <div className="machine-image-preview-panel">
+            <div className="machine-image-preview-panel" style={{ flex: 2 }}>
               <div className="image-preview-header">
                 <h2 className="machine-section-title">Defect Preview</h2>
               </div>
@@ -318,7 +318,7 @@ function AdminDetection() {
             </div>
 
             {/* Defect List Section - Right */}
-            <div className="machine-defects-panel">
+            <div className="machine-defects-panel" style={{ flex: 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                 <div>
                   <h2 className="machine-section-title" style={{ marginBottom: '0' }}>Detected Defects ({currentDefects.length})</h2>
@@ -456,7 +456,7 @@ function AdminDetection() {
                   <div className="det-modal-detail-row">
                     <span className="det-modal-detail-label">Image URL</span>
                     {modalDefect.imageUrl
-                      ? <a href={modalDefect.imageUrl} target="_blank" rel="noreferrer" className="det-modal-detail-link det-modal-detail-url" title={modalDefect.imageUrl}>{modalDefect.imageUrl}</a>
+                      ? <a href={modalDefect.imageUrl} target="_blank" rel="noreferrer" className="det-modal-detail-link">↗</a>
                       : <span className="det-modal-detail-empty">—</span>
                     }
                   </div>
