@@ -1,5 +1,5 @@
 // Admin Detection History - Browse past detection sessions grouped by date (Admin version)
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
@@ -24,6 +24,9 @@ function AdminDetectionHistory() {
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }));
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [defectTypeFilter, setDefectTypeFilter] = useState('all');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterBtnRef = useRef(null);
 
   // Check if admin is authenticated - restore from localStorage if needed
   useEffect(() => {
@@ -92,6 +95,15 @@ function AdminDetectionHistory() {
     return () => { cancelled = true; };
   }, [authChecked, timeFilter, customFromDate, customToDate]);
 
+  useEffect(() => {
+    if (!filterOpen) return;
+    const handler = (e) => {
+      if (filterBtnRef.current && !filterBtnRef.current.contains(e.target)) setFilterOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [filterOpen]);
+
   function handleSessionClick(session) {
     setSelectedSession(session);
     setSelectedDefect(null);
@@ -111,11 +123,20 @@ function AdminDetectionHistory() {
     setSelectedDefect(null);
     setShowDeleteConfirm(false);
 
-    // Update selectedSession so column 2 instantly reflects the deletion
+    // Update selectedSession so column 2 instantly reflects the deletion (respecting active filter)
     if (selectedSession) {
       const [dateKey] = selectedSession;
-      const updatedSession = newSessions.find(([k]) => k === dateKey);
-      setSelectedSession(updatedSession || null);
+      const updatedRaw = newSessions.find(([k]) => k === dateKey);
+      if (!updatedRaw) {
+        setSelectedSession(null);
+      } else if (defectTypeFilter === 'all') {
+        setSelectedSession(updatedRaw);
+      } else {
+        const filteredDefects = updatedRaw[1].filter(d =>
+          (d.detected_defects || []).some(dd => dd.type?.toLowerCase() === defectTypeFilter)
+        );
+        setSelectedSession(filteredDefects.length > 0 ? [dateKey, filteredDefects] : null);
+      }
     }
 
     // Fire the actual delete in the background
@@ -123,10 +144,26 @@ function AdminDetectionHistory() {
       await deleteDefect(deletedId);
     } catch (error) {
       console.error('[AdminDetectionHistory] Error deleting defect:', error);
-      // Revert by re-fetching
       setFetchError('Delete failed — please refresh to restore the list.');
     }
   }
+
+  const countByType = (type) =>
+    sessions.reduce((acc, [, defects]) =>
+      acc + defects.filter(d =>
+        (d.detected_defects || []).some(dd => dd.type?.toLowerCase() === type)
+      ).length, 0);
+
+  const filteredSessions = defectTypeFilter === 'all'
+    ? sessions
+    : sessions
+        .map(([dateKey, defects]) => [
+          dateKey,
+          defects.filter(d =>
+            (d.detected_defects || []).some(dd => dd.type?.toLowerCase() === defectTypeFilter)
+          ),
+        ])
+        .filter(([, defects]) => defects.length > 0);
 
   return (
     <>
@@ -174,16 +211,67 @@ function AdminDetectionHistory() {
         <div className="dh-page-content-area">
           <div className="dashboard-title-row" style={{ padding: '0 0 8px 0', gap: '12px', alignItems: 'center' }}>
             <h2 className="dashboard-box-title">Sessions</h2>
-            <div style={{ minWidth: '300px' }}>
-              <DateRangePicker
-                onApply={(result) => {
-                  setTimeFilter('custom-range');
-                  setCustomFromDate(result.from);
-                  setCustomToDate(result.to);
-                }}
-                initialFrom={customFromDate}
-                initialTo={customToDate}
-              />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: 'auto' }}>
+              <div ref={filterBtnRef} style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setFilterOpen(o => !o)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '8px 14px',
+                    background: defectTypeFilter !== 'all' ? '#0f2942' : '#fff',
+                    color: defectTypeFilter !== 'all' ? '#fff' : '#0f2942',
+                    border: '1.5px solid #0f2942', borderRadius: 8,
+                    fontWeight: 600, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                  </svg>
+                  {defectTypeFilter === 'all' ? 'Filter' : defectTypeFilter.charAt(0).toUpperCase() + defectTypeFilter.slice(1)}
+                </button>
+                {filterOpen && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 100,
+                    background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.12)', minWidth: 170, overflow: 'hidden',
+                  }}>
+                    {[
+                      { value: 'all', label: 'All Types' },
+                      { value: 'bubble', label: `Bubble (${countByType('bubble')})` },
+                      { value: 'scratch', label: `Scratch (${countByType('scratch')})` },
+                      { value: 'crack', label: `Crack (${countByType('crack')})` },
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => { setDefectTypeFilter(opt.value); setFilterOpen(false); }}
+                        style={{
+                          display: 'block', width: '100%', textAlign: 'left',
+                          padding: '10px 16px', border: 'none',
+                          background: defectTypeFilter === opt.value ? '#f0f4ff' : 'transparent',
+                          color: defectTypeFilter === opt.value ? '#0f2942' : '#374151',
+                          fontWeight: defectTypeFilter === opt.value ? 700 : 500,
+                          fontSize: 13, cursor: 'pointer',
+                        }}
+                        onMouseEnter={e => { if (defectTypeFilter !== opt.value) e.currentTarget.style.background = '#f9fafb'; }}
+                        onMouseLeave={e => { if (defectTypeFilter !== opt.value) e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div style={{ minWidth: '300px' }}>
+                <DateRangePicker
+                  onApply={(result) => {
+                    setTimeFilter('custom-range');
+                    setCustomFromDate(result.from);
+                    setCustomToDate(result.to);
+                  }}
+                  initialFrom={customFromDate}
+                  initialTo={customToDate}
+                />
+              </div>
             </div>
           </div>
           {loading && <div className="dh-loading">Loading history…</div>}
@@ -194,15 +282,15 @@ function AdminDetectionHistory() {
               <div className="dh-panel dh-panel-always">
                 <div className="dh-panel-header">
                   <span className="dh-panel-title">History</span>
-                  <span className="dh-panel-count">{sessions.length}</span>
+                  <span className="dh-panel-count">{filteredSessions.length}</span>
                 </div>
                 <div className="dh-panel-list">
-                  {sessions.length === 0 ? (
+                  {filteredSessions.length === 0 ? (
                     <div className="dh-empty">
-                      {fetchError ? fetchError : 'No history found'}
+                      {fetchError ? fetchError : sessions.length === 0 ? 'No history found' : `No ${defectTypeFilter} defects in this period`}
                     </div>
                   ) : (
-                    sessions.map(([dateKey, defects]) => (
+                    filteredSessions.map(([dateKey, defects]) => (
                       <div
                         key={dateKey}
                         className={`dh-row${selectedSession && selectedSession[0] === dateKey ? ' dh-row-selected' : ''}`}
