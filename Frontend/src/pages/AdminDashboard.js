@@ -253,13 +253,13 @@ function AdminDashboard() {
                     ? new Date(deviceStatus.last_seen).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
                     : null;
                   return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                       <span className="dashboard-stat-value dashboard-stat-status" style={{ color: online ? '#22c55e' : '#ef4444', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: online ? '#22c55e' : '#ef4444', flexShrink: 0 }} />
                         {online ? 'Online' : 'Offline'}
                       </span>
                       {lastSeen && (
-                        <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                        <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 2, textAlign: 'center' }}>
                           Last seen: {lastSeen}
                         </span>
                       )}
