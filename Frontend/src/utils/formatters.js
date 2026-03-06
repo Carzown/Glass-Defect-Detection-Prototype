@@ -120,8 +120,9 @@ export function aggregateDefectsByType(defects) {
   const counts = {};
   defects.forEach((record) => {
     const items = Array.isArray(record.detected_defects) ? record.detected_defects : [];
-    items.forEach(d => {
-      const type = capitalizeDefectType(d.type) || 'Unknown';
+    // Count each record once per unique type it contains (not each individual detection)
+    const types = new Set(items.map(d => capitalizeDefectType(d.type)).filter(Boolean));
+    types.forEach(type => {
       counts[type] = (counts[type] || 0) + 1;
     });
   });
