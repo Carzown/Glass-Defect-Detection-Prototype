@@ -18,45 +18,27 @@ except ImportError:
 FRAME_PATH = os.path.join(tempfile.gettempdir(), "gdd_latest_frame.jpg")
 
 # ── Supabase device_status sync ───────────────────────────────────────────
-# Load credentials from modules/config.py (shared with MainDetection.py)
+# Same config import pattern as MainDetection.py
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'modules'))
 
-DEVICE_ID = 'raspi-pi-1'
-_SUPABASE_URL = None
-_SUPABASE_KEY = None
-
-# 1) Try modules/config.py (present on the Raspberry Pi)
 try:
-    from config import SUPABASE_URL as _SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY as _SUPABASE_KEY
-    try:
-        from config import DEVICE_ID
-    except ImportError:
-        pass
-except ImportError:
-    pass
-
-# 2) Fall back to .env file in the project root (works on dev machine + Pi)
-if not _SUPABASE_URL:
-    _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
-    if os.path.exists(_env_path):
-        with open(_env_path) as _f:
-            for _line in _f:
-                _line = _line.strip()
-                if _line.startswith('SUPABASE_URL='):
-                    _SUPABASE_URL = _line.split('=', 1)[1].strip()
-                elif _line.startswith('SUPABASE_SERVICE_ROLE_KEY='):
-                    _SUPABASE_KEY = _line.split('=', 1)[1].strip()
+    from config import DEVICE_ID, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+except ImportError as e:
+    print(f'[TkinterApp] ERROR: Failed to import config: {e}')
+    DEVICE_ID = 'raspi-pi-1'
+    SUPABASE_URL = None
+    SUPABASE_SERVICE_ROLE_KEY = None
 
 _supabase = None
-if _SUPABASE_URL and _SUPABASE_KEY:
-    try:
-        from supabase import create_client as _create_client
-        _supabase = _create_client(_SUPABASE_URL, _SUPABASE_KEY)
+try:
+    from supabase import create_client as _create_client
+    if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
+        _supabase = _create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
         print(f'[TkinterApp] Supabase connected (device: {DEVICE_ID})')
-    except Exception as _e:
-        print(f'[TkinterApp] Supabase init failed: {_e}')
-else:
-    print('[TkinterApp] WARNING: Supabase credentials not found – device status will not sync')
+    else:
+        print('[TkinterApp] WARNING: Supabase credentials missing in config.py')
+except Exception as _e:
+    print(f'[TkinterApp] Supabase init failed: {_e}')
 
 
 def _set_device_online(online: bool):
