@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Sidebar from '../components/Sidebar';
@@ -14,7 +14,7 @@ import {
   getDefectTypesLabel,
 } from '../utils/formatters';
 import { restoreAuthState, isUserAuthenticated } from '../utils/auth';
-import { fetchDefects, fetchDefectsByRange, fetchDefectsByDateRange, fetchDeviceStatus, subscribeToDeviceStatus } from '../services/defects';
+import { fetchDefects, fetchDefectsByRange, fetchDefectsByDateRange, fetchDeviceStatus, subscribeToDeviceStatus, subscribeToDefects, connectWebSocket } from '../services/defects';
 import './Dashboard.css';
 
 const BACKEND_URL = getBackendURL();
@@ -93,6 +93,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
   const [lastDetectionTime, setLastDetectionTime] = useState(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   // Raspberry Pi device status (from device_status table)
   const [deviceStatus, setDeviceStatus] = useState(null); // { is_online, last_seen }
@@ -136,6 +137,36 @@ function Dashboard() {
     loadLastDetection();
   }, [authChecked]);
 
+  // Keep a ref to latest timeFilter so real-time callbacks always see the current value
+  const timeFilterRef = useRef(timeFilter);
+  useEffect(() => { timeFilterRef.current = timeFilter; }, [timeFilter]);
+
+  // Real-time: WebSocket (instant) + Supabase Realtime (redundancy) + 30-second poll
+  useEffect(() => {
+    if (!authChecked) return;
+    const pollId = setInterval(() => {
+      loadLastDetection();
+      setRefreshTick(t => t + 1);
+    }, 30_000);
+    const onNew = (newDefect) => {
+      setLastDetectionTime(newDefect.detected_at);
+      if (timeFilterRef.current === 'today') {
+        setFilteredDefects(prev =>
+          prev.some(d => d.id === newDefect.id) ? prev : [newDefect, ...prev]
+        );
+      } else if (timeFilterRef.current !== 'custom-range') {
+        setRefreshTick(t => t + 1);
+      }
+    };
+    const unsubWS = connectWebSocket({ onNew });
+    const unsubSupa = subscribeToDefects({ onNew });
+    return () => {
+      clearInterval(pollId);
+      unsubWS();
+      unsubSupa();
+    };
+  }, [authChecked]);
+
   // Re-fetch whenever the date filter or page navigation changes (only after auth is verified)
   useEffect(() => {
     if (!authChecked) return;
@@ -175,7 +206,7 @@ function Dashboard() {
     }
     load();
     return () => { cancelled = true; };
-  }, [authChecked, timeFilter, customFromDate, customToDate]);
+  }, [authChecked, timeFilter, customFromDate, customToDate, refreshTick]);
 
 
 
