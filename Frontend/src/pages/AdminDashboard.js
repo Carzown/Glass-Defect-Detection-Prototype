@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import DateRangePicker from '../components/DateRangePicker';
 import AdminEmployeeManagement from '../components/AdminEmployeeManagement';
-import { formatRelativeTime, getBackendURL } from '../utils/formatters';
+import { formatRelativeTime, getBackendURL, capitalizeDefectType } from '../utils/formatters';
 import { restoreAdminAuthState, isAdminAuthenticated } from '../utils/auth';
 import { fetchDefects, fetchDefectsByRange, fetchDefectsByDateRange, fetchDeviceStatus, subscribeToDeviceStatus } from '../services/defects';
 import './AdminDashboard.css';
@@ -93,13 +93,13 @@ function AdminDashboard() {
     
     let cancelled = false;
     setDeviceStatusLoading(true);
-    fetchDeviceStatus('raspi-pi-1').then((status) => {
+    fetchDeviceStatus('raspi').then((status) => {
       if (!cancelled) {
         setDeviceStatus(status);
         setDeviceStatusLoading(false);
       }
     });
-    const unsubscribe = subscribeToDeviceStatus('raspi-pi-1', (updated) => {
+    const unsubscribe = subscribeToDeviceStatus('raspi', (updated) => {
       if (!cancelled) setDeviceStatus(updated);
     });
     return () => {
@@ -226,13 +226,13 @@ function AdminDashboard() {
                   <span className="dashboard-stat-value">{loading ? '…' : filteredDefects.length}</span>
                 </div>
                 <div className="dashboard-stat-card">
-                  <span className="dashboard-stat-label">Average Confidence Score</span>
-                  <span className="dashboard-stat-value">
+                  <span className="dashboard-stat-label">Last Detected Defect</span>
+                  <span className="dashboard-stat-value" style={{ fontSize: filteredDefects[0] && (filteredDefects[0].detected_defects || []).length > 0 ? '16px' : undefined }}>
                     {loading ? '…' : (() => {
-                      const allItems = filteredDefects.flatMap(r => Array.isArray(r.detected_defects) ? r.detected_defects : []);
-                      return allItems.length > 0
-                        ? `${(allItems.reduce((sum, d) => sum + (d.confidence || 0), 0) / allItems.length * 100).toFixed(1)}%`
-                        : '0%';
+                      const latest = filteredDefects[0];
+                      if (!latest) return '--';
+                      const types = [...new Set((latest.detected_defects || []).map(d => capitalizeDefectType(d.type)))];
+                      return types.length > 0 ? types.join(', ') : '--';
                     })()}
                   </span>
                 </div>
