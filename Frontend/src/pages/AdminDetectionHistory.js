@@ -102,19 +102,29 @@ function AdminDetectionHistory() {
   }
 
   async function handleDeleteDefect() {
+    const deletedId = selectedDefect.id;
+    // Optimistically remove from UI immediately
+    const newSessions = sessions
+      .map(([dateKey, defects]) => [dateKey, defects.filter(d => d.id !== deletedId)])
+      .filter(([, defects]) => defects.length > 0);
+    setSessions(newSessions);
+    setSelectedDefect(null);
+    setShowDeleteConfirm(false);
+
+    // Update selectedSession so column 2 instantly reflects the deletion
+    if (selectedSession) {
+      const [dateKey] = selectedSession;
+      const updatedSession = newSessions.find(([k]) => k === dateKey);
+      setSelectedSession(updatedSession || null);
+    }
+
+    // Fire the actual delete in the background
     try {
-      await deleteDefect(selectedDefect.id);
-      // Refresh the current view by reloading the sessions
-      const newSessions = sessions.map(([dateKey, defects]) => {
-        return [dateKey, defects.filter(d => d.id !== selectedDefect.id)];
-      }).filter(([, defects]) => defects.length > 0);
-      setSessions(newSessions);
-      setSelectedDefect(null);
-      setShowDeleteConfirm(false);
+      await deleteDefect(deletedId);
     } catch (error) {
       console.error('[AdminDetectionHistory] Error deleting defect:', error);
-      setFetchError('Failed to delete defect. Please try again.');
-      setShowDeleteConfirm(false);
+      // Revert by re-fetching
+      setFetchError('Delete failed — please refresh to restore the list.');
     }
   }
 
