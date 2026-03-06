@@ -308,7 +308,7 @@ function Dashboard() {
               <div className="dashboard-box dashboard-stats-box">
                 <div className="dashboard-stat-card">
                   <span className="dashboard-stat-label">Total Defects Detected</span>
-                  <span className="dashboard-stat-value">{loading ? '…' : filteredDefects.length}</span>
+                  <span className="dashboard-stat-value">{loading ? '…' : filteredDefects.reduce((sum, d) => sum + (d.detected_defects || []).length, 0)}</span>
                 </div>
                 <div className="dashboard-stat-card">
                   <span className="dashboard-stat-label">Last Detected Defect</span>
