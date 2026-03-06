@@ -281,7 +281,7 @@ function Dashboard() {
                 </div>
                 <div className="dashboard-stat-card">
                   <span className="dashboard-stat-label">Last Detected Defect</span>
-                  <span className="dashboard-stat-value" style={{ fontSize: filteredDefects[0] && (filteredDefects[0].detected_defects || []).length > 0 ? '16px' : undefined }}>
+                  <span className="dashboard-stat-value">
                     {loading ? '…' : (() => {
                       const latest = filteredDefects[0];
                       if (!latest) return '--';
