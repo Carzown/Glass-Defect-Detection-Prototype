@@ -21,7 +21,7 @@ FRAME_PATH = os.path.join(tempfile.gettempdir(), "gdd_latest_frame.jpg")
 # Load credentials from modules/config.py (shared with MainDetection.py)
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'modules'))
 
-DEVICE_ID = 'raspi'
+DEVICE_ID = 'raspi-pi-1'
 _SUPABASE_URL = None
 _SUPABASE_KEY = None
 
