@@ -36,12 +36,24 @@ function invalidateBackendCache() {
 // ── Device Status ─────────────────────────────────────────────────────────
 
 /**
- * Fetch the current online/offline status for a device from the
- * `device_status` table in Supabase.
+ * Fetch the current online/offline status for a device.
+ * Tries backend (Railway) first, then falls back to Supabase direct.
  *
  * Returns: { is_online: boolean, last_seen: string } or null
  */
-export async function fetchDeviceStatus(deviceId = 'raspi') {
+export async function fetchDeviceStatus(deviceId = 'raspi-pi-1') {
+  // Try backend first (backend has Supabase service role key)
+  if (BACKEND_URL) {
+    try {
+      const res = await fetch(`${BACKEND_URL}/defects/device-status/${deviceId}`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) return await res.json();
+    } catch (err) {
+      console.warn('[defects] fetchDeviceStatus backend error, trying Supabase direct:', err.message);
+    }
+  }
+  // Fallback: Supabase direct (requires REACT_APP_SUPABASE_ANON_KEY to be set)
   try {
     if (!supabase) return null;
     const { data, error } = await supabase
@@ -57,23 +69,39 @@ export async function fetchDeviceStatus(deviceId = 'raspi') {
 }
 
 /**
- * Subscribe to real-time changes on the device_status table.
- * `callback` is called with the updated row whenever it changes.
+ * Subscribe to real-time device status changes.
+ * Uses Supabase Realtime if available, otherwise polls the backend every 10 s.
  * Returns an unsubscribe function.
  */
-export function subscribeToDeviceStatus(deviceId = 'raspi', callback) {
-  if (!supabase) return () => {};
-  const channel = supabase
-    .channel('device_status_changes')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'device_status', filter: `device_id=eq.${deviceId}` },
-      (payload) => {
-        if (payload.new) callback(payload.new);
-      }
-    )
-    .subscribe();
-  return () => supabase.removeChannel(channel);
+export function subscribeToDeviceStatus(deviceId = 'raspi-pi-1', callback) {
+  // Use Supabase Realtime when the client is available
+  if (supabase) {
+    const channel = supabase
+      .channel('device_status_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'device_status', filter: `device_id=eq.${deviceId}` },
+        (payload) => {
+          if (payload.new) callback(payload.new);
+        }
+      )
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }
+  // Fallback: poll backend every 10 s
+  let stopped = false;
+  const poll = async () => {
+    if (stopped) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/defects/device-status/${deviceId}`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) callback(await res.json());
+    } catch {}
+    if (!stopped) setTimeout(poll, 10_000);
+  };
+  setTimeout(poll, 10_000);
+  return () => { stopped = true; };
 }
 
 // ── Fetch all defects (backend → Supabase fallback) ───────────────────────

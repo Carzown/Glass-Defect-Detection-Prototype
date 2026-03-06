@@ -1,6 +1,6 @@
 import React from 'react';
 import '../pages/Dashboard.css';
-import logoDefault from '../assets/AlumpreneurLogo.png';
+import logoDefault from '../assets/inspectra.png';
 
 function Sidebar({ logoSrc = logoDefault, onLogout, mainItems = [], bottomItems = [], activeKey, isOpen = false, onToggle }) {
   const items = Array.isArray(mainItems) ? mainItems : [];

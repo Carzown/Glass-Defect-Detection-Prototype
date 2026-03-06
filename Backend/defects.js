@@ -353,4 +353,22 @@ function groupBy(array, key) {
   }, {});
 }
 
+// GET /device-status/:deviceId - Get online/offline status for a device
+router.get('/device-status/:deviceId', async (req, res) => {
+  try {
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const { deviceId } = req.params;
+    const { data, error } = await supabase
+      .from('device_status')
+      .select('is_online, last_seen')
+      .eq('device_id', deviceId)
+      .single();
+    if (error || !data) return res.status(404).json({ error: 'Device not found' });
+    res.json(data);
+  } catch (err) {
+    console.error('[DEFECTS] Error fetching device status:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

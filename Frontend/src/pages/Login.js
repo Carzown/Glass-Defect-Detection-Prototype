@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { getBackendURL } from '../utils/formatters';
-import logo from '../assets/AlumpreneurLogo.png';
+import logo from '../assets/inspectra.png';
 import './Login.css';
 
 const BACKEND_URL = getBackendURL();
