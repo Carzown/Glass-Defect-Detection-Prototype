@@ -1,14 +1,14 @@
 {
   "files": {
     "main.css": "/Glass-Defect-Detection-Prototype/static/css/main.acd51e53.css",
-    "main.js": "/Glass-Defect-Detection-Prototype/static/js/main.7547a07f.js",
+    "main.js": "/Glass-Defect-Detection-Prototype/static/js/main.76944791.js",
     "static/media/inspectra.png": "/Glass-Defect-Detection-Prototype/static/media/inspectra.b232ce03959d9bbcd517.png",
     "index.html": "/Glass-Defect-Detection-Prototype/index.html",
     "main.acd51e53.css.map": "/Glass-Defect-Detection-Prototype/static/css/main.acd51e53.css.map",
-    "main.7547a07f.js.map": "/Glass-Defect-Detection-Prototype/static/js/main.7547a07f.js.map"
+    "main.76944791.js.map": "/Glass-Defect-Detection-Prototype/static/js/main.76944791.js.map"
   },
   "entrypoints": [
     "static/css/main.acd51e53.css",
-    "static/js/main.7547a07f.js"
+    "static/js/main.76944791.js"
   ]
 }
