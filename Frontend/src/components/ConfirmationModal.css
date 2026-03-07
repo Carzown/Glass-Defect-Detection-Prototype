@@ -1,4 +1,4 @@
-/* Confirmation Modal Styles */
+
 
 .confirmation-modal-overlay {
   position: fixed;
@@ -85,7 +85,6 @@
   text-align: center;
 }
 
-/* Cancel Button */
 .confirmation-modal-cancel {
   border-color: #cbd5e1;
   background: #f8fafb;
@@ -102,7 +101,6 @@
   transform: scale(0.98);
 }
 
-/* Confirm Button */
 .confirmation-modal-confirm {
   border-color: #0f2942;
   background: #0f2942;
@@ -119,7 +117,6 @@
   transform: scale(0.98);
 }
 
-/* Dangerous Confirm Button (for deletions) */
 .confirmation-modal-confirm.dangerous {
   border-color: #dc2626;
   background: #dc2626;
@@ -131,7 +128,6 @@
   box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
 }
 
-/* Responsive */
 @media (max-width: 480px) {
   .confirmation-modal {
     width: 85%;

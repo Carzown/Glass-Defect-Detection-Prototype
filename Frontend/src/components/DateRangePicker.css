@@ -27,7 +27,6 @@
   box-shadow: 0 4px 8px rgba(15, 41, 66, 0.2);
 }
 
-/* Vertical Dropdown Container */
 .drp-dropdown {
   position: absolute;
   top: calc(100% + 4px);
@@ -41,7 +40,6 @@
   overflow: hidden;
 }
 
-/* Presets List - Vertical Stack */
 .drp-presets-list {
   display: flex;
   flex-direction: column;
@@ -73,14 +71,12 @@
   font-weight: 600;
 }
 
-/* Divider */
 .drp-divider {
   height: 1px;
   background: #e5e7eb;
   margin: 4px 0;
 }
 
-/* Custom Section - Hidden by default, shown when custom selected */
 .drp-custom-section {
   padding: 14px 14px;
   border-top: 1px solid #e5e7eb;
@@ -137,7 +133,6 @@
   flex-shrink: 0;
 }
 
-/* Calendar Preview */
 .drp-calendar-preview {
   display: flex;
   align-items: center;
@@ -215,7 +210,6 @@
   box-shadow: 0 0 0 2px rgba(15, 41, 66, 0.1);
 }
 
-/* Footer with Buttons */
 .drp-footer {
   display: flex;
   gap: 8px;
@@ -263,4 +257,3 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
-

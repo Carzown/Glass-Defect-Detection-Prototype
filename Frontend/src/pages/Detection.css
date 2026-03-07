@@ -1,9 +1,5 @@
-/* Detection Page Styles - Reuse from Dashboard.css */
-@import './Dashboard.css';
 
-/* ─────────────────────────────────────────────────────────────────
-   Defect List Row
-   ──────────────────────────────────────────────────────────────── */
+@import './Dashboard.css';
 
 .det-defect-row {
   display: flex;
@@ -30,7 +26,6 @@
   border-left: 3px solid #e5a445;
 }
 
-/* Index circle badge */
 .det-defect-index {
   width: 28px;
   height: 28px;
@@ -50,7 +45,6 @@
   background: linear-gradient(135deg, #e5a445 0%, #d4941d 100%);
 }
 
-/* Type + time stacked */
 .det-defect-body {
   flex: 1;
   display: flex;
@@ -80,7 +74,6 @@
   font-weight: 500;
 }
 
-/* Confidence pill */
 .det-defect-confidence {
   font-family: 'Inter', sans-serif;
   font-size: 11px;
@@ -97,7 +90,6 @@
   color: #d4941d;
 }
 
-/* Chevron */
 .det-defect-chevron {
   width: 14px;
   height: 14px;
@@ -109,10 +101,6 @@
 .det-defect-row:hover .det-defect-chevron {
   color: #e5a445;
 }
-
-/* ─────────────────────────────────────────────────────────────────
-   Modal
-   ──────────────────────────────────────────────────────────────── */
 
 .det-modal-content {
   background: white;
@@ -127,7 +115,6 @@
   animation: slideIn 0.25s ease;
 }
 
-/* Modal Header */
 .det-modal-header {
   display: flex;
   align-items: center;
@@ -184,7 +171,6 @@
   transform: rotate(90deg);
 }
 
-/* Image area */
 .det-modal-image-area {
   flex-shrink: 0;
   background: #0f2942;
@@ -216,7 +202,6 @@
   font-weight: 500;
 }
 
-/* Detail rows */
 .det-modal-details {
   flex: 1;
   overflow: hidden;
@@ -275,7 +260,6 @@
   color: #d1d5db;
 }
 
-/* Footer */
 .det-modal-footer {
   display: flex;
   align-items: center;

@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 
-// Initialize Supabase client
 let supabase = null;
 try {
   const { createClient } = require('@supabase/supabase-js');
@@ -17,24 +16,6 @@ try {
   console.warn('[AUTH] Failed to initialize Supabase:', e.message);
 }
 
-/**
- * POST /auth/login
- * Login endpoint for employees and admins
- * 
- * Request body:
- * {
- *   email: string,
- *   password: string,
- *   role: 'employee' | 'admin'
- * }
- * 
- * Response:
- * {
- *   success: boolean,
- *   user: { id, email, role },
- *   error?: string
- * }
- */
 router.post('/login', async (req, res) => {
   try {
     if (!supabase) {
@@ -47,7 +28,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Email and password are required' });
     }
 
-    // Authenticate with Supabase Auth
+    
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -62,7 +43,7 @@ router.post('/login', async (req, res) => {
 
     const userId = authData.user.id;
 
-    // Fetch user profile and role from profiles table
+    
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role, email')
@@ -71,11 +52,11 @@ router.post('/login', async (req, res) => {
 
     let userRole = profile?.role || 'employee';
 
-    // Apply role selection logic
+    
     if (role === 'admin') {
-      // For admin login, verify the user has admin role
+      
       if (userRole !== 'admin') {
-        // Check against env var admin emails as fallback
+        
         const adminEmails = (process.env.REACT_APP_ADMIN_EMAILS || '')
           .split(',')
           .map(e => e.trim().toLowerCase())
@@ -90,7 +71,7 @@ router.post('/login', async (req, res) => {
         userRole = 'admin';
       }
     } else if (role === 'employee') {
-      // For employee login, reject if user is admin
+      
       if (userRole === 'admin') {
         return res.status(403).json({
           success: false,
@@ -100,7 +81,7 @@ router.post('/login', async (req, res) => {
       userRole = 'employee';
     }
 
-    // Return user info and auth session
+    
     return res.status(200).json({
       success: true,
       user: {
@@ -123,17 +104,13 @@ router.post('/login', async (req, res) => {
   }
 });
 
-/**
- * POST /auth/logout
- * Logout endpoint (invalidates session)
- */
 router.post('/logout', async (req, res) => {
   try {
     if (!supabase) {
       return res.status(500).json({ success: false, error: 'Authentication service unavailable' });
     }
 
-    // Sign out from Supabase
+    
     await supabase.auth.signOut();
 
     return res.status(200).json({ success: true });
@@ -146,20 +123,6 @@ router.post('/logout', async (req, res) => {
   }
 });
 
-/**
- * POST /auth/verify-session
- * Verify if a session token is still valid
- * 
- * Request header:
- * Authorization: Bearer <access_token>
- * 
- * Response:
- * {
- *   valid: boolean,
- *   user?: { id, email, role },
- *   error?: string
- * }
- */
 router.post('/verify-session', async (req, res) => {
   try {
     if (!supabase) {
@@ -173,14 +136,14 @@ router.post('/verify-session', async (req, res) => {
 
     const accessToken = authHeader.substring(7);
 
-    // Verify token with Supabase
+    
     const { data, error } = await supabase.auth.getUser(accessToken);
 
     if (error || !data.user) {
       return res.status(401).json({ valid: false, error: 'Invalid token' });
     }
 
-    // Fetch user role
+    
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -207,14 +170,6 @@ router.post('/verify-session', async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────
-// EMPLOYEE MANAGEMENT (requires service role key on backend)
-// ─────────────────────────────────────────────────────────────────
-
-/**
- * GET /auth/employees
- * List all users with role = 'employee'
- */
 router.get('/employees', async (req, res) => {
   try {
     if (!supabase) return res.status(500).json({ success: false, error: 'Auth service unavailable' });
@@ -231,18 +186,13 @@ router.get('/employees', async (req, res) => {
   }
 });
 
-/**
- * POST /auth/employees
- * Create a new employee account
- * Body: { email, password }
- */
 router.post('/employees', async (req, res) => {
   try {
     if (!supabase) return res.status(500).json({ success: false, error: 'Auth service unavailable' });
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ success: false, error: 'Email and password are required' });
 
-    // Create auth user via admin API (requires service role)
+    
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
@@ -250,7 +200,7 @@ router.post('/employees', async (req, res) => {
     });
     if (authError) throw authError;
 
-    // Upsert profile row
+    
     const { error: profileError } = await supabase
       .from('profiles')
       .upsert([{ id: authData.user.id, email, role: 'employee' }]);
@@ -263,11 +213,6 @@ router.post('/employees', async (req, res) => {
   }
 });
 
-/**
- * PUT /auth/employees/:id
- * Update employee email and/or password
- * Body: { email?, password? }
- */
 router.put('/employees/:id', async (req, res) => {
   try {
     if (!supabase) return res.status(500).json({ success: false, error: 'Auth service unavailable' });
@@ -298,20 +243,16 @@ router.put('/employees/:id', async (req, res) => {
   }
 });
 
-/**
- * DELETE /auth/employees/:id
- * Delete an employee account
- */
 router.delete('/employees/:id', async (req, res) => {
   try {
     if (!supabase) return res.status(500).json({ success: false, error: 'Auth service unavailable' });
     const { id } = req.params;
 
-    // Delete from auth (cascades to profiles if FK is set, otherwise delete manually)
+    
     const { error: authError } = await supabase.auth.admin.deleteUser(id);
     if (authError) throw authError;
 
-    // Also delete from profiles table in case there's no cascade
+    
     await supabase.from('profiles').delete().eq('id', id);
 
     return res.status(200).json({ success: true });

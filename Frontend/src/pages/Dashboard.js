@@ -19,18 +19,16 @@ import './Dashboard.css';
 
 const BACKEND_URL = getBackendURL();
 
-// Aggregate defects for trend line chart
-// When timeFilter is 'today', groups by hour (all 24 hours); otherwise groups by date
 function aggregateDefectsForTrend(defects, timeFilter) {
   if (timeFilter === 'today') {
-    // Initialize all 24 hours with count 0
+    
     const hourlyData = {};
     for (let h = 0; h < 24; h++) {
       const timeStr = h.toString().padStart(2, '0') + ':00';
       hourlyData[timeStr] = 0;
     }
 
-    // Group defects by hour in PHT (Asia/Manila = UTC+8)
+    
     defects.forEach((d) => {
       const dt = new Date(d.detected_at);
       const hour = dt.toLocaleString('en-US', {
@@ -43,12 +41,12 @@ function aggregateDefectsForTrend(defects, timeFilter) {
       }
     });
 
-    // Return all 24 hours in order
+    
     return Object.entries(hourlyData)
       .map(([time, count]) => ({ date: time, count }))
       .sort((a, b) => parseInt(a.date) - parseInt(b.date));
   } else {
-    // Group by date
+    
     const counts = {};
     const timestamps = {};
 
@@ -76,7 +74,7 @@ function Dashboard() {
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }));
 
-  // Check if employee is authenticated - restore from localStorage if needed
+  
   useEffect(() => {
     restoreAuthState();
     if (!isUserAuthenticated()) {
@@ -86,7 +84,7 @@ function Dashboard() {
     setAuthChecked(true);
   }, [navigate]);
 
-  // Sessions widget state
+  
   const [dashSelectedSession, setDashSelectedSession] = useState(null);
   const [dashSelectedDefect, setDashSelectedDefect] = useState(null);
   const [filteredDefects, setFilteredDefects] = useState([]);
@@ -95,11 +93,11 @@ function Dashboard() {
   const [lastDetectionTime, setLastDetectionTime] = useState(null);
   const [refreshTick, setRefreshTick] = useState(0);
 
-  // Raspberry Pi device status (from device_status table)
-  const [deviceStatus, setDeviceStatus] = useState(null); // { is_online, last_seen }
+  
+  const [deviceStatus, setDeviceStatus] = useState(null); 
   const [deviceStatusLoading, setDeviceStatusLoading] = useState(true);
 
-  // Fetch initial device status and subscribe to real-time updates
+  
   useEffect(() => {
     if (!authChecked) return;
     
@@ -120,28 +118,28 @@ function Dashboard() {
     };
   }, [authChecked]);
 
-  // Load the most recent defect across all time (for "Last detection" indicator)
+  
   const loadLastDetection = async () => {
     try {
       const result = await fetchDefects({ limit: 1, offset: 0, dateFrom: new Date(0).toISOString(), dateTo: new Date().toISOString() });
       const supabaseData = result.data || [];
       if (supabaseData.length > 0) setLastDetectionTime(supabaseData[0].detected_at);
     } catch {
-      // Non-critical – indicator just won't update
+      
     }
   };
 
-  // Load last detection on mount (only after auth is verified)
+  
   useEffect(() => {
     if (!authChecked) return;
     loadLastDetection();
   }, [authChecked]);
 
-  // Keep a ref to latest timeFilter so real-time callbacks always see the current value
+  
   const timeFilterRef = useRef(timeFilter);
   useEffect(() => { timeFilterRef.current = timeFilter; }, [timeFilter]);
 
-  // Real-time: WebSocket (instant) + Supabase Realtime (redundancy) + 30-second poll
+  
   useEffect(() => {
     if (!authChecked) return;
     const pollId = setInterval(() => {
@@ -167,7 +165,7 @@ function Dashboard() {
     };
   }, [authChecked]);
 
-  // Re-fetch whenever the date filter or page navigation changes (only after auth is verified)
+  
   useEffect(() => {
     if (!authChecked) return;
     
@@ -208,8 +206,6 @@ function Dashboard() {
     return () => { cancelled = true; };
   }, [authChecked, timeFilter, customFromDate, customToDate, refreshTick]);
 
-
-
   const dashSessions = groupByDate(filteredDefects);
 
   async function handleLogout() {
@@ -223,7 +219,7 @@ function Dashboard() {
         signal: AbortSignal.timeout(3000),
       });
     } catch {
-      // Logout should always succeed locally even if server unreachable
+      
     }
     sessionStorage.removeItem('loggedIn');
     sessionStorage.removeItem('adminLoggedIn');
@@ -288,7 +284,7 @@ function Dashboard() {
         </header>
 
         <div className="machine-content-area">
-          {/* Top Container - Full Width */}
+          {}
           <div className="dashboard-box-wrapper dashboard-box-wrapper-full">
             <div className="dashboard-title-row" style={{ gap: '12px', alignItems: 'center' }}>
               <h2 className="dashboard-box-title">Statistics</h2>
@@ -355,7 +351,7 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* Bottom Containers */}
+          {}
           <div className="machine-content-wrapper">
             <div className="dashboard-box-wrapper">
               <div className="dashboard-sessions-header">
@@ -373,7 +369,7 @@ function Dashboard() {
                   <div className="dh-loading">Loading…</div>
                 ) : (
                 <div className="dh-miller-container">
-                  {/* Column 1: Sessions */}
+                  {}
                   <div className="dh-panel dh-panel-always">
                     <div className="dh-panel-header">
                       <span className="dh-panel-title"></span>
@@ -404,7 +400,7 @@ function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Column 2: Defects in selected session */}
+                  {}
                   <div className={`dh-panel dh-panel-slide${dashSelectedSession ? ' dh-panel-visible' : ''}`}>
                     {dashSelectedSession && (
                       <>
@@ -435,7 +431,7 @@ function Dashboard() {
                     )}
                   </div>
 
-                  {/* Column 3: Defect details */}
+                  {}
                   <div className={`dh-panel dh-panel-slide${dashSelectedDefect ? ' dh-panel-visible' : ''}`}>
                     {dashSelectedDefect && (
                       <>
@@ -570,7 +566,7 @@ function Dashboard() {
                   {filteredDefects.length > 0 ? (() => {
                     const trendData = aggregateDefectsForTrend(filteredDefects, timeFilter);
                     const isTodayView = timeFilter === 'today';
-                    // For today view, show every 3 hours; for other views, show fewer labels
+                    
                     const interval = isTodayView ? 2 : Math.max(0, Math.floor(trendData.length / 10) - 1);
                     const needsAngle = !isTodayView && trendData.length > 6;
                     return (

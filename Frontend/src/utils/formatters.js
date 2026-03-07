@@ -1,50 +1,28 @@
-/**
- * Centralized utility functions for formatting and transforming data
- */
 
-/**
- * Capitalize first letter and lowercase rest
- * @param {string} type - Input string
- * @returns {string} - Formatted string
- */
+
 export function capitalizeDefectType(type) {
   if (!type) return type;
   return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
 }
 
-/**
- * Get a display label for all detected defects in a record
- * @param {object} record - Supabase defect record with detected_defects array
- * @returns {string} - e.g. "Crack, Scratch" or "Bubble"
- */
 export function getDefectTypesLabel(record) {
   const defects = record?.detected_defects;
   if (!Array.isArray(defects) || defects.length === 0) return 'Unknown';
-  // Count occurrences of each type
+  
   const counts = {};
   defects.forEach(d => {
     const t = capitalizeDefectType(d.type) || 'Unknown';
     counts[t] = (counts[t] || 0) + 1;
   });
-  // Format as "2 Scratch, 1 Bubble"
+  
   return Object.entries(counts).map(([type, count]) => `${count} ${type}`).join(', ');
 }
 
-/**
- * Format date to localized time string (HH:MM:SS)
- * @param {string} dateStr - ISO date string
- * @returns {string} - Formatted time
- */
 export function formatTime(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-/**
- * Format date to relative time (e.g., "2 minutes ago")
- * @param {string} dateStr - ISO date string
- * @returns {string} - Relative time string
- */
 export function formatRelativeTime(dateStr) {
   const detectionDate = new Date(dateStr);
   const now = new Date();
@@ -66,21 +44,11 @@ export function formatRelativeTime(dateStr) {
   return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
 }
 
-/**
- * Format date to localized date string
- * @param {string} dateStr - ISO date string
- * @returns {string} - Formatted date
- */
 export function formatDate(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-/**
- * Format full display date and time
- * @param {string} dateStr - ISO date string
- * @returns {string} - Formatted date and time
- */
 export function formatDisplayDate(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -91,11 +59,6 @@ export function formatDisplayTime(dateStr) {
   return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-/**
- * Group defects by date
- * @param {Array} defects - Array of defect objects
- * @returns {Array} - Array of [dateKey, defectsArray] pairs, sorted by date descending
- */
 export function groupByDate(defects) {
   const groups = {};
   defects.forEach((d) => {
@@ -111,16 +74,11 @@ export function groupByDate(defects) {
   return Object.entries(groups).sort((a, b) => new Date(b[0]) - new Date(a[0]));
 }
 
-/**
- * Aggregate defects by type for bar chart
- * @param {Array} defects - Array of defect objects
- * @returns {Array} - Array of {type, count} objects
- */
 export function aggregateDefectsByType(defects) {
   const counts = {};
   defects.forEach((record) => {
     const items = Array.isArray(record.detected_defects) ? record.detected_defects : [];
-    // Count each record once per unique type it contains (not each individual detection)
+    
     const types = new Set(items.map(d => capitalizeDefectType(d.type)).filter(Boolean));
     types.forEach(type => {
       counts[type] = (counts[type] || 0) + 1;
@@ -129,14 +87,8 @@ export function aggregateDefectsByType(defects) {
   return Object.entries(counts).map(([type, count]) => ({ type, count }));
 }
 
-// Production Railway backend URL – used as default when REACT_APP_BACKEND_URL is not set
 const RAILWAY_BACKEND_URL = 'https://glass-defect-detection-prototype-production.up.railway.app';
 
-/**
- * Returns the backend API base URL.
- * Priority: REACT_APP_BACKEND_URL env var → localhost (dev) → Railway (production).
- * @returns {string}
- */
 export function getBackendURL() {
   if (process.env.REACT_APP_BACKEND_URL) {
     return process.env.REACT_APP_BACKEND_URL;
@@ -147,6 +99,6 @@ export function getBackendURL() {
   ) {
     return 'http://localhost:5000';
   }
-  // Production fallback: always point to the Railway backend
+  
   return RAILWAY_BACKEND_URL;
 }

@@ -8,7 +8,7 @@ import './Login.css';
 const BACKEND_URL = getBackendURL();
 
 function Login() {
-  const [role, setRole] = useState('employee'); // 'admin' | 'employee'
+  const [role, setRole] = useState('employee'); 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
@@ -17,7 +17,7 @@ function Login() {
 
   const navigate = useNavigate();
 
-  // Restore saved email if "Remember me" was previously selected
+  
   useEffect(() => {
     const remembered = localStorage.getItem('rememberMe') === 'true';
     const savedEmail = localStorage.getItem('email') || '';
@@ -27,7 +27,7 @@ function Login() {
     }
   }, []);
 
-  // Auto-redirect if already logged in
+  
   useEffect(() => {
     const checkAuthState = async () => {
       try {
@@ -40,13 +40,13 @@ function Login() {
           return;
         }
       } catch {
-        // not authenticated
+        
       }
     };
     checkAuthState();
   }, [navigate]);
 
-  // Clear errors when switching roles
+  
   const handleRoleSwitch = (newRole) => {
     setRole(newRole);
     setError('');
@@ -83,7 +83,7 @@ function Login() {
         return;
       }
 
-      // Save user info and session
+      
       if (remember) {
         localStorage.setItem('rememberMe', 'true');
         localStorage.setItem('email', email);
@@ -92,14 +92,14 @@ function Login() {
         localStorage.removeItem('email');
       }
 
-      // Store session tokens (sessionStorage - session-only)
+      
       if (data.session?.accessToken) {
         sessionStorage.setItem('accessToken', data.session.accessToken);
         if (data.session.refreshToken) {
           sessionStorage.setItem('refreshToken', data.session.refreshToken);
         }
-        // Sync the Supabase client session so direct-Supabase fallback queries
-        // are authenticated (bypasses RLS restrictions on anon role).
+        
+        
         if (supabase) {
           try {
             await supabase.auth.setSession({
@@ -107,22 +107,22 @@ function Login() {
               refresh_token: data.session.refreshToken || '',
             });
           } catch (_) {
-            // Non-fatal: direct queries will fall back to anon role
+            
           }
         }
       }
 
-      // Store user info (sessionStorage + localStorage for persistence across refresh)
+      
       sessionStorage.setItem('userId', data.user.id);
       sessionStorage.setItem('userEmail', data.user.email);
       sessionStorage.setItem('userRole', data.user.role);
       
-      // Persist auth state to localStorage so refresh doesn't lose login
+      
       localStorage.setItem('userId', data.user.id);
       localStorage.setItem('userEmail', data.user.email);
       localStorage.setItem('userRole', data.user.role);
 
-      // Redirect based on role
+      
       if (data.user.role === 'admin') {
         sessionStorage.setItem('adminLoggedIn', 'true');
         sessionStorage.setItem('adminToken', data.user.id);
@@ -156,7 +156,7 @@ function Login() {
         </div>
         <h1 className="login-title">Glass Defect Detector</h1>
 
-        {/* Role tab slider */}
+        {}
         <div className="login-role-tabs">
           <button
             type="button"
@@ -174,7 +174,7 @@ function Login() {
           </button>
         </div>
 
-        {/* Single stable form — handler switches based on role */}
+        {}
         <form
           className="login-form"
           onSubmit={role === 'admin' ? handleAdminSubmit : handleEmployeeSubmit}
@@ -221,11 +221,9 @@ function Login() {
           </button>
         </form>
 
-
       </div>
     </div>
   );
 }
 
 export default Login;
-

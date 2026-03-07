@@ -1,5 +1,4 @@
-/* DetectionHistory page — layout wrapper */
-/* All .dh-* miller-column styles live in Dashboard.css (shared) */
+
 
 .dh-page-content-area {
   flex: 1;
@@ -11,7 +10,6 @@
   background: linear-gradient(135deg, #f8fafb 0%, #f0f3f7 100%);
 }
 
-/* Full-page miller container overrides */
 .dh-miller-page {
   flex: 1;
   min-height: 0;

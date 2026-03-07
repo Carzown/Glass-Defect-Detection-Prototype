@@ -16,7 +16,7 @@ const corsOptions = {
     'https://Carzown.github.io/Glass-Defect-Detection-Prototype',
     'https://glass-defect-detection-prototype-production.up.railway.app',
     process.env.FRONTEND_URL || 'http://localhost:3000',
-    // Railway deployments - regex pattern for all Railway domains
+    
     /^https:\/\/.*\.railway\.app$/,
   ],
   credentials: true,
@@ -41,8 +41,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-
-// Authentication API routes
 try {
   const authRouter = require('./auth')
   app.use('/auth', authRouter)
@@ -51,7 +49,6 @@ try {
   console.warn('[SERVER] Auth routes not loaded:', e?.message || e)
 }
 
-// Defects API routes
 try {
   const defectsRouter = require('./defects')
   app.use('/defects', defectsRouter)
@@ -60,7 +57,6 @@ try {
   console.warn('[SERVER] Defects routes not loaded:', e?.message || e)
 }
 
-// Defect tagger - auto-tags and overlays numbered badges on images
 try {
   const tagger = require('./defect-tagger')
   tagger.start()
@@ -68,19 +64,18 @@ try {
   console.warn('[SERVER] Defect tagger not started:', e?.message || e)
 }
 
-// Serve static files from the built frontend
 const path = require('path');
 const fs = require('fs');
 const frontendBuildPath = path.join(__dirname, '../Frontend/build');
 try {
   app.use(express.static(frontendBuildPath));
-  // SPA fallback - serve index.html for routes not matched by API or static files
+  
   app.use((req, res, next) => {
-    // Skip API and defects routes
+    
     if (req.path.startsWith('/api') || req.path.startsWith('/defects') || req.path.startsWith('/auth')) {
       return next();
     }
-    // For other routes, serve index.html if it exists
+    
     const indexPath = path.join(frontendBuildPath, 'index.html');
     if (fs.existsSync(indexPath)) {
       res.sendFile(indexPath);
@@ -113,7 +108,7 @@ function startServer(port, attempt = 1) {
 
   const server = http.createServer(app);
   
-  // Initialize WebSocket server for real-time defect streaming
+  
   try {
     const realtime = require('./realtime');
     realtime.initializeWebSocketServer(server);

@@ -40,7 +40,7 @@ function AdminHowToUse() {
     }))
   );
 
-  // Check if admin is authenticated
+  
   useEffect(() => {
     const adminLoggedIn = sessionStorage.getItem('adminLoggedIn') === 'true';
     const adminToken = sessionStorage.getItem('adminToken');
@@ -83,9 +83,9 @@ function AdminHowToUse() {
           </div>
         </header>
         <div style={{ flex: 1, padding: '24px', overflowY: 'auto', background: '#f8fafb', display: 'flex', gap: '24px' }}>
-          {/* Left Column - Title Box Only */}
+          {}
           <div style={{ width: '240px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', height: 'fit-content' }}>
-            {/* Title Section */}
+            {}
             <div style={{ padding: '28px 20px', background: 'linear-gradient(135deg, #0f2942 0%, #1a3a52 100%)', borderBottom: '3px solid #e5a445' }}>
               <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#fff', lineHeight: '1.6', letterSpacing: '0.3px' }}>
                 INSTRUCTIONS FOR FLAT GLASS DEFECT DETECTION DEVICE
@@ -93,7 +93,7 @@ function AdminHowToUse() {
             </div>
           </div>
 
-          {/* Right Column - All Numbered Instructions */}
+          {}
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
             <div style={{
               background: '#fff',
@@ -105,7 +105,7 @@ function AdminHowToUse() {
               flexDirection: 'column',
               height: '100%', 
             }}>
-              {/* Instructions List */}
+              {}
               <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {allSteps.map((item, idx) => (
@@ -163,7 +163,7 @@ function AdminHowToUse() {
               </div>
             </div>
 
-            {/* Safety Tip */}
+            {}
             <div style={{ marginTop: '20px', padding: '20px', background: 'linear-gradient(135deg, rgba(229, 164, 69, 0.1) 0%, rgba(229, 164, 69, 0.05) 100%)', borderLeft: '4px solid #e5a445', borderRadius: '8px' }}>
               <p style={{ margin: 0, fontSize: '14px', color: '#6b7280', lineHeight: '1.6' }}>
                 <strong style={{ color: '#0f2942' }}>Safety Tip:</strong> Always ensure the device is properly powered off and cooled down between inspections. Handle glass with care and wear protective equipment when necessary.

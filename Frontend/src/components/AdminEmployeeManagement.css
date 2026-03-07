@@ -1,8 +1,4 @@
-/* ════════════════════════════════════════════════════════════════ */
-/* ADMIN EMPLOYEE MANAGEMENT – matches site theme                */
-/* Colors:  navy #0f2942 · gold #e5a445 · bg #f8fafb            */
-/* Fonts:   Poppins (headings) · Inter (body)                    */
-/* ════════════════════════════════════════════════════════════════ */
+
 
 .admin-employee-management {
   display: flex;
@@ -14,7 +10,6 @@
   overflow: hidden;
 }
 
-/* ── Toast messages ─────────────────────────────────────────── */
 .admin-message {
   padding: 10px 16px;
   border-radius: 10px;
@@ -42,7 +37,6 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Tabs ───────────────────────────────────────────────────── */
 .admin-tabs {
   display: flex;
   gap: 4px;
@@ -79,7 +73,6 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
-/* ── Content area (NO inner scroll) ─────────────────────────── */
 .admin-content {
   flex: 1;
   display: flex;
@@ -120,7 +113,6 @@
   flex-shrink: 0;
 }
 
-/* ── Section header row (title + add button) ────────────────── */
 .admin-section-header {
   display: flex;
   align-items: center;
@@ -155,7 +147,6 @@
   box-shadow: 0 4px 8px rgba(15, 41, 66, 0.25);
 }
 
-/* ── Add employee inline dropdown form ──────────────────────── */
 .admin-add-dropdown {
   flex-shrink: 0;
   margin-bottom: 12px;
@@ -221,7 +212,6 @@
   transform: translateY(0);
 }
 
-/* ── Loading & empty states ─────────────────────────────────── */
 .admin-loading,
 .admin-empty {
   text-align: center;
@@ -241,9 +231,6 @@
   50%      { opacity: 0.4; }
 }
 
-/* ════════════════════════════════════════════════════════════════ */
-/* MANAGE TAB – two-panel layout: sidebar list + detail          */
-/* ════════════════════════════════════════════════════════════════ */
 .admin-manage-layout {
   display: flex;
   gap: 16px;
@@ -252,7 +239,6 @@
   overflow: hidden;
 }
 
-/* ── Left: compact employee list ─────────────────────────────── */
 .admin-emp-sidebar {
   width: 280px;
   min-width: 220px;
@@ -339,7 +325,6 @@
   font-weight: 600;
 }
 
-/* ── Right: detail panel ─────────────────────────────────────── */
 .admin-emp-detail {
   flex: 1;
   display: flex;
@@ -473,7 +458,6 @@
   gap: 16px;
 }
 
-/* ── Forms ───────────────────────────────────────────────────── */
 .admin-form {
   display: grid;
   gap: 16px;
@@ -518,7 +502,6 @@
   background: white;
 }
 
-/* ── Buttons ─────────────────────────────────────────────────── */
 .admin-btn-primary,
 .admin-btn-secondary,
 .admin-btn-danger {
@@ -576,7 +559,6 @@
   transform: translateY(0);
 }
 
-/* ── Database info cards ─────────────────────────────────────── */
 .admin-db-info {
   display: grid;
   gap: 12px;
@@ -629,7 +611,6 @@
   font-weight: 700;
 }
 
-/* ── Delete confirmation ─────────────────────────────────────── */
 .admin-confirm-delete {
   background: linear-gradient(135deg, #fef2f2 0%, #fff5f5 100%);
   border: 2px solid #fecaca;
@@ -662,7 +643,6 @@
   font-size: 12px;
 }
 
-/* ── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .admin-employee-management {
     padding: 12px;

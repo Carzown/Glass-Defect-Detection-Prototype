@@ -1,8 +1,5 @@
 @import './Dashboard.css';
 
-/* ── Admin Dashboard page-specific overrides ─────────────────── */
-
-/* Scrollable content area for the admin dashboard sections */
 .dashboard-container {
   flex: 1;
   overflow: hidden;
@@ -13,7 +10,6 @@
   min-height: 0;
 }
 
-/* Employee management wrapper expands to fill remaining space */
 .admin-emp-expand {
   flex: 1 !important;
   min-height: 0;
@@ -40,7 +36,6 @@
   border-radius: 4px;
 }
 
-/* Stats section: fixed height to match employee dashboard */
 .dashboard-box-wrapper-full {
   flex: unset;
   width: 100%;
@@ -56,7 +51,6 @@
   overflow: visible;
 }
 
-/* Employee management box */
 .dashboard-employee-box {
   padding: 0 !important;
   overflow: hidden;

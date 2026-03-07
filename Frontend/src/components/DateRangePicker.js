@@ -24,7 +24,7 @@ function DateRangePicker({ onApply, initialFrom = '', initialTo = '' }) {
     }
   }, [showDropdown]);
 
-  // Fetch available dates when dropdown opens or custom section is shown
+  
   useEffect(() => {
     if (showDropdown && preset === 'custom') {
       fetchAvailableDates();
@@ -81,7 +81,7 @@ function DateRangePicker({ onApply, initialFrom = '', initialTo = '' }) {
   const handlePresetClick = (presetType) => {
     if (presetType === 'custom') {
       setPreset('custom');
-      // Keep dropdown open for custom to show date inputs
+      
       return;
     }
     setPreset(presetType);
@@ -127,7 +127,7 @@ function DateRangePicker({ onApply, initialFrom = '', initialTo = '' }) {
 
       {showDropdown && (
         <div className="drp-dropdown">
-          {/* Presets List */}
+          {}
           <div className="drp-presets-list">
             <button
               className={`drp-preset-option ${preset === 'today' ? 'active' : ''}`}
@@ -156,7 +156,7 @@ function DateRangePicker({ onApply, initialFrom = '', initialTo = '' }) {
             </button>
           </div>
 
-          {/* Custom Date Range Section - Only show when custom is selected */}
+          {}
           {preset === 'custom' && (
             <div className="drp-custom-section">
               <div className="drp-range-display">
@@ -181,7 +181,7 @@ function DateRangePicker({ onApply, initialFrom = '', initialTo = '' }) {
                 </div>
               </div>
 
-              {/* Calendar Preview */}
+              {}
               <div className="drp-calendar-preview">
                 {fromDate && (
                   <div className="drp-month">
@@ -218,7 +218,7 @@ function DateRangePicker({ onApply, initialFrom = '', initialTo = '' }) {
                 )}
               </div>
 
-              {/* Action Buttons */}
+              {}
               <div className="drp-footer">
                 <button
                   className="drp-btn drp-btn-cancel"

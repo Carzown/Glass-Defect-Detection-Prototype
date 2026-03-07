@@ -754,7 +754,7 @@ body {
   font-family: 'Inter', sans-serif;
   color: #6b7280;
 }
-/* Dashboard Box Styles */
+
 .dashboard-box-wrapper {
   flex: 1;
   display: flex;
@@ -1051,12 +1051,6 @@ body {
   white-space: nowrap;
 }
 
-/* ════════════════════════════════════════
-   Miller-Column (Detection History) styles
-   Used in both Dashboard widget + DetectionHistory page
-   ════════════════════════════════════════ */
-
-/* Shared miller container */
 .dh-miller-container {
   display: flex;
   flex-direction: row;
@@ -1067,7 +1061,6 @@ body {
   background: white;
 }
 
-/* Panel base */
 .dh-panel {
   display: flex;
   flex-direction: column;
@@ -1081,12 +1074,10 @@ body {
   border-right: none;
 }
 
-/* Panel 1 — always displayed */
 .dh-panel-always {
   flex: 1;
 }
 
-/* Panels 2 & 3 — slide in when an item is selected */
 .dh-panel-slide {
   display: none;
   flex: 1;
@@ -1097,7 +1088,6 @@ body {
   display: flex;
 }
 
-/* Panel header */
 .dh-panel-header {
   padding: 12px 16px;
   background: #f8fafb;
@@ -1127,14 +1117,12 @@ body {
   font-weight: 600;
 }
 
-/* Scrollable list inside panel */
 .dh-panel-list {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
 }
 
-/* Empty state */
 .dh-empty {
   color: #9ca3af;
   font-family: 'Inter', sans-serif;
@@ -1143,7 +1131,6 @@ body {
   padding: 32px 16px;
 }
 
-/* Loading / error */
 .dh-loading,
 .dh-error {
   color: #9ca3af;
@@ -1157,7 +1144,6 @@ body {
   color: #dc2626;
 }
 
-/* Row */
 .dh-row {
   display: flex;
   align-items: center;
@@ -1219,7 +1205,6 @@ body {
   margin-left: 8px;
 }
 
-/* Defect type labels */
 .dh-defect-type {
   font-family: 'Inter', sans-serif;
   font-size: 13px;
@@ -1227,7 +1212,6 @@ body {
   color: #1a3a52;
 }
 
-/* Detail card (column 3) */
 .dh-detail-card-wrapper {
   padding: 14px;
   overflow-y: auto;
@@ -1282,11 +1266,6 @@ body {
   text-transform: capitalize;
 }
 
-/* ════════════════════════════════════════
-   Dashboard – Sessions widget overrides
-   ════════════════════════════════════════ */
-
-/* Title row with ">" nav button */
 .dashboard-sessions-header {
   display: flex;
   align-items: center;
@@ -1323,7 +1302,6 @@ body {
   border-color: #1a3a52;
 }
 
-/* The dashboard box that holds the miller columns */
 .dashboard-sessions-box {
   display: flex;
   flex-direction: column;
@@ -1337,7 +1315,6 @@ body {
   box-shadow: none;
 }
 
-/* ── Sidebar hamburger toggle button ───────────────── */
 .sidebar-hamburger {
   display: none;
   background: none;
@@ -1360,7 +1337,6 @@ body {
   transition: all 0.3s ease;
 }
 
-/* Backdrop overlay behind sidebar on mobile */
 .sidebar-backdrop {
   display: none;
   position: fixed;
@@ -1374,7 +1350,6 @@ body {
   display: block;
 }
 
-/* ── Responsive: ≤ 900px (tablets / small monitors) ── */
 @media (max-width: 900px) {
   .machine-sidebar {
     position: fixed;
@@ -1431,7 +1406,6 @@ body {
   }
 }
 
-/* ── Responsive: ≤ 600px (phones) ──────────────────── */
 @media (max-width: 600px) {
   .machine-header {
     padding: 12px 16px;
@@ -1451,7 +1425,6 @@ body {
   }
 }
 
-/* Trend Chart - clean centered card matching reference style */
 .dashboard-trend-box {
   background: white;
   border: 2px solid #e5e7eb;
@@ -1479,7 +1452,6 @@ body {
   letter-spacing: -0.3px;
 }
 
-/* Trend Chart Container Styles */
 .dashboard-trend-chart-container {
   width: 100%;
   overflow: visible;

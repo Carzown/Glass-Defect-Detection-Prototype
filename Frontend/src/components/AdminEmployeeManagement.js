@@ -7,13 +7,13 @@ const BACKEND_URL = getBackendURL();
 function AdminEmployeeManagement() {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('manage'); // manage, clear
+  const [activeTab, setActiveTab] = useState('manage'); 
   const [successMessage, setSuccessMessage] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
 
-  // Form states for adding employee
+  
   const [newEmployee, setNewEmployee] = useState({ email: '', password: '' });
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [clearDbConfirm, setClearDbConfirm] = useState(false);
@@ -21,7 +21,7 @@ function AdminEmployeeManagement() {
   const [editEmail, setEditEmail] = useState('');
   const [editPassword, setEditPassword] = useState('');
 
-  // Load employees on mount
+  
   const loadEmployees = useCallback(async () => {
     try {
       setLoading(true);
@@ -45,14 +45,14 @@ function AdminEmployeeManagement() {
     }, 5000);
   };
 
-  // Load employees on component mount
+  
   useEffect(() => {
     loadEmployees();
   }, [loadEmployees]);
 
-  // ════════════════════════════════════════════════════════════════
-  // ADD EMPLOYEE
-  // ════════════════════════════════════════════════════════════════
+  
+  
+  
   const handleAddEmployee = async (e) => {
     e.preventDefault();
     if (!newEmployee.email || !newEmployee.password) {
@@ -81,9 +81,9 @@ function AdminEmployeeManagement() {
     }
   };
 
-  // ════════════════════════════════════════════════════════════════
-  // EDIT EMPLOYEE
-  // ════════════════════════════════════════════════════════════════
+  
+  
+  
   const handleEditEmployee = async (id, email) => {
     if (!editEmail.trim()) {
       setErrorMessage('Email cannot be empty');
@@ -114,8 +114,8 @@ function AdminEmployeeManagement() {
     }
   };
 
-  // DELETE EMPLOYEE
-  // ════════════════════════════════════════════════════════════════
+  
+  
   const handleDeleteEmployee = async (id, email) => {
     try {
       const res = await fetch(`${BACKEND_URL}/auth/employees/${id}`, { method: 'DELETE' });
@@ -133,9 +133,9 @@ function AdminEmployeeManagement() {
     }
   };
 
-  // ════════════════════════════════════════════════════════════════
-  // CLEAR DEFECTS DATABASE
-  // ════════════════════════════════════════════════════════════════
+  
+  
+  
   const handleClearDatabase = async () => {
     try {
       const res = await fetch(`${BACKEND_URL}/defects/all`, { method: 'DELETE' });
@@ -152,7 +152,7 @@ function AdminEmployeeManagement() {
     }
   };
 
-  // Helper: Format date
+  
   const formatDate = (date) => {
     if (!date) return 'Never';
     return new Date(date).toLocaleDateString('en-US', {
@@ -164,15 +164,13 @@ function AdminEmployeeManagement() {
     });
   };
 
-
-
   return (
     <div className="admin-employee-management">
-      {/* Messages */}
+      {}
       {successMessage && <div className="admin-message admin-success">{successMessage}</div>}
       {errorMessage && <div className="admin-message admin-error">{errorMessage}</div>}
 
-      {/* Tabs */}
+      {}
       <div className="admin-tabs">
         <button
           className={`admin-tab ${activeTab === 'manage' ? 'active' : ''}`}
@@ -188,11 +186,11 @@ function AdminEmployeeManagement() {
         </button>
       </div>
 
-      {/* Content */}
+      {}
       <div className="admin-content">
-        {/* ════════════════════════════════════════════════════════════════ */}
-        {/* MANAGE EMPLOYEES TAB */}
-        {/* ════════════════════════════════════════════════════════════════ */}
+        {}
+        {}
+        {}
         {activeTab === 'manage' && (
           <div className="admin-section">
             <div className="admin-section-header">
@@ -235,7 +233,7 @@ function AdminEmployeeManagement() {
               <div className="admin-empty">No employees found. Add one to get started!</div>
             ) : (
               <div className="admin-manage-layout">
-                {/* Employee sidebar list */}
+                {}
                 <div className="admin-emp-sidebar">
                   {employees.map((emp, index) => (
                     <button
@@ -251,7 +249,7 @@ function AdminEmployeeManagement() {
                   ))}
                 </div>
 
-                {/* Detail panel */}
+                {}
                 <div className="admin-emp-detail">
                   {(() => {
                     const empIndex = employees.findIndex(e => e.id === (selectedEmployeeId || (employees[0] && employees[0].id)));
@@ -372,9 +370,9 @@ function AdminEmployeeManagement() {
           </div>
         )}
 
-        {/* ════════════════════════════════════════════════════════════════ */}
-        {/* DATABASE MANAGEMENT TAB */}
-        {/* ════════════════════════════════════════════════════════════════ */}
+        {}
+        {}
+        {}
         {activeTab === 'clear' && (
           <div className="admin-section">
             <h3>Database Management</h3>

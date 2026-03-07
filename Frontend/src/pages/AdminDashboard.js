@@ -10,8 +10,6 @@ import './AdminDashboard.css';
 
 const BACKEND_URL = getBackendURL();
 
-// ── Helpers ──────────────────────────────────────────────────────
-
 function AdminDashboard() {
   const navigate = useNavigate();
   const [authChecked, setAuthChecked] = useState(false);
@@ -25,11 +23,11 @@ function AdminDashboard() {
   const [lastDetectionTime, setLastDetectionTime] = useState(null);
   const [refreshTick, setRefreshTick] = useState(0);
 
-  // Raspberry Pi device status
+  
   const [deviceStatus, setDeviceStatus] = useState(null);
   const [deviceStatusLoading, setDeviceStatusLoading] = useState(true);
 
-  // Check if admin is authenticated - restore from localStorage if needed
+  
   useEffect(() => {
     restoreAdminAuthState();
     if (!isAdminAuthenticated()) {
@@ -50,7 +48,7 @@ function AdminDashboard() {
         signal: AbortSignal.timeout(3000),
       });
     } catch {
-      // Logout is always successful locally
+      
     }
     sessionStorage.removeItem('adminToken');
     sessionStorage.removeItem('adminLoggedIn');
@@ -69,7 +67,7 @@ function AdminDashboard() {
     navigate('/');
   };
 
-  // Load the most recent defect across all time (for "Last detection" indicator)
+  
   const loadLastDetection = async () => {
     try {
       const result = await fetchDefects({ limit: 1, offset: 0, dateFrom: new Date(0).toISOString(), dateTo: new Date().toISOString() });
@@ -82,17 +80,17 @@ function AdminDashboard() {
     }
   };
 
-  // Load last detection on mount (only after auth is verified)
+  
   useEffect(() => {
     if (!authChecked) return;
     loadLastDetection();
   }, [authChecked]);
 
-  // Keep a ref to latest timeFilter so real-time callbacks always see the current value
+  
   const timeFilterRef = useRef(timeFilter);
   useEffect(() => { timeFilterRef.current = timeFilter; }, [timeFilter]);
 
-  // Real-time: WebSocket (instant) + Supabase Realtime (redundancy) + 30-second poll
+  
   useEffect(() => {
     if (!authChecked) return;
     const pollId = setInterval(() => {
@@ -118,7 +116,7 @@ function AdminDashboard() {
     };
   }, [authChecked]);
 
-  // Fetch initial device status and subscribe to real-time updates
+  
   useEffect(() => {
     if (!authChecked) return;
     
@@ -139,7 +137,7 @@ function AdminDashboard() {
     };
   }, [authChecked]);
 
-  // Re-fetch whenever the date filter or page navigation changes (only after auth is verified)
+  
   useEffect(() => {
     if (!authChecked) return;
     
@@ -178,8 +176,6 @@ function AdminDashboard() {
     return () => { cancelled = true; };
   }, [authChecked, timeFilter, customFromDate, customToDate, refreshTick]);
 
-
-
   const sidebarMenuItems = [
     { key: 'admin-dashboard', label: 'Dashboard', onClick: () => navigate('/admin-dashboard') },
     { key: 'admin-detection', label: 'Detection', onClick: () => navigate('/admin-detection') },
@@ -217,7 +213,7 @@ function AdminDashboard() {
       />
       
       <main className="machine-main-content">
-        {/* Header */}
+        {}
         <header className="machine-header">
           <button className="sidebar-hamburger" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle sidebar">
             <span /><span /><span />
@@ -228,7 +224,7 @@ function AdminDashboard() {
           </div>
         </header>
 
-        {/* Content Area */}
+        {}
         <div className="dashboard-container">
           {fetchError && (
             <div style={{ padding: '10px 16px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, color: '#dc2626', fontSize: 14, marginBottom: 12 }}>
@@ -301,7 +297,7 @@ function AdminDashboard() {
             </div>
           </div>
 
-          {/* Employee Management Section */}
+          {}
           <div className="dashboard-box-wrapper dashboard-box-wrapper-full admin-emp-expand">
             <h2 className="dashboard-box-title">Employee Management</h2>
             <div className="dashboard-box dashboard-employee-box">

@@ -1,14 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * Setup Test Users - Create test users in Supabase Auth for development/testing
- * 
- * Usage: node setup-test-users.js
- * 
- * This script creates test users in Supabase Auth that can be used to test the login system
- * Uses the Supabase Admin API (service role key) to bypass email confirmation
- */
-
 try { require('dotenv').config(); } catch (_) {}
 
 const { createClient } = require('@supabase/supabase-js');
@@ -21,10 +12,8 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
-// Initialize Supabase Admin client (with service role key for user creation)
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Test users to create
 const TEST_USERS = [
   {
     email: 'grodionahoa@pu.edu.ph',
@@ -66,11 +55,11 @@ async function setupTestUsers() {
 
   for (const user of TEST_USERS) {
     try {
-      // Create user with Supabase Admin API
+      
       const { data, error } = await supabaseAdmin.auth.admin.createUser({
         email: user.email,
         password: user.password,
-        email_confirm: true, // Skip email verification for test users
+        email_confirm: true, 
         user_metadata: {
           full_name: user.full_name,
           role: user.role,
@@ -78,7 +67,7 @@ async function setupTestUsers() {
       });
 
       if (error) {
-        // Check if user already exists
+        
         if (error.message.includes('already registered')) {
           console.log(`⚠️  User ${user.email} already exists (skipping)`);
           successCount++;
@@ -93,7 +82,7 @@ async function setupTestUsers() {
         successCount++;
       }
 
-      // Try to insert profile if user was created
+      
       if (data?.user?.id) {
         const { error: profileError } = await supabaseAdmin
           .from('profiles')

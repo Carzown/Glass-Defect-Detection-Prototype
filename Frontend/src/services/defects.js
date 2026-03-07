@@ -1,15 +1,13 @@
-// Defects service - API interface for glass defect records
-// Strategy: backend (Railway) is primary; Supabase direct is the fallback.
-// Auth/login is always direct-to-Supabase (no backend auth routes exist).
+
+
 import { supabase } from '../supabase';
 import { getBackendURL } from '../utils/formatters';
 
 const BACKEND_URL = getBackendURL();
 
-// ── Backend availability cache ────────────────────────────────────────────
 let _backendAvailable = null;
 let _backendCheckedAt = 0;
-const BACKEND_CACHE_MS = 30_000; // re-check every 30 s
+const BACKEND_CACHE_MS = 30_000; 
 
 async function isBackendAvailable() {
   const now = Date.now();
@@ -27,22 +25,13 @@ async function isBackendAvailable() {
   return _backendAvailable;
 }
 
-// Reset cache (e.g. after a backend error so we re-check sooner)
 function invalidateBackendCache() {
   _backendAvailable = null;
   _backendCheckedAt = 0;
 }
 
-// ── Device Status ─────────────────────────────────────────────────────────
-
-/**
- * Fetch the current online/offline status for a device.
- * Tries backend (Railway) first, then falls back to Supabase direct.
- *
- * Returns: { is_online: boolean, last_seen: string } or null
- */
 export async function fetchDeviceStatus(deviceId = 'raspi-pi-1') {
-  // Try backend first (backend has Supabase service role key)
+  
   if (BACKEND_URL) {
     try {
       const res = await fetch(`${BACKEND_URL}/defects/device-status/${deviceId}`, {
@@ -53,7 +42,7 @@ export async function fetchDeviceStatus(deviceId = 'raspi-pi-1') {
       console.warn('[defects] fetchDeviceStatus backend error, trying Supabase direct:', err.message);
     }
   }
-  // Fallback: Supabase direct (requires REACT_APP_SUPABASE_ANON_KEY to be set)
+  
   try {
     if (!supabase) return null;
     const { data, error } = await supabase
@@ -68,13 +57,8 @@ export async function fetchDeviceStatus(deviceId = 'raspi-pi-1') {
   }
 }
 
-/**
- * Subscribe to real-time device status changes.
- * Uses Supabase Realtime if available, otherwise polls the backend every 10 s.
- * Returns an unsubscribe function.
- */
 export function subscribeToDeviceStatus(deviceId = 'raspi-pi-1', callback) {
-  // Use Supabase Realtime when the client is available
+  
   if (supabase) {
     const channel = supabase
       .channel('device_status_changes')
@@ -88,7 +72,7 @@ export function subscribeToDeviceStatus(deviceId = 'raspi-pi-1', callback) {
       .subscribe();
     return () => supabase.removeChannel(channel);
   }
-  // Fallback: poll backend every 10 s
+  
   let stopped = false;
   const poll = async () => {
     if (stopped) return;
@@ -104,11 +88,10 @@ export function subscribeToDeviceStatus(deviceId = 'raspi-pi-1', callback) {
   return () => { stopped = true; };
 }
 
-// ── Fetch all defects (backend → Supabase fallback) ───────────────────────
 export async function fetchDefects(filters = {}) {
   const { limit = 50, offset = 0, dateFrom, dateTo } = filters;
 
-  // Try backend first
+  
   if (await isBackendAvailable()) {
     try {
       const params = new URLSearchParams({ limit, offset });
@@ -123,7 +106,7 @@ export async function fetchDefects(filters = {}) {
     }
   }
 
-  // Supabase direct fallback
+  
   if (!supabase) throw new Error('Neither backend nor Supabase is available');
   let query = supabase
     .from('defects')
@@ -137,7 +120,6 @@ export async function fetchDefects(filters = {}) {
   return { data: data || [], pagination: { total: count, limit: parseInt(limit), offset: parseInt(offset) }, source: 'supabase-direct' };
 }
 
-// ── Fetch single defect by ID (backend → Supabase fallback) ──────────────
 export async function fetchDefectById(id) {
   if (await isBackendAvailable()) {
     try {
@@ -156,7 +138,6 @@ export async function fetchDefectById(id) {
   return data;
 }
 
-// ── Create defect record (backend → Supabase fallback) ───────────────────
 export async function createDefect(defectData) {
   if (await isBackendAvailable()) {
     try {
@@ -181,7 +162,6 @@ export async function createDefect(defectData) {
   return data;
 }
 
-// ── Update defect record (backend → Supabase fallback) ───────────────────
 export async function updateDefect(id, updates) {
   if (await isBackendAvailable()) {
     try {
@@ -205,7 +185,6 @@ export async function updateDefect(id, updates) {
   return data;
 }
 
-// ── Delete defect record (backend → Supabase fallback) ───────────────────
 export async function deleteDefect(id) {
   if (await isBackendAvailable()) {
     try {
@@ -228,7 +207,6 @@ export async function deleteDefect(id) {
   return true;
 }
 
-// ── Delete all defects (Supabase direct only – no backend bulk-delete) ────
 export async function deleteAllDefects() {
   try {
     if (!supabase) throw new Error('Supabase not initialized');
@@ -241,14 +219,6 @@ export async function deleteAllDefects() {
   }
 }
 
-// ── Real-time subscription (Supabase direct – no backend equivalent) ──────
-/**
- * Subscribe to real-time defect updates.
- * Calls `onNew(defect)` when a new defect is inserted
- * Calls `onUpdate(defect)` when an existing defect is updated
- * Calls `onDelete(id)` when a defect is deleted
- * Returns an unsubscribe function to cleanup the subscription.
- */
 export function subscribeToDefects({ onNew, onUpdate, onDelete } = {}) {
   try {
     if (!supabase) return () => {};
@@ -282,7 +252,6 @@ export function subscribeToDefects({ onNew, onUpdate, onDelete } = {}) {
   }
 }
 
-// ── Defect statistics (backend → Supabase fallback) ──────────────────────
 export async function getDefectStats() {
   if (await isBackendAvailable()) {
     try {
@@ -309,14 +278,12 @@ export async function getDefectStats() {
   return stats;
 }
 
-// ── Date range helpers ────────────────────────────────────────────────────
-// PH timezone constant (UTC+8)
 const PH_TZ = 'Asia/Manila';
-// Get current date string in PHT as YYYY-MM-DD
+
 function getTodayPH() {
   return new Date().toLocaleDateString('en-CA', { timeZone: PH_TZ });
 }
-// Parse a YYYY-MM-DD date string as start-of-day PHT
+
 function phDayStart(dateStr) {
   return new Date(dateStr + 'T00:00:00+08:00');
 }
@@ -326,7 +293,7 @@ export function getDateRangeBounds(range) {
   const end = now.toISOString();
   let start;
   if (range === 'today') {
-    // Start of today in PHT (UTC+8)
+    
     start = phDayStart(getTodayPH()).toISOString();
   } else if (range === '7days') {
     const d = new Date();
@@ -339,7 +306,7 @@ export function getDateRangeBounds(range) {
     const dateStr = d.toLocaleDateString('en-CA', { timeZone: PH_TZ });
     start = phDayStart(dateStr).toISOString();
   } else {
-    start = new Date(0).toISOString(); // all time
+    start = new Date(0).toISOString(); 
   }
   return { start, end };
 }
@@ -349,7 +316,6 @@ export async function fetchDefectsByRange(range) {
   return fetchDefectsByDateRange(new Date(start), new Date(end));
 }
 
-// ── Fetch by date range (backend → Supabase fallback) ────────────────────
 export async function fetchDefectsByDateRange(startDate, endDate) {
   if (await isBackendAvailable()) {
     try {
@@ -381,23 +347,8 @@ export async function fetchDefectsByDateRange(startDate, endDate) {
   return data || [];
 }
 
-// ── WebSocket real-time connection (optional, as supplement to Supabase) ─
 let ws = null;
 
-/**
- * Connect to WebSocket server for real-time defect updates.
- * Falls back to Supabase if WebSocket is unavailable.
- * 
- * Usage:
- * ```
- * const unsubscribe = connectWebSocket({
- *   onNew: (defect) => console.log('New:', defect),
- *   onUpdate: (defect) => console.log('Update:', defect),
- *   onDelete: (id) => console.log('Delete:', id),
- * });
- * // Later: unsubscribe();
- * ```
- */
 export function connectWebSocket({ onNew, onUpdate, onDelete } = {}) {
   try {
     if (!BACKEND_URL) {
@@ -405,7 +356,7 @@ export function connectWebSocket({ onNew, onUpdate, onDelete } = {}) {
       return () => {};
     }
 
-    // Build WebSocket URL
+    
     const wsURL = BACKEND_URL
       .replace(/^http:/, 'ws:')
       .replace(/^https:/, 'wss:')
@@ -434,7 +385,7 @@ export function connectWebSocket({ onNew, onUpdate, onDelete } = {}) {
             break;
         }
       } catch {
-        // Ignore malformed messages
+        
       }
     };
 
@@ -442,7 +393,7 @@ export function connectWebSocket({ onNew, onUpdate, onDelete } = {}) {
 
     ws.onclose = () => { ws = null; };
 
-    // Return unsubscribe function
+    
     return () => {
       if (ws && ws.readyState === WebSocket.OPEN) ws.close();
       ws = null;
@@ -452,9 +403,6 @@ export function connectWebSocket({ onNew, onUpdate, onDelete } = {}) {
   }
 }
 
-/**
- * Get current WebSocket connection status
- */
 export function getWebSocketStatus() {
   if (!ws) return 'disconnected';
   switch (ws.readyState) {
@@ -466,9 +414,6 @@ export function getWebSocketStatus() {
   }
 }
 
-/**
- * Disconnect from WebSocket server
- */
 export function disconnectWebSocket() {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.close();

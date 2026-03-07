@@ -1,9 +1,8 @@
-// Defects API Routes - CRUD operations for glass defect records
+
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 
-// Real-time WebSocket broadcasting (optional - will gracefully fail if not available)
 let realtime = null;
 try {
   realtime = require('./realtime');
@@ -11,7 +10,6 @@ try {
   console.warn('[DEFECTS] Real-time module not loaded:', e?.message);
 }
 
-// In-memory fallback store (optional, only used if Supabase is not configured)
 let defectsStore = null;
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -25,7 +23,6 @@ if (supabaseUrl && supabaseKey) {
   console.warn('[defects] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set – falling back to in-memory store (no persistence)');
 }
 
-// GET /defects - Retrieve all defects with pagination
 router.get('/', async (req, res) => {
   try {
     if (!supabase) {
@@ -78,7 +75,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /stats/summary - Overall defect statistics
 router.get('/stats/summary', async (req, res) => {
   try {
     if (!supabase) {
@@ -107,7 +103,6 @@ router.get('/stats/summary', async (req, res) => {
   }
 });
 
-// GET /stats/range - Statistics filtered by date range
 router.get('/stats/range', async (req, res) => {
   try {
     if (!supabase) {
@@ -149,7 +144,6 @@ router.get('/stats/range', async (req, res) => {
   }
 });
 
-// GET /defects/:id - Retrieve specific defect
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -181,7 +175,6 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /defects - Create new defect record
 router.post('/', async (req, res) => {
   try {
     if (!supabase) {
@@ -207,7 +200,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Insert into Supabase
+    
     const { data, error } = await supabase
       .from('defects')
       .insert([
@@ -229,7 +222,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Broadcast new defect to WebSocket clients
+    
     if (realtime && data[0]) {
       try {
         realtime.broadcastNewDefect(data[0]);
@@ -250,7 +243,6 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PATCH /defects/:id - Update defect record
 router.patch('/:id', async (req, res) => {
   try {
     if (!supabase) {
@@ -277,7 +269,7 @@ router.patch('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Defect not found' });
     }
 
-    // Broadcast defect update to WebSocket clients
+    
     if (realtime && data[0]) {
       try {
         realtime.broadcastDefectUpdate(id, updates);
@@ -293,7 +285,6 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-// DELETE /defects/all - Delete ALL defect records (admin action)
 router.delete('/all', async (req, res) => {
   try {
     if (!supabase) {
@@ -311,7 +302,6 @@ router.delete('/all', async (req, res) => {
   }
 });
 
-// DELETE /defects/:id - Delete defect record
 router.delete('/:id', async (req, res) => {
   try {
     if (!supabase) {
@@ -328,7 +318,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
 
-    // Broadcast defect deletion to WebSocket clients
+    
     if (realtime) {
       try {
         realtime.broadcastDefectDelete(id);
@@ -344,7 +334,6 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// Helper function to group array by key
 function groupBy(array, key) {
   return array.reduce((acc, obj) => {
     const value = obj[key];
@@ -353,7 +342,6 @@ function groupBy(array, key) {
   }, {});
 }
 
-// GET /device-status/:deviceId - Get online/offline status for a device
 router.get('/device-status/:deviceId', async (req, res) => {
   try {
     if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });

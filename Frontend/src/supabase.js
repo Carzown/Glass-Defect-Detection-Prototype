@@ -47,9 +47,8 @@ export async function getCurrentUser() {
   return data.session?.user || null;
 }
 
-// User role management functions (Supabase profiles table)
 export async function createUserWithRole(email, password, role) {
-  // Create user in Supabase Auth
+  
   const { data: authData, error: authError } = await auth.signUp({
     email,
     password,
@@ -57,7 +56,7 @@ export async function createUserWithRole(email, password, role) {
   
   if (authError) throw authError;
 
-  // Store user role in profiles table
+  
   const { error } = await supabase
     .from('profiles')
     .insert([
@@ -88,7 +87,7 @@ export async function signInAndGetRole(email, password) {
 
   if (!supabase) throw new Error('Supabase not configured');
 
-  // Try lookup by user id first
+  
   let role = null;
   const { data: byId } = await supabase
     .from('profiles')
@@ -99,7 +98,7 @@ export async function signInAndGetRole(email, password) {
   if (byId?.role) {
     role = byId.role;
   } else {
-    // Fallback: try lookup by email
+    
     const { data: byEmail } = await supabase
       .from('profiles')
       .select('role')
@@ -108,7 +107,7 @@ export async function signInAndGetRole(email, password) {
     role = byEmail?.role || null;
   }
 
-  // Final fallback: check against REACT_APP_ADMIN_EMAILS env var
+  
   if (!role || role === 'employee') {
     const adminEmails = (process.env.REACT_APP_ADMIN_EMAILS || '')
       .split(',')
@@ -134,7 +133,7 @@ export async function getRole(uid) {
       .eq('id', uid)
       .single();
     
-    if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows found
+    if (error && error.code !== 'PGRST116') throw error; 
     
     return data?.role;
   } catch (error) {
@@ -143,7 +142,6 @@ export async function getRole(uid) {
   }
 }
 
-// Upload image to Supabase Storage
 export async function uploadImageToStorage(imageFile, bucketName = 'defects', path) {
   try {
     if (!supabase) throw new Error('Supabase not initialized');
@@ -155,7 +153,7 @@ export async function uploadImageToStorage(imageFile, bucketName = 'defects', pa
     
     if (error) throw error;
     
-    // Get public URL
+    
     const { data: publicUrl } = supabase
       .storage
       .from(bucketName)
@@ -171,7 +169,6 @@ export async function uploadImageToStorage(imageFile, bucketName = 'defects', pa
   }
 }
 
-// Save defect record to database
 export async function saveDefectRecord(defectData) {
   try {
     if (!supabase) throw new Error('Supabase not initialized');
@@ -189,7 +186,6 @@ export async function saveDefectRecord(defectData) {
   }
 }
 
-// Fetch defects from database with pagination
 export async function fetchDefectsFromDB(filters = {}) {
   try {
     if (!supabase) throw new Error('Supabase not initialized');
@@ -212,8 +208,6 @@ export async function fetchDefectsFromDB(filters = {}) {
     throw error;
   }
 }
-
-
 
 export async function signOutUser() {
   await signOut();

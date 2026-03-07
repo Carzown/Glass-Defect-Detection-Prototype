@@ -24,7 +24,7 @@ function DetectionHistory() {
   const [filterOpen, setFilterOpen] = useState(false);
   const filterBtnRef = useRef(null);
 
-  // Check if employee is authenticated - restore from localStorage if needed
+  
   useEffect(() => {
     restoreAuthState();
     if (!isUserAuthenticated()) {
@@ -233,7 +233,7 @@ function DetectionHistory() {
 
           {!loading && (
             <div className="dh-miller-container dh-miller-page">
-              {/* ── Column 1: Sessions ── */}
+              {}
               <div className="dh-panel dh-panel-always">
                 <div className="dh-panel-header">
                   <span className="dh-panel-title">History</span>
@@ -266,7 +266,7 @@ function DetectionHistory() {
                 </div>
               </div>
 
-              {/* ── Column 2: Defects in selected session ── */}
+              {}
               <div className={`dh-panel dh-panel-slide${selectedSession ? ' dh-panel-visible' : ''}`}>
                 {selectedSession && (
                   <>
@@ -297,7 +297,7 @@ function DetectionHistory() {
                 )}
               </div>
 
-              {/* ── Column 3: Defect details ── */}
+              {}
               <div className={`dh-panel dh-panel-slide${selectedDefect ? ' dh-panel-visible' : ''}`}>
                 {selectedDefect && (
                   <>

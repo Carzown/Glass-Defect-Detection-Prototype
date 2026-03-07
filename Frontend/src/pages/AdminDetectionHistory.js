@@ -1,4 +1,4 @@
-// Admin Detection History - Browse past detection sessions grouped by date (Admin version)
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
@@ -28,7 +28,7 @@ function AdminDetectionHistory() {
   const [filterOpen, setFilterOpen] = useState(false);
   const filterBtnRef = useRef(null);
 
-  // Check if admin is authenticated - restore from localStorage if needed
+  
   useEffect(() => {
     restoreAdminAuthState();
     if (!isAdminAuthenticated()) {
@@ -115,7 +115,7 @@ function AdminDetectionHistory() {
 
   async function handleDeleteDefect() {
     const deletedId = selectedDefect.id;
-    // Optimistically remove from UI immediately
+    
     const newSessions = sessions
       .map(([dateKey, defects]) => [dateKey, defects.filter(d => d.id !== deletedId)])
       .filter(([, defects]) => defects.length > 0);
@@ -123,7 +123,7 @@ function AdminDetectionHistory() {
     setSelectedDefect(null);
     setShowDeleteConfirm(false);
 
-    // Update selectedSession so column 2 instantly reflects the deletion (respecting active filter)
+    
     if (selectedSession) {
       const [dateKey] = selectedSession;
       const updatedRaw = newSessions.find(([k]) => k === dateKey);
@@ -139,7 +139,7 @@ function AdminDetectionHistory() {
       }
     }
 
-    // Fire the actual delete in the background
+    
     try {
       await deleteDefect(deletedId);
     } catch (error) {
@@ -278,7 +278,7 @@ function AdminDetectionHistory() {
 
           {!loading && (
             <div className="dh-miller-container dh-miller-page">
-              {/* ── Column 1: Sessions ── */}
+              {}
               <div className="dh-panel dh-panel-always">
                 <div className="dh-panel-header">
                   <span className="dh-panel-title">History</span>
@@ -311,7 +311,7 @@ function AdminDetectionHistory() {
                 </div>
               </div>
 
-              {/* ── Column 2: Defects in selected session ── */}
+              {}
               <div className={`dh-panel dh-panel-slide${selectedSession ? ' dh-panel-visible' : ''}`}>
                 {selectedSession && (
                   <>
@@ -342,7 +342,7 @@ function AdminDetectionHistory() {
                 )}
               </div>
 
-              {/* ── Column 3: Defect details ── */}
+              {}
               <div className={`dh-panel dh-panel-slide${selectedDefect ? ' dh-panel-visible' : ''}`}>
                 {selectedDefect && (
                   <>
@@ -402,7 +402,7 @@ function AdminDetectionHistory() {
                           </div>
                         )}
                       </div>
-                      {/* Delete Button - Centered at Bottom */}
+                      {}
                       <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
                         <button
                           onClick={() => setShowDeleteConfirm(true)}

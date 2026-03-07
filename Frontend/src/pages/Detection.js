@@ -15,10 +15,10 @@ import { fetchDefects, getDateRangeBounds, subscribeToDefects } from '../service
 import './Detection.css';
 
 function Detection() {
-  // Auth state
+  
   const [authChecked, setAuthChecked] = useState(false);
 
-  // State
+  
   const [currentDefects, setCurrentDefects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
@@ -30,16 +30,16 @@ function Detection() {
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }));
 
-  // Connections
+  
   const navigate = useNavigate();
   const defectsListRef = useRef(null);
 
-  // Check and restore authentication on mount
+  
   useEffect(() => {
-    // First, restore auth from localStorage if needed
+    
     restoreAuthState();
 
-    // Then check if authenticated
+    
     if (!isUserAuthenticated()) {
       navigate('/');
       return;
@@ -48,7 +48,7 @@ function Detection() {
     setAuthChecked(true);
   }, [navigate]);
 
-  // Fetch defects whenever auth is verified or filter changes
+  
   useEffect(() => {
     if (!authChecked) return;
     let cancelled = false;
@@ -94,7 +94,7 @@ function Detection() {
     return () => { cancelled = true; };
   }, [authChecked, timeFilter, customFromDate, customToDate]);
 
-  // Subscribe to real-time defect updates (new detections)
+  
   useEffect(() => {
     if (!authChecked) return;
     if (timeFilter !== 'today' && timeFilter !== 'custom-range') return;
@@ -144,7 +144,6 @@ function Detection() {
 
     return () => { unsubscribe(); };
   }, [authChecked, timeFilter]);
-
 
   async function handleLogout() {
     try { await signOutUser(); } catch {}
@@ -200,27 +199,25 @@ function Detection() {
     });
   }
 
-  // Sync modal index if selected defect ID is still valid
+  
   useEffect(() => {
     if (modalOpen && selectedDefectId) {
       const foundIndex = currentDefects.findIndex(d => d.id === selectedDefectId);
       if (foundIndex !== -1 && foundIndex !== currentImageIndex) {
         setCurrentImageIndex(foundIndex);
       } else if (foundIndex === -1) {
-        // Defect was removed, close modal
+        
         closeModal();
       }
     }
   }, [currentDefects, modalOpen, selectedDefectId, currentImageIndex]);
 
-  // Auto-scroll defects list so newest entry (top) is always visible
+  
   useEffect(() => {
     if (defectsListRef.current) {
       defectsListRef.current.scrollTop = 0;
     }
   }, [currentDefects]);
-
-
 
   return (
     <>
@@ -267,7 +264,7 @@ function Detection() {
 
         <div className="machine-content-area" style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div className="machine-content-wrapper" style={{ flex: 1, height: 'auto', minHeight: 0 }}>
-            {/* Image Preview Section - Left */}
+            {}
             <div className="machine-image-preview-panel" style={{ flex: '2 1 0', minWidth: 0 }}>
               <div className="image-preview-header">
                 <h2 className="machine-section-title">Defect Preview</h2>
@@ -316,7 +313,7 @@ function Detection() {
               </div>
             </div>
 
-            {/* Defect List Section - Right */}
+            {}
             <div className="machine-defects-panel" style={{ flex: '1 1 0', minWidth: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                 <div>
@@ -370,7 +367,7 @@ function Detection() {
         </div>
       </main>
 
-      {/* Modal */}
+      {}
       {modalOpen && currentImageIndex >= 0 && currentDefects[currentImageIndex] && (
         (() => {
           const modalDefect = currentDefects[currentImageIndex];
@@ -378,7 +375,7 @@ function Detection() {
             <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
               <div className="det-modal-content">
 
-                {/* Header */}
+                {}
                 <div className="det-modal-header">
                   <div className="det-modal-header-left">
                     <span className="det-modal-index">{currentImageIndex + 1} / {currentDefects.length}</span>
@@ -392,7 +389,7 @@ function Detection() {
                   </button>
                 </div>
 
-                {/* Image area */}
+                {}
                 <div className="det-modal-image-area">
                   {modalDefect.imageUrl ? (
                     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -427,7 +424,7 @@ function Detection() {
                   )}
                 </div>
 
-                {/* Details */}
+                {}
                 <div className="det-modal-details">
                   <div className="det-modal-detail-row">
                     <span className="det-modal-detail-label">Defect Count</span>
@@ -456,7 +453,7 @@ function Detection() {
                   </div>
                 </div>
 
-                {/* Footer nav */}
+                {}
                 <div className="det-modal-footer">
                   <button
                     onClick={prevImage}

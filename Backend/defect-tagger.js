@@ -1,4 +1,4 @@
-// Defect Tagger - Auto-tags defects with sequential numbers and overlays badges on images
+
 try { require('dotenv').config(); } catch (_) {}
 
 const { createClient } = require('@supabase/supabase-js');
@@ -14,7 +14,7 @@ try {
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 const BUCKET       = process.env.DEFECT_IMAGES_BUCKET || 'defects';
-const POLL_MS      = 6000; // poll Supabase every 6 seconds
+const POLL_MS      = 6000; 
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.warn('[Tagger] ⚠️  Supabase not configured');
@@ -24,7 +24,6 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Build SVG badge with tag number
 function makeBadgeSvg(number) {
   const label   = String(number);
   const fontSize = 14;
@@ -44,7 +43,6 @@ function makeBadgeSvg(number) {
   );
 }
 
-// Download image from URL
 async function downloadImage(url) {
   const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
   if (!res.ok) throw new Error(`HTTP ${res.status} downloading image from ${url}`);
@@ -52,16 +50,15 @@ async function downloadImage(url) {
   return Buffer.from(ab);
 }
 
-// Composite badge onto image and return JPEG
 async function buildTaggedImage(originalBuffer, tagNumber) {
   if (!sharp) return null;
   const badge = makeBadgeSvg(tagNumber);
   
-  // Get image dimensions to position badge at upper right
+  
   const metadata = await sharp(originalBuffer).metadata();
   const imageWidth = metadata.width || 640;
-  const badgeWidth = Math.max(28, String(tagNumber).length * 9 + 16); // matches makeBadgeSvg calculation
-  const rightPosition = Math.max(0, imageWidth - badgeWidth - 8); // 8px padding from right edge
+  const badgeWidth = Math.max(28, String(tagNumber).length * 9 + 16); 
+  const rightPosition = Math.max(0, imageWidth - badgeWidth - 8); 
   
   return sharp(originalBuffer)
     .composite([{ input: badge, top: 8, left: rightPosition }])
@@ -69,7 +66,6 @@ async function buildTaggedImage(originalBuffer, tagNumber) {
     .toBuffer();
 }
 
-// Upload tagged image to Supabase Storage
 async function uploadToStorage(defectId, tagNumber, imageBuffer) {
   const filePath = `tagged/defect-${defectId}-tag${tagNumber}.jpg`;
   const { error } = await supabase.storage
@@ -80,7 +76,6 @@ async function uploadToStorage(defectId, tagNumber, imageBuffer) {
   return data.publicUrl;
 }
 
-// Get next sequential tag number from database
 async function getNextTagNumber() {
   const { data } = await supabase
     .from('defects')
@@ -92,9 +87,8 @@ async function getNextTagNumber() {
   return (data?.tag_number ?? 0) + 1;
 }
 
-// Process untagged defects - assign numbers and tag images
 async function processUntagged() {
-  // Fetch untagged defects ordered oldest-first
+  
   const { data: defects, error } = await supabase
     .from('defects')
     .select('id, image_url, detected_at')
@@ -128,8 +122,6 @@ async function processUntagged() {
     }
   }
 }
-
-// ─── Public API ───────────────────────────────────────────────────────────────
 
 let _timer = null;
 
