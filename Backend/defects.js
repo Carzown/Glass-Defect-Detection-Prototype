@@ -359,4 +359,26 @@ router.get('/device-status/:deviceId', async (req, res) => {
   }
 });
 
+router.patch('/device-status/:deviceId', async (req, res) => {
+  try {
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    const { deviceId } = req.params;
+    const updates = {};
+    if (req.body.is_online !== undefined) updates.is_online = req.body.is_online;
+    updates.last_seen = req.body.last_seen || new Date().toISOString();
+    const { data, error } = await supabase
+      .from('device_status')
+      .update(updates)
+      .eq('device_id', deviceId)
+      .select('is_online, last_seen')
+      .single();
+    if (error || !data) return res.status(404).json({ error: 'Device not found' });
+    if (realtime) realtime.broadcastDeviceStatus({ device_id: deviceId, ...data });
+    res.json(data);
+  } catch (err) {
+    console.error('[DEFECTS] Error updating device status:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

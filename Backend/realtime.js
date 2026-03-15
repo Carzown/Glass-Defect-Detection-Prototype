@@ -141,6 +141,23 @@ function broadcastDefectDelete(defectId) {
   }
 }
 
+function broadcastDeviceStatus(status) {
+  if (!wss) return;
+  try {
+    const message = JSON.stringify({
+      type: 'device_status',
+      timestamp: new Date().toISOString(),
+      data: status
+    });
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) client.send(message);
+    });
+    console.log('[REALTIME] 📡 Broadcast device status');
+  } catch (error) {
+    console.error('[REALTIME] ❌ Error broadcasting device status:', error);
+  }
+}
+
 function getClientCount() {
   return wss ? wss.clients.size : 0;
 }
@@ -159,6 +176,7 @@ module.exports = {
   broadcastNewDefect,
   broadcastDefectUpdate,
   broadcastDefectDelete,
+  broadcastDeviceStatus,
   getClientCount,
   close
 };

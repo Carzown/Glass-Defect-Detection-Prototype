@@ -6,7 +6,7 @@ import DateRangePicker from '../components/DateRangePicker';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { capitalizeDefectType, formatDate, formatTime, groupByDate, getDefectTypesLabel } from '../utils/formatters';
 import { restoreAdminAuthState, isAdminAuthenticated } from '../utils/auth';
-import { fetchDefectsByRange, fetchDefectsByDateRange, deleteDefect } from '../services/defects';
+import { fetchDefectsByRange, fetchDefectsByDateRange, deleteDefect, subscribeToDefects, connectWebSocket, getDateRangeBounds } from '../services/defects';
 import './Dashboard.css';
 import './DetectionHistory.css';
 
@@ -27,6 +27,12 @@ function AdminDetectionHistory() {
   const [defectTypeFilter, setDefectTypeFilter] = useState('all');
   const [filterOpen, setFilterOpen] = useState(false);
   const filterBtnRef = useRef(null);
+  const timeFilterRef = useRef(timeFilter);
+  const customFromDateRef = useRef(customFromDate);
+  const customToDateRef = useRef(customToDate);
+  useEffect(() => { timeFilterRef.current = timeFilter; }, [timeFilter]);
+  useEffect(() => { customFromDateRef.current = customFromDate; }, [customFromDate]);
+  useEffect(() => { customToDateRef.current = customToDate; }, [customToDate]);
 
   
   useEffect(() => {
@@ -94,6 +100,74 @@ function AdminDetectionHistory() {
     load();
     return () => { cancelled = true; };
   }, [authChecked, timeFilter, customFromDate, customToDate]);
+
+  // Realtime subscription — handles new/update/delete without a full reload
+  useEffect(() => {
+    if (!authChecked) return;
+
+    const makeKey = (detected_at) => new Date(detected_at).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Manila',
+    });
+
+    const inRange = (detected_at) => {
+      const tf = timeFilterRef.current;
+      const from = customFromDateRef.current;
+      const to = customToDateRef.current;
+      if (tf === 'custom-range') {
+        if (!from || !to) return false;
+        const d = new Date(detected_at);
+        return d >= new Date(from + 'T00:00:00+08:00') && d <= new Date(to + 'T23:59:59.999+08:00');
+      }
+      const { start, end } = getDateRangeBounds(tf);
+      const d = new Date(detected_at);
+      return d >= new Date(start) && d <= new Date(end);
+    };
+
+    const onNew = (newDefect) => {
+      if (!inRange(newDefect.detected_at)) return;
+      const dateKey = makeKey(newDefect.detected_at);
+      setSessions(prev => {
+        const idx = prev.findIndex(([k]) => k === dateKey);
+        if (idx !== -1) {
+          if (prev[idx][1].some(d => d.id === newDefect.id)) return prev;
+          return prev.map((entry, i) => i === idx ? [dateKey, [newDefect, ...entry[1]]] : entry);
+        }
+        return [[dateKey, [newDefect]], ...prev].sort((a, b) => new Date(b[0]) - new Date(a[0]));
+      });
+      setSelectedSession(prev => {
+        if (!prev || prev[0] !== dateKey) return prev;
+        if (prev[1].some(d => d.id === newDefect.id)) return prev;
+        return [dateKey, [newDefect, ...prev[1]]];
+      });
+    };
+
+    const onUpdate = (updatedDefect) => {
+      setSessions(prev => prev.map(([k, defects]) =>
+        [k, defects.map(d => d.id === updatedDefect.id ? updatedDefect : d)]
+      ));
+      setSelectedSession(prev =>
+        prev ? [prev[0], prev[1].map(d => d.id === updatedDefect.id ? updatedDefect : d)] : prev
+      );
+      setSelectedDefect(prev => prev && prev.id === updatedDefect.id ? updatedDefect : prev);
+    };
+
+    const onDelete = (deletedId) => {
+      setSessions(prev =>
+        prev.map(([k, defects]) => [k, defects.filter(d => d.id !== deletedId)])
+           .filter(([, defects]) => defects.length > 0)
+      );
+      setSelectedDefect(prev => prev && prev.id === deletedId ? null : prev);
+      setSelectedSession(prev => {
+        if (!prev) return prev;
+        const updated = prev[1].filter(d => d.id !== deletedId);
+        return updated.length > 0 ? [prev[0], updated] : null;
+      });
+    };
+
+    const unsubSupa = subscribeToDefects({ onNew, onUpdate, onDelete });
+    const unsubWS = connectWebSocket({ onNew, onUpdate, onDelete });
+    return () => { unsubSupa(); unsubWS(); };
+  }, [authChecked]);
 
   useEffect(() => {
     if (!filterOpen) return;

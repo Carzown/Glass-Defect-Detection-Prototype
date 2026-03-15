@@ -10,7 +10,7 @@ import {
   getDefectTypesLabel,
 } from '../utils/formatters';
 import { restoreAdminAuthState, isAdminAuthenticated } from '../utils/auth';
-import { fetchDefects, getDateRangeBounds, subscribeToDefects } from '../services/defects';
+import { fetchDefects, getDateRangeBounds, subscribeToDefects, connectWebSocket } from '../services/defects';
 import './Detection.css';
 
 function AdminDetection() {
@@ -90,56 +90,45 @@ function AdminDetection() {
   
   useEffect(() => {
     if (!authChecked) return;
-    
-    
-    if (timeFilter !== 'today' && timeFilter !== 'custom-range') {
-      return;
-    }
 
-    let unsubscribe = () => {};
-
-    const subscribeToRealTime = async () => {
-      try {
-        unsubscribe = subscribeToDefects({
-          onNew: (newDefect) => {
-            setCurrentDefects(prevDefects => {
-              if (prevDefects.some(d => d.id === newDefect.id)) return prevDefects;
-              const displayDefect = {
-                id: newDefect.id,
-                time: formatRelativeTime(newDefect.detected_at),
-                type: getDefectTypesLabel(newDefect),
-                defects: newDefect.detected_defects || [],
-                imageUrl: newDefect.image_url,
-                tagNumber: newDefect.tag_number,
-                detected_at: newDefect.detected_at,
-                image_path: newDefect.image_path,
-                notes: newDefect.notes,
-                supabaseData: newDefect,
-              };
-              return [displayDefect, ...prevDefects];
-            });
-          },
-          onUpdate: (updatedDefect) => {
-            setCurrentDefects(prevDefects =>
-              prevDefects.map(d =>
-                d.id === updatedDefect.id
-                  ? { ...d, type: getDefectTypesLabel(updatedDefect), defects: updatedDefect.detected_defects || [], notes: updatedDefect.notes, supabaseData: updatedDefect }
-                  : d
-              )
-            );
-          },
-          onDelete: (deletedId) => {
-            setCurrentDefects(prevDefects => prevDefects.filter(d => d.id !== deletedId));
-          },
-        });
-      } catch {
-        
-      }
+    const onNew = (newDefect) => {
+      setCurrentDefects(prevDefects => {
+        if (prevDefects.some(d => d.id === newDefect.id)) return prevDefects;
+        const displayDefect = {
+          id: newDefect.id,
+          time: formatRelativeTime(newDefect.detected_at),
+          type: getDefectTypesLabel(newDefect),
+          defects: newDefect.detected_defects || [],
+          imageUrl: newDefect.image_url,
+          tagNumber: newDefect.tag_number,
+          detected_at: newDefect.detected_at,
+          image_path: newDefect.image_path,
+          notes: newDefect.notes,
+          supabaseData: newDefect,
+        };
+        return [displayDefect, ...prevDefects];
+      });
     };
 
-    subscribeToRealTime();
-    return () => { unsubscribe(); };
-  }, [authChecked, timeFilter]);
+    const onUpdate = (updatedDefect) => {
+      setCurrentDefects(prevDefects =>
+        prevDefects.map(d =>
+          d.id === updatedDefect.id
+            ? { ...d, type: getDefectTypesLabel(updatedDefect), defects: updatedDefect.detected_defects || [], notes: updatedDefect.notes, supabaseData: updatedDefect }
+            : d
+        )
+      );
+    };
+
+    const onDelete = (deletedId) => {
+      setCurrentDefects(prevDefects => prevDefects.filter(d => d.id !== deletedId));
+    };
+
+    const unsubSupa = subscribeToDefects({ onNew, onUpdate, onDelete });
+    const unsubWS = connectWebSocket({ onNew, onUpdate, onDelete });
+
+    return () => { unsubSupa(); unsubWS(); };
+  }, [authChecked]);
 
   function handleLogout() {
     sessionStorage.removeItem('adminToken');

@@ -58,34 +58,38 @@ export async function fetchDeviceStatus(deviceId = 'raspi-pi-1') {
 }
 
 export function subscribeToDeviceStatus(deviceId = 'raspi-pi-1', callback) {
-  
+  let stopped = false;
+
+  // Supabase realtime for instant updates when the DB row changes
+  let supaChannel = null;
   if (supabase) {
-    const channel = supabase
+    supaChannel = supabase
       .channel('device_status_changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'device_status', filter: `device_id=eq.${deviceId}` },
         (payload) => {
-          if (payload.new) callback(payload.new);
+          if (payload.new && !stopped) callback(payload.new);
         }
       )
       .subscribe();
-    return () => supabase.removeChannel(channel);
   }
-  
-  let stopped = false;
+
+  // Always poll periodically as a safety net regardless of Supabase availability
   const poll = async () => {
     if (stopped) return;
     try {
-      const res = await fetch(`${BACKEND_URL}/defects/device-status/${deviceId}`, {
-        signal: AbortSignal.timeout(5000),
-      });
-      if (res.ok) callback(await res.json());
+      const status = await fetchDeviceStatus(deviceId);
+      if (status && !stopped) callback(status);
     } catch {}
-    if (!stopped) setTimeout(poll, 10_000);
+    if (!stopped) setTimeout(poll, 30_000);
   };
-  setTimeout(poll, 10_000);
-  return () => { stopped = true; };
+  setTimeout(poll, 30_000);
+
+  return () => {
+    stopped = true;
+    if (supaChannel) supabase.removeChannel(supaChannel);
+  };
 }
 
 export async function fetchDefects(filters = {}) {
@@ -349,7 +353,7 @@ export async function fetchDefectsByDateRange(startDate, endDate) {
 
 let ws = null;
 
-export function connectWebSocket({ onNew, onUpdate, onDelete } = {}) {
+export function connectWebSocket({ onNew, onUpdate, onDelete, onDeviceStatus } = {}) {
   try {
     if (!BACKEND_URL) {
       console.warn('[WebSocket] No backend URL configured, skipping WebSocket connection');
@@ -380,6 +384,9 @@ export function connectWebSocket({ onNew, onUpdate, onDelete } = {}) {
             break;
           case 'defect_delete':
             if (onDelete) onDelete(message.defectId);
+            break;
+          case 'device_status':
+            if (onDeviceStatus) onDeviceStatus(message.data);
             break;
           default:
             break;

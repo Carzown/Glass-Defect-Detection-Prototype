@@ -26,6 +26,13 @@ function AdminDashboard() {
   
   const [deviceStatus, setDeviceStatus] = useState(null);
   const [deviceStatusLoading, setDeviceStatusLoading] = useState(true);
+  const [timeTick, setTimeTick] = useState(0);
+
+  // Tick every 60 s so relative timestamps ("X minutes ago") stay current
+  useEffect(() => {
+    const id = setInterval(() => setTimeTick(t => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   
   useEffect(() => {
@@ -107,7 +114,7 @@ function AdminDashboard() {
         setRefreshTick(t => t + 1);
       }
     };
-    const unsubWS = connectWebSocket({ onNew });
+    const unsubWS = connectWebSocket({ onNew, onDeviceStatus: (status) => setDeviceStatus(status) });
     const unsubSupa = subscribeToDefects({ onNew });
     return () => {
       clearInterval(pollId);
@@ -266,6 +273,7 @@ function AdminDashboard() {
                 <div className="dashboard-stat-card">
                   <span className="dashboard-stat-label">Last Detection</span>
                   <span className="dashboard-stat-value">
+                    {/* timeTick causes re-render every 60 s to keep the relative time fresh */}
                     {lastDetectionTime ? formatRelativeTime(lastDetectionTime) : '--'}
                   </span>
                 </div>
