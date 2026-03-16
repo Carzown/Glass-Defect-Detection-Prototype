@@ -15,7 +15,7 @@ export function getDefectTypesLabel(record) {
     counts[t] = (counts[t] || 0) + 1;
   });
   
-  return Object.entries(counts).map(([type, count]) => `${count} ${type}`).join(', ');
+  return Object.entries(counts).map(([type]) => type).join(', ');
 }
 
 export function formatTime(dateStr) {

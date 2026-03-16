@@ -474,10 +474,6 @@ function Dashboard() {
                             </div>
                           )}
                           <div className="dh-detail-card">
-                            <div className="dh-detail-row">
-                              <span className="dh-detail-label">Defect Count</span>
-                              <span className="dh-detail-value">{(dashSelectedDefect.detected_defects || []).length}</span>
-                            </div>
                             {(dashSelectedDefect.detected_defects || []).length > 0 && (
                               <div className="dh-detail-row">
                                 <span className="dh-detail-label">Type</span>

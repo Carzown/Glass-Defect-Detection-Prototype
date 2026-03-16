@@ -451,10 +451,6 @@ function AdminDetectionHistory() {
                         </div>
                       )}
                       <div className="dh-detail-card">
-                        <div className="dh-detail-row">
-                          <span className="dh-detail-label">Defect Count</span>
-                          <span className="dh-detail-value">{(selectedDefect.detected_defects || []).length}</span>
-                        </div>
                         {(selectedDefect.detected_defects || []).length > 0 && (
                           <div className="dh-detail-row">
                             <span className="dh-detail-label">Type</span>
