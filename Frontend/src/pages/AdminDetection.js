@@ -416,10 +416,6 @@ function AdminDetection() {
 
                 {}
                 <div className="det-modal-details">
-                  <div className="det-modal-detail-row">
-                    <span className="det-modal-detail-label">Defect Count</span>
-                    <span className="det-modal-detail-value">{modalDefect.defects.length}</span>
-                  </div>
                   {modalDefect.defects.length > 0 && (
                     <div className="det-modal-detail-row">
                       <span className="det-modal-detail-label">Type</span>
