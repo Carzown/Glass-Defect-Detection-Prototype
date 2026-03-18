@@ -14,10 +14,10 @@ const corsOptions = {
     'http://127.0.0.1:3001',
     'https://carzown.github.io',
     'https://Carzown.github.io/Glass-Defect-Detection-Prototype',
-    'https://glass-defect-detection-prototype-production.up.railway.app',
+    'https://glass-defect-detection-prototype.onrender.com',
     process.env.FRONTEND_URL || 'http://localhost:3000',
     
-    /^https:\/\/.*\.railway\.app$/,
+    /^https:\/\/.*\.onrender\.com$/,
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],

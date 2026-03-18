@@ -87,7 +87,7 @@ export function aggregateDefectsByType(defects) {
   return Object.entries(counts).map(([type, count]) => ({ type, count }));
 }
 
-const RAILWAY_BACKEND_URL = 'https://glass-defect-detection-prototype-production.up.railway.app';
+const RENDER_BACKEND_URL = 'https://glass-defect-detection-prototype.onrender.com';
 
 export function getBackendURL() {
   if (process.env.REACT_APP_BACKEND_URL) {
@@ -100,5 +100,5 @@ export function getBackendURL() {
     return 'http://localhost:5000';
   }
   
-  return RAILWAY_BACKEND_URL;
+  return RENDER_BACKEND_URL;
 }

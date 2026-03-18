@@ -29,9 +29,9 @@ router.get('/', async (req, res) => {
       return res.status(503).json({ 
         error: 'Supabase not configured - cannot retrieve defects',
         instructions: [
-          'Configure Supabase on Railway to save and retrieve defects:',
-          '1. Go to Railway Dashboard → glass-defect-detection-prototype-production',
-          '2. Click "Variables" tab',
+          'Configure Supabase on Render to save and retrieve defects:',
+          '1. Go to Render Dashboard → glass-defect-detection-prototype',
+          '2. Click "Environment" tab',
           '3. Add: SUPABASE_URL = https://kfeztemgrbkfwaicvgnk.supabase.co',
           '4. Add: SUPABASE_SERVICE_ROLE_KEY = (from Supabase Settings → API)',
           '5. Redeploy'
@@ -180,10 +180,10 @@ router.post('/', async (req, res) => {
     if (!supabase) {
       return res.status(503).json({ 
         error: 'Supabase not configured',
-        message: 'To save defects, configure Supabase on Railway:',
+        message: 'To save defects, configure Supabase on Render:',
         instructions: [
-          '1. Go to Railway Dashboard → glass-defect-detection-prototype-production',
-          '2. Click "Variables" tab',
+          '1. Go to Render Dashboard → glass-defect-detection-prototype',
+          '2. Click "Environment" tab',
           '3. Add: SUPABASE_URL = https://kfeztemgrbkfwaicvgnk.supabase.co',
           '4. Add: SUPABASE_SERVICE_ROLE_KEY = (get from Supabase Dashboard → Settings → API)',
           '5. Redeploy'

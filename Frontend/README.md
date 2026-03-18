@@ -11,7 +11,7 @@ Modern React dashboard for real-time glass defect detection with Supabase integr
 ### Prerequisites
 - Node.js 16+ installed
 - Supabase project with credentials
-- Backend running (Railway.app in production)
+- Backend running (Render.com in production)
 
 ### Installation
 
@@ -23,7 +23,7 @@ npm install
 cat > .env.local << EOF
 REACT_APP_SUPABASE_URL=https://your-project.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=your_anon_key
-REACT_APP_BACKEND_URL=https://your-railway-backend.railway.app
+REACT_APP_BACKEND_URL=https://glass-defect-detection-prototype.onrender.com
 EOF
 
 # Start development server
@@ -78,7 +78,7 @@ npm run build
          │
 ┌────────▼────────┐
 │  Backend API    │
-│  (Railway)      │
+│  (Render)       │
 └────────┬────────┘
          │
     Supabase

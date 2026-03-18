@@ -28,8 +28,12 @@ function AdminDetection() {
   const [customToDate, setCustomToDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }));
 
   
+  const [refreshTick, setRefreshTick] = useState(0);
+
   const navigate = useNavigate();
   const defectsListRef = useRef(null);
+  const timeFilterRef = useRef(timeFilter);
+  useEffect(() => { timeFilterRef.current = timeFilter; }, [timeFilter]);
 
   
   useEffect(() => {
@@ -45,7 +49,8 @@ function AdminDetection() {
   useEffect(() => {
     if (!authChecked) return;
     let cancelled = false;
-    setLoading(true);
+    const isBackgroundPoll = refreshTick > 0;
+    if (!isBackgroundPoll) setLoading(true);
     (async () => {
       try {
         let start, end;
@@ -81,33 +86,37 @@ function AdminDetection() {
           setFetchError('Failed to load defects. Please check your connection.');
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && !isBackgroundPoll) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [authChecked, timeFilter, customFromDate, customToDate]);
+  }, [authChecked, timeFilter, customFromDate, customToDate, refreshTick]);
 
   
   useEffect(() => {
     if (!authChecked) return;
 
     const onNew = (newDefect) => {
-      setCurrentDefects(prevDefects => {
-        if (prevDefects.some(d => d.id === newDefect.id)) return prevDefects;
-        const displayDefect = {
-          id: newDefect.id,
-          time: formatRelativeTime(newDefect.detected_at),
-          type: getDefectTypesLabel(newDefect),
-          defects: newDefect.detected_defects || [],
-          imageUrl: newDefect.image_url,
-          tagNumber: newDefect.tag_number,
-          detected_at: newDefect.detected_at,
-          image_path: newDefect.image_path,
-          notes: newDefect.notes,
-          supabaseData: newDefect,
-        };
-        return [displayDefect, ...prevDefects];
-      });
+      if (timeFilterRef.current === 'today') {
+        setCurrentDefects(prevDefects => {
+          if (prevDefects.some(d => d.id === newDefect.id)) return prevDefects;
+          const displayDefect = {
+            id: newDefect.id,
+            time: formatRelativeTime(newDefect.detected_at),
+            type: getDefectTypesLabel(newDefect),
+            defects: newDefect.detected_defects || [],
+            imageUrl: newDefect.image_url,
+            tagNumber: newDefect.tag_number,
+            detected_at: newDefect.detected_at,
+            image_path: newDefect.image_path,
+            notes: newDefect.notes,
+            supabaseData: newDefect,
+          };
+          return [displayDefect, ...prevDefects];
+        });
+      } else {
+        setRefreshTick(t => t + 1);
+      }
     };
 
     const onUpdate = (updatedDefect) => {
@@ -127,7 +136,9 @@ function AdminDetection() {
     const unsubSupa = subscribeToDefects({ onNew, onUpdate, onDelete });
     const unsubWS = connectWebSocket({ onNew, onUpdate, onDelete });
 
-    return () => { unsubSupa(); unsubWS(); };
+    const pollId = setInterval(() => setRefreshTick(t => t + 1), 5_000);
+
+    return () => { unsubSupa(); unsubWS(); clearInterval(pollId); };
   }, [authChecked]);
 
   function handleLogout() {

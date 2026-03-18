@@ -4,15 +4,12 @@
 .env.development
 .env.staging
 .env.*
-!.env.example
-!.env.production.example
 *.env
 
 # Frontend specific
 Frontend/.env
 Frontend/.env.local
 Frontend/.env.*
-!Frontend/.env.example
 
 # Native app
 native-glass/.env

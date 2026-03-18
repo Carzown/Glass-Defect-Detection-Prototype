@@ -20,11 +20,9 @@ npm-debug.log
 .env.*.local
 
 # Project files not needed in Docker
-QtApp/
 .github/
 *.md
 README.md
-railway.json
 DATABASE_SETUP.sql
 
 # Keep frontend and backend source code, but exclude their node_modules

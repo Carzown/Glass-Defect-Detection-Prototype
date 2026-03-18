@@ -212,17 +212,19 @@ class DefectDetectorApp:
 
         self.defect_tree = ttk.Treeview(
             tree_container,
-            columns=("num", "defects", "time"),
+            columns=("num", "defects", "date", "time"),
             show="headings",
             style="Defects.Treeview"
         )
 
         self.defect_tree.heading("num", text="#")
         self.defect_tree.heading("defects", text="Defects")
+        self.defect_tree.heading("date", text="Date")
         self.defect_tree.heading("time", text="Time")
 
         self.defect_tree.column("num", width=35, anchor="center", stretch=False)
         self.defect_tree.column("defects", width=160, anchor="w")
+        self.defect_tree.column("date", width=85, anchor="center", stretch=False)
         self.defect_tree.column("time", width=75, anchor="center", stretch=False)
 
         scrollbar = ttk.Scrollbar(tree_container, orient=tk.VERTICAL,
@@ -446,12 +448,14 @@ class DefectDetectorApp:
 
         self.defect_count += 1
 
-        timestamp = datetime.now().strftime("%I:%M %p")
+        now = datetime.now()
+        datestamp = now.strftime("%m/%d/%Y")
+        timestamp = now.strftime("%I:%M %p")
 
         self.defect_tree.insert(
             "",
             tk.END,
-            values=(self.defect_count, defects_label, timestamp)
+            values=(self.defect_count, defects_label, datestamp, timestamp)
         )
 
         children = self.defect_tree.get_children()
