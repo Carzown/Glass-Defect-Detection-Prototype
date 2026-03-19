@@ -152,7 +152,7 @@ function Dashboard() {
     const pollId = setInterval(() => {
       loadLastDetection();
       setRefreshTick(t => t + 1);
-    }, 30_000);
+    }, 5_000);
     const onNew = (newDefect) => {
       setLastDetectionTime(newDefect.detected_at);
       if (timeFilterRef.current === 'today') {
@@ -177,10 +177,13 @@ function Dashboard() {
     if (!authChecked) return;
     
     let cancelled = false;
+    const isBackgroundPoll = refreshTick > 0;
     async function load() {
-      setLoading(true);
-      setDashSelectedSession(null);
-      setDashSelectedDefect(null);
+      if (!isBackgroundPoll) {
+        setLoading(true);
+        setDashSelectedSession(null);
+        setDashSelectedDefect(null);
+      }
       try {
         let data;
         if (timeFilter === 'custom-range') {
@@ -206,7 +209,7 @@ function Dashboard() {
           setFilteredDefects([]);
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && !isBackgroundPoll) setLoading(false);
       }
     }
     load();
